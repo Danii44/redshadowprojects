@@ -93,6 +93,23 @@ create index if not exists idx_tasks_project_due on public.tasks(project_id,due_
 create index if not exists idx_notifications_user_unread on public.notifications(user_id,read_at);
 create index if not exists idx_activity_project_created on public.activity_logs(project_id,created_at desc);
 
+-- A delivered project can become active again when a client requests changes.
+-- `revision` is intentionally separate from `active` and `completed` so the
+-- dashboard never presents reopened work as a finished project.
+create or replace function public.reopen_completed_project_for_revision()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  update public.projects
+     set status = 'revision', last_activity_at = now(), updated_at = now()
+   where id = new.project_id and status = 'completed';
+  return new;
+end;
+$$;
+drop trigger if exists revisions_reopen_completed_project on public.revisions;
+create trigger revisions_reopen_completed_project
+after insert on public.revisions
+for each row execute function public.reopen_completed_project_for_revision();
+
 create or replace function public.current_profile() returns public.users language sql stable security definer set search_path=public as
 $$ select * from public.users where auth_user_id=auth.uid() and active limit 1 $$;
 create or replace function public.is_admin() returns boolean language sql stable security definer set search_path=public as
