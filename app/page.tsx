@@ -588,27 +588,26 @@ function Dashboard({
       detail: `${task.project} · ${task.state}`,
       action: "View task",
     }));
-  const workload = Array.from(
-    tasks.reduce(
-      (map, task) => {
-        const owner = task.owner || "Unassigned";
-        const current = map.get(owner) ?? {
-          name: owner,
-          initials: task.initials || "TM",
-          count: 0,
-          blocked: false,
-        };
-        current.count += 1;
-        if (task.state === "Blocked") current.blocked = true;
-        map.set(owner, current);
-        return map;
-      },
-      new Map<
-        string,
-        { name: string; initials: string; count: number; blocked: boolean }
-      >(),
-    ).values(),
-  ).slice(0, 5);
+  type WorkloadMember = {
+    name: string;
+    initials: string;
+    count: number;
+    blocked: boolean;
+  };
+  const workloadByOwner = new Map<string, WorkloadMember>();
+  tasks.forEach((task) => {
+    const owner = task.owner || "Unassigned";
+    const current = workloadByOwner.get(owner) ?? {
+      name: owner,
+      initials: task.initials || "TM",
+      count: 0,
+      blocked: false,
+    };
+    current.count += 1;
+    if (task.state === "Blocked") current.blocked = true;
+    workloadByOwner.set(owner, current);
+  });
+  const workload: WorkloadMember[] = [...workloadByOwner.values()].slice(0, 5);
   return (
     <>
       <section className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
