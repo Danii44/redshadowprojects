@@ -206,10 +206,13 @@ drop policy if exists activity_access on public.activity_logs; create policy act
 
 -- Initial editable staff. Add email/auth_user_id after inviting each person in Supabase Authentication.
 insert into public.users(name,role) values
- ('Daniyal Ahmad','admin'), ('Ahmad Shujaat','project_leader'),
- ('Team Member 1','team_member'), ('Team Member 2','team_member'),
- ('Team Member 3','team_member'), ('Team Member 4','team_member')
+ ('Daniyal Ahmad','admin'), ('Ahmad Shujaat','project_leader')
 on conflict do nothing;
+
+-- Remove the original evaluation-only placeholder profiles.
+delete from public.users
+where auth_user_id is null
+  and name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4');
 
 do $$
 declare
@@ -217,12 +220,12 @@ declare
 begin
   select id into admin_id from public.users where name='Daniyal Ahmad' limit 1;
   select id into leader_id from public.users where name='Ahmad Shujaat' limit 1;
-  select id into member_id from public.users where name='Team Member 1' limit 1;
+  member_id := leader_id;
   if not exists(select 1 from public.projects where code='RSD-2408') then
     insert into public.projects(code,name,client,description,requirements,internal_notes,status,priority,leader_id,deadline)
     values('RSD-2408','Atlas Tow Dolly','Northstar Mobility','Tow-dolly mechanical design and production package','Resolve chassis geometry and hitch clearance before client review.','Confirm manufacturability before releasing drawings.','active','critical',leader_id,now()+interval '7 days')
     returning id into v_project_id;
-    insert into public.project_members(project_id,user_id,project_role) values(v_project_id,leader_id,'Project Leader'),(v_project_id,member_id,'Mechanical Design');
+    insert into public.project_members(project_id,user_id,project_role) values(v_project_id,leader_id,'Project Leader');
     insert into public.project_phases(project_id,name,position,state,started_at) values
       (v_project_id,'Requirements',1,'completed',now()-interval '20 days'),
       (v_project_id,'Concept',2,'completed',now()-interval '14 days'),
