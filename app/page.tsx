@@ -1360,11 +1360,17 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
   const createMember = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!supabase) return;
-    const { data, error } = await supabase.from("users").insert({ ...memberForm, active: true }).select().single();
-    if (error) return notify(error.message);
-    setMembers((items) => [...items, data]);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session?.access_token}` },
+      body: JSON.stringify(memberForm),
+    });
+    const result = await response.json();
+    if (!response.ok) return notify(result.error || "Could not create user");
     setMemberForm({ name: "", email: "", role: "team_member" });
-    notify("Member profile created");
+    notify("User created with temporary password #RSD2026");
+    window.location.reload();
   };
   const updateMember = async (id: string, changes: Record<string, unknown>) => {
     if (!supabase) return;
@@ -1403,7 +1409,7 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
             <select value={memberForm.role} onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select>
             <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-3">Create member profile</button>
           </form>
-          <p className="mb-4 text-xs text-slate-400">After creating a profile, invite the same email from Supabase Authentication. It will link automatically.</p>
+          <p className="mb-4 text-xs text-slate-400">New users can sign in immediately with temporary password #RSD2026. Ask them to change it after first login.</p>
           <div className="space-y-2">{members.map((member) => <div key={member.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-40 flex-1"><p className="font-bold">{member.name}</p><p className="text-xs text-slate-500">{member.email || "Email not set"}</p></div><select value={member.role} onChange={(e) => updateMember(member.id, { role: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select><button onClick={() => updateMember(member.id, { active: !member.active })} className={`rounded-lg px-3 py-2 text-xs font-bold ${member.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{member.active ? "Active" : "Inactive"}</button></div>)}</div>
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
