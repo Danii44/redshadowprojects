@@ -239,13 +239,13 @@ export default function Home() {
       ),
     );
     if (supabase && typeof id === "string") {
-      const databaseState = nextState.toLowerCase().replace(" ", "_");
+      const databaseState = nextState.toLowerCase().replaceAll(" ", "_");
       const { error } = await supabase
         .from("tasks")
         .update({
           status: databaseState,
-          submitted_at: databaseState === "review" ? new Date().toISOString() : null,
-          reviewed_at: databaseState === "done" ? new Date().toISOString() : null,
+          submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
+          reviewed_at: databaseState === "completed" ? new Date().toISOString() : null,
         })
         .eq("id", id);
       if (error) {
@@ -357,12 +357,10 @@ export default function Home() {
                   .join("")
                   .slice(0, 2)
                   .toUpperCase(),
-                state:
-                  task.status === "in_progress"
-                    ? "In Progress"
-                    : task.status === "todo"
-                      ? "To Do"
-                      : task.status.charAt(0).toUpperCase() + task.status.slice(1),
+                state: task.status
+                  .split("_")
+                  .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
+                  .join(" "),
                 due: task.due_at
                   ? new Date(task.due_at).toLocaleDateString()
                   : "No deadline",
@@ -591,11 +589,11 @@ function Dashboard({
     (project) => !["completed", "archived"].includes(project.status),
   );
   const liveAttention = tasks
-    .filter((task) => task.state === "Blocked" || task.state === "Review")
+    .filter((task) => task.state === "In Review" || task.state === "In Revision")
     .slice(0, role === "Team Member" ? 2 : 4)
     .map((task) => ({
-      level: task.state === "Blocked" ? "Critical" : "Warning",
-      icon: task.state === "Blocked" ? CircleAlert : FileClock,
+      level: task.state === "In Revision" ? "Critical" : "Warning",
+      icon: task.state === "In Revision" ? CircleAlert : FileClock,
       title: task.title,
       detail: `${task.project} · ${task.state}`,
       action: "View task",
@@ -616,7 +614,7 @@ function Dashboard({
       blocked: false,
     };
     current.count += 1;
-    if (task.state === "Blocked") current.blocked = true;
+        if (task.state === "In Revision") current.blocked = true;
     workloadByOwner.set(owner, current);
   });
   const workload: WorkloadMember[] = [...workloadByOwner.values()].slice(0, 5);
@@ -655,10 +653,10 @@ function Dashboard({
             role === "Admin" ? "Total projects" : "My active projects",
             "blue",
           ],
-          [String(tasks.filter((task) => task.state === "Review").length), "In review", "purple"],
+          [String(tasks.filter((task) => task.state === "In Review").length), "In review", "purple"],
           [String(projects.filter((project) => project.phase === "Client Review").length), "Waiting on client", "amber"],
-          [String(tasks.filter((task) => task.state === "Blocked").length), "Blocked tasks", "red"],
-          [String(tasks.filter((task) => task.state !== "Done").length), "Open tasks", "green"],
+          [String(tasks.filter((task) => task.state === "In Revision").length), "In revision", "red"],
+          [String(tasks.filter((task) => !["Closed", "Cancelled", "Completed"].includes(task.state)).length), "Open tasks", "green"],
         ].map(([n, l, c]) => (
           <div
             key={l}
@@ -1086,9 +1084,22 @@ function TasksView({
   kanban: boolean;
   updateTask: (id: string | number, state: string) => void;
 }) {
-  const cols = ["To Do", "In Progress", "Review", "Blocked", "Done"];
+  const cols = [
+    "Open",
+    "In Progress",
+    "In Review",
+    "In Revision",
+    "Closed",
+    "Cancelled",
+    "Completed",
+  ];
   const [creating, setCreating] = useState(false);
-  const [taskForm, setTaskForm] = useState({ title: "", projectId: "", assigneeId: "" });
+  const [taskForm, setTaskForm] = useState({
+    title: "",
+    projectId: "",
+    assigneeId: "",
+    deadline: "",
+  });
   const createTask = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!supabase) return;
@@ -1097,14 +1108,14 @@ function TasksView({
       project_id: taskForm.projectId,
       assignee_id: taskForm.assigneeId || null,
       created_by: profileId,
-      status: "todo",
+      status: "open",
       priority: "normal",
+      due_at: new Date(`${taskForm.deadline}T17:00:00`).toISOString(),
     });
     if (error) return window.alert(error.message);
     window.location.reload();
   };
-  const canEdit = (task: any) =>
-    role !== "Team Member" || task.assignee_id === profileId;
+  const canEdit = () => role === "Admin" || role === "Project Leader";
   if (kanban)
     return (
       <>
@@ -1121,7 +1132,7 @@ function TasksView({
               {tasks
                 .filter((t) => t.state === c)
                 .map((t) => (
-                  <TaskCard key={t.id} t={t} updateTask={updateTask} editable={canEdit(t)} />
+                  <TaskCard key={t.id} t={t} updateTask={updateTask} editable={canEdit()} />
                 ))}
             </div>
           ))}
@@ -1135,11 +1146,12 @@ function TasksView({
         {role !== "Team Member" && <button onClick={() => setCreating(!creating)} className="rounded-xl bg-[#e3292f] px-4 py-2.5 text-sm font-bold text-white">{creating ? "Cancel" : "+ New task"}</button>}
       </div>
       {creating && (
-        <form onSubmit={createTask} className="mb-5 grid gap-3 rounded-2xl border border-red-100 bg-white p-5 md:grid-cols-3">
+        <form onSubmit={createTask} className="mb-5 grid gap-3 rounded-2xl border border-red-100 bg-white p-5 md:grid-cols-4">
           <input required placeholder="Task title" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
           <select required value={taskForm.projectId} onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
           <select value={taskForm.assigneeId} onChange={(e) => setTaskForm({ ...taskForm, assigneeId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Unassigned</option>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
-          <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white md:col-span-3">Create task</button>
+          <input required type="date" aria-label="Task deadline" value={taskForm.deadline} onChange={(e) => setTaskForm({ ...taskForm, deadline: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+          <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white md:col-span-4">Create task</button>
         </form>
       )}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -1152,10 +1164,10 @@ function TasksView({
               <div className="flex-1">
                 <p className="font-bold">{t.title}</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  {t.project} · {t.checklist} checklist
+                  {t.project} · Assigned to {t.owner}
                 </p>
               </div>
-              <select disabled={!canEdit(t)} value={t.state} onChange={(e) => updateTask(t.id, e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400">
+              <select disabled={!canEdit()} value={t.state} onChange={(e) => updateTask(t.id, e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400">
                 {cols.map((state) => <option key={state} value={state}>{state}</option>)}
               </select>
               <span
@@ -1186,6 +1198,9 @@ function TaskCard({
     <div className="mb-3 w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm">
       <p className="text-sm font-bold leading-5">{t.title}</p>
       <p className="mt-2 text-xs text-slate-400">{t.project}</p>
+      <p className="mt-1 text-xs font-semibold text-slate-500">
+        {t.owner} · Due {t.due}
+      </p>
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs font-bold text-slate-500">
           ☑ {t.checklist}
@@ -1196,7 +1211,7 @@ function TaskCard({
       </div>
       {editable && (
         <select value={t.state} onChange={(e) => updateTask(t.id, e.target.value)} className="mt-3 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-bold">
-          {["To Do", "In Progress", "Review", "Blocked", "Done"].map((state) => <option key={state}>{state}</option>)}
+          {["Open", "In Progress", "In Review", "In Revision", "Closed", "Cancelled", "Completed"].map((state) => <option key={state}>{state}</option>)}
         </select>
       )}
     </div>
