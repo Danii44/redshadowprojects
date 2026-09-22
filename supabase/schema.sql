@@ -210,6 +210,10 @@ insert into public.users(name,role) values
 on conflict do nothing;
 
 -- Remove the original evaluation-only placeholder profiles.
+update public.tasks set assignee_id=null where assignee_id in (select id from public.users where name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4'));
+update public.tasks set reviewer_id=null where reviewer_id in (select id from public.users where name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4'));
+delete from public.team_members where user_id in (select id from public.users where name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4'));
+delete from public.project_members where user_id in (select id from public.users where name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4'));
 delete from public.users
 where auth_user_id is null
   and name in ('Team Member 1','Team Member 2','Team Member 3','Team Member 4');
