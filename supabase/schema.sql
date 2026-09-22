@@ -1,276 +1,831 @@
--- Red Shadow Designs — Supabase schema
--- Run once in Supabase > SQL Editor. Safe to re-run.
-create extension if not exists pgcrypto;
+-- ============================================================
+-- RED SHADOW DESIGNS
+-- CLEAN DATABASE SCHEMA
+--
+-- NO USERS
+-- NO PROJECTS
+-- NO SAMPLE DATA
+-- ============================================================
 
-do $$ begin create type public.app_role as enum ('admin','project_leader','team_member'); exception when duplicate_object then null; end $$;
-do $$ begin create type public.task_state as enum ('todo','in_progress','review','blocked','done'); exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'open'; exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'in_review'; exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'in_revision'; exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'closed'; exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'cancelled'; exception when duplicate_object then null; end $$;
-do $$ begin alter type public.task_state add value if not exists 'completed'; exception when duplicate_object then null; end $$;
-do $$ begin create type public.alert_level as enum ('critical','warning','information'); exception when duplicate_object then null; end $$;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
-create table if not exists public.users (
-  id uuid primary key default gen_random_uuid(),
-  auth_user_id uuid unique references auth.users(id) on delete set null,
-  email text unique,
-  name text not null,
-  role public.app_role not null default 'team_member',
-  avatar_url text,
-  active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+
+-- ============================================================
+-- ENUMS
+-- ============================================================
+
+CREATE TYPE public.app_role AS ENUM (
+    'admin',
+    'project_leader',
+    'team_member'
 );
-create table if not exists public.projects (
-  id uuid primary key default gen_random_uuid(), code text unique not null, name text not null,
-  client text, description text, requirements text, internal_notes text,
-  status text not null default 'active', priority text not null default 'normal',
-  leader_id uuid not null references public.users(id), deadline timestamptz,
-  last_activity_at timestamptz default now(), archived_at timestamptz,
-  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+
+CREATE TYPE public.alert_level AS ENUM (
+    'critical',
+    'warning',
+    'information'
 );
-alter table public.projects alter column client drop not null;
-create table if not exists public.project_members (
-  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade, project_role text,
-  created_at timestamptz not null default now(), unique(project_id,user_id)
+
+
+-- ============================================================
+-- USERS
+-- Application profile linked to Supabase Authentication
+-- ============================================================
+
+CREATE TABLE public.users (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    auth_user_id uuid UNIQUE
+        REFERENCES auth.users(id)
+        ON DELETE SET NULL,
+
+    email text UNIQUE,
+    name text NOT NULL,
+
+    role public.app_role NOT NULL DEFAULT 'team_member',
+
+    avatar_url text,
+
+    active boolean NOT NULL DEFAULT true,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
-create table if not exists public.teams (
-  id uuid primary key default gen_random_uuid(), name text unique not null,
-  leader_id uuid references public.users(id) on delete set null,
-  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+
+
+-- ============================================================
+-- TEAMS
+-- ============================================================
+
+CREATE TABLE public.teams (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    name text UNIQUE NOT NULL,
+
+    leader_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
-create table if not exists public.team_members (
-  id uuid primary key default gen_random_uuid(), team_id uuid not null references public.teams(id) on delete cascade,
-  user_id uuid not null references public.users(id) on delete cascade,
-  created_at timestamptz not null default now(), unique(team_id,user_id)
+
+
+CREATE TABLE public.team_members (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    team_id uuid NOT NULL
+        REFERENCES public.teams(id)
+        ON DELETE CASCADE,
+
+    user_id uuid NOT NULL
+        REFERENCES public.users(id)
+        ON DELETE CASCADE,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE(team_id, user_id)
 );
-create table if not exists public.project_phases (
-  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
-  name text not null, position integer not null, state text not null default 'upcoming',
-  started_at timestamptz, completed_at timestamptz, created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(), unique(project_id,position)
+
+
+-- ============================================================
+-- PROJECTS
+-- ============================================================
+
+CREATE TABLE public.projects (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    code text UNIQUE NOT NULL,
+    name text NOT NULL,
+
+    client text,
+
+    description text,
+    requirements text,
+    internal_notes text,
+
+    -- active / in_review / on_hold /
+    -- revision / completed / cancelled
+    status text NOT NULL DEFAULT 'active',
+
+    -- none / low / normal / high / critical
+    priority text NOT NULL DEFAULT 'normal',
+
+    -- NULL means unassigned
+    leader_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    start_date date,
+    deadline date,
+
+    completion_percentage integer NOT NULL DEFAULT 0
+        CHECK (
+            completion_percentage >= 0
+            AND completion_percentage <= 100
+        ),
+
+    last_activity_at timestamptz DEFAULT now(),
+
+    archived_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
-create table if not exists public.project_phase_history (
-  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
-  from_phase_id uuid references public.project_phases(id), to_phase_id uuid not null references public.project_phases(id),
-  requested_by uuid not null references public.users(id), approved_by uuid references public.users(id),
-  state text not null default 'requested', note text, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+
+
+-- ============================================================
+-- PROJECT MEMBERS
+-- Multiple people can work on one project
+-- ============================================================
+
+CREATE TABLE public.project_members (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    project_id uuid NOT NULL
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    user_id uuid NOT NULL
+        REFERENCES public.users(id)
+        ON DELETE CASCADE,
+
+    project_role text,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE(project_id, user_id)
 );
-create table if not exists public.tasks (
-  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
-  phase_id uuid references public.project_phases(id) on delete set null, title text not null, description text,
-  assignee_id uuid references public.users(id), created_by uuid not null references public.users(id),
-  reviewer_id uuid references public.users(id), status text not null default 'open',
-  priority text not null default 'normal', due_at timestamptz, blocked_reason text, blocked_at timestamptz,
-  submitted_at timestamptz, reviewed_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+
+
+-- ============================================================
+-- PROJECT PHASES
+-- ============================================================
+
+CREATE TABLE public.project_phases (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    project_id uuid NOT NULL
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    name text NOT NULL,
+
+    position integer NOT NULL,
+
+    -- upcoming / active / review / revision / completed
+    state text NOT NULL DEFAULT 'upcoming',
+
+    started_at timestamptz,
+    completed_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE(project_id, position)
 );
-create table if not exists public.task_checklists (
-  id uuid primary key default gen_random_uuid(), task_id uuid not null references public.tasks(id) on delete cascade,
-  label text not null, position integer not null, completed boolean not null default false,
-  completed_by uuid references public.users(id), completed_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+
+
+-- ============================================================
+-- PHASE HISTORY
+-- Keeps history when project moves between phases
+-- ============================================================
+
+CREATE TABLE public.project_phase_history (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    project_id uuid NOT NULL
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    from_phase_id uuid
+        REFERENCES public.project_phases(id)
+        ON DELETE SET NULL,
+
+    to_phase_id uuid NOT NULL
+        REFERENCES public.project_phases(id)
+        ON DELETE CASCADE,
+
+    requested_by uuid NOT NULL
+        REFERENCES public.users(id),
+
+    approved_by uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    state text NOT NULL DEFAULT 'requested',
+
+    note text,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
 );
-create or replace function public.update_assigned_task_status(task_id uuid, new_status text)
-returns public.tasks language plpgsql security definer set search_path=public as $$
-declare
-  updated_task public.tasks;
-begin
-  if new_status not in ('open','in_progress','in_review','in_revision','closed','cancelled','completed') then
-    raise exception 'Invalid task status';
-  end if;
-  update public.tasks as task
-     set status = new_status,
-         submitted_at = case when new_status = 'in_review' then now() else task.submitted_at end,
-         reviewed_at = case when new_status = 'completed' then now() else task.reviewed_at end,
-         updated_at = now()
-   where task.id = public.update_assigned_task_status.task_id
-     and task.assignee_id = (select id from public.current_profile());
-  if not found then
-    raise exception 'You can only update tasks assigned to you';
-  end if;
-  select * into updated_task from public.tasks where id = public.update_assigned_task_status.task_id;
-  return updated_task;
-end;
+
+
+-- ============================================================
+-- TASKS
+-- ============================================================
+
+CREATE TABLE public.tasks (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    project_id uuid NOT NULL
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    phase_id uuid
+        REFERENCES public.project_phases(id)
+        ON DELETE SET NULL,
+
+    title text NOT NULL,
+    description text,
+
+    assignee_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    created_by uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    reviewer_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    -- open / in_progress / in_review /
+    -- in_revision / completed / cancelled
+    status text NOT NULL DEFAULT 'open',
+
+    priority text NOT NULL DEFAULT 'normal',
+
+    start_date date,
+    due_date date,
+
+    completion_percentage integer NOT NULL DEFAULT 0
+        CHECK (
+            completion_percentage >= 0
+            AND completion_percentage <= 100
+        ),
+
+    blocked_reason text,
+    blocked_at timestamptz,
+
+    submitted_at timestamptz,
+    reviewed_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- TASK CHECKLIST
+-- ============================================================
+
+CREATE TABLE public.task_checklists (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    task_id uuid NOT NULL
+        REFERENCES public.tasks(id)
+        ON DELETE CASCADE,
+
+    label text NOT NULL,
+
+    position integer NOT NULL,
+
+    completed boolean NOT NULL DEFAULT false,
+
+    completed_by uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    completed_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE(task_id, position)
+);
+
+
+-- ============================================================
+-- TASK COMMENTS
+-- ============================================================
+
+CREATE TABLE public.task_comments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    task_id uuid NOT NULL
+        REFERENCES public.tasks(id)
+        ON DELETE CASCADE,
+
+    author_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    body text NOT NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- REVISIONS
+-- ============================================================
+
+CREATE TABLE public.revisions (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    project_id uuid NOT NULL
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    phase_id uuid
+        REFERENCES public.project_phases(id)
+        ON DELETE SET NULL,
+
+    number integer NOT NULL,
+
+    notes text,
+
+    state text NOT NULL DEFAULT 'open',
+
+    submitted_by uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    submitted_at timestamptz,
+
+    reviewed_by uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    reviewed_at timestamptz,
+
+    review_outcome text,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+
+    UNIQUE(project_id, number)
+);
+
+
+-- ============================================================
+-- REVISION COMMENTS
+-- ============================================================
+
+CREATE TABLE public.revision_comments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    revision_id uuid NOT NULL
+        REFERENCES public.revisions(id)
+        ON DELETE CASCADE,
+
+    author_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    body text NOT NULL,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- DAILY UPDATES
+-- ============================================================
+
+CREATE TABLE public.daily_updates (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    user_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    project_id uuid
+        REFERENCES public.projects(id)
+        ON DELETE SET NULL,
+
+    summary text NOT NULL,
+
+    blockers text,
+    next_steps text,
+
+    update_date date NOT NULL DEFAULT current_date,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- NOTIFICATIONS
+-- ============================================================
+
+CREATE TABLE public.notifications (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    user_id uuid NOT NULL
+        REFERENCES public.users(id)
+        ON DELETE CASCADE,
+
+    type text NOT NULL,
+
+    severity public.alert_level NOT NULL
+        DEFAULT 'information',
+
+    title text NOT NULL,
+    body text,
+
+    entity_type text,
+    entity_id uuid,
+
+    read_at timestamptz,
+
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- ACTIVITY LOGS
+-- ============================================================
+
+CREATE TABLE public.activity_logs (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+
+    actor_id uuid
+        REFERENCES public.users(id)
+        ON DELETE SET NULL,
+
+    project_id uuid
+        REFERENCES public.projects(id)
+        ON DELETE CASCADE,
+
+    action text NOT NULL,
+
+    entity_type text NOT NULL,
+    entity_id uuid,
+
+    metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+
+    created_at timestamptz NOT NULL DEFAULT now()
+);
+
+
+-- ============================================================
+-- INDEXES
+-- ============================================================
+
+CREATE INDEX idx_projects_leader_status
+ON public.projects(leader_id, status);
+
+CREATE INDEX idx_projects_status
+ON public.projects(status);
+
+CREATE INDEX idx_projects_start_date
+ON public.projects(start_date);
+
+CREATE INDEX idx_projects_deadline
+ON public.projects(deadline);
+
+CREATE INDEX idx_project_members_user
+ON public.project_members(user_id);
+
+CREATE INDEX idx_project_members_project
+ON public.project_members(project_id);
+
+CREATE INDEX idx_tasks_project
+ON public.tasks(project_id);
+
+CREATE INDEX idx_tasks_assignee_status
+ON public.tasks(assignee_id, status);
+
+CREATE INDEX idx_tasks_due_date
+ON public.tasks(due_date);
+
+CREATE INDEX idx_notifications_user_unread
+ON public.notifications(user_id, read_at);
+
+CREATE INDEX idx_activity_project_created
+ON public.activity_logs(project_id, created_at DESC);
+
+
+-- ============================================================
+-- AUTH USER -> PUBLIC PROFILE
+--
+-- IMPORTANT:
+-- This does NOT create any user now.
+-- It only runs later when a Supabase Auth user is created.
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.handle_new_auth_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+
+    INSERT INTO public.users (
+        auth_user_id,
+        email,
+        name,
+        role,
+        active
+    )
+    VALUES (
+        NEW.id,
+        NEW.email,
+
+        COALESCE(
+            NEW.raw_user_meta_data->>'display_name',
+            NEW.raw_user_meta_data->>'full_name',
+            NEW.raw_user_meta_data->>'name',
+            split_part(NEW.email, '@', 1)
+        ),
+
+        'team_member',
+        true
+    )
+
+    ON CONFLICT (email)
+    DO UPDATE SET
+
+        auth_user_id = EXCLUDED.auth_user_id,
+
+        name = COALESCE(
+            NEW.raw_user_meta_data->>'display_name',
+            NEW.raw_user_meta_data->>'full_name',
+            NEW.raw_user_meta_data->>'name',
+            public.users.name
+        ),
+
+        active = true,
+        updated_at = now();
+
+    RETURN NEW;
+
+END;
 $$;
-grant execute on function public.update_assigned_task_status(uuid,text) to authenticated;
-drop trigger if exists tasks_notify_assignee on public.tasks;
-alter table public.tasks alter column status drop default;
-alter table public.tasks alter column status type text using status::text;
-alter table public.tasks alter column status set default 'open';
-update public.tasks set status = case status
-  when 'todo' then 'open'
-  when 'review' then 'in_review'
-  when 'blocked' then 'in_revision'
-  when 'done' then 'completed'
-  else status
-end where status in ('todo','review','blocked','done');
-create table if not exists public.task_comments (
-  id uuid primary key default gen_random_uuid(), task_id uuid not null references public.tasks(id) on delete cascade,
-  author_id uuid not null references public.users(id), body text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
-);
-create table if not exists public.revisions (
-  id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
-  phase_id uuid not null references public.project_phases(id) on delete cascade, number integer not null,
-  notes text, state text not null default 'open', submitted_by uuid references public.users(id), submitted_at timestamptz,
-  reviewed_by uuid references public.users(id), reviewed_at timestamptz, review_outcome text,
-  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(phase_id,number)
-);
-create table if not exists public.revision_comments (
-  id uuid primary key default gen_random_uuid(), revision_id uuid not null references public.revisions(id) on delete cascade,
-  author_id uuid not null references public.users(id), body text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
-);
-create table if not exists public.daily_updates (
-  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.users(id),
-  project_id uuid references public.projects(id) on delete set null, summary text not null, blockers text, next_steps text,
-  update_date date not null default current_date, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
-);
-create table if not exists public.notifications (
-  id uuid primary key default gen_random_uuid(), user_id uuid not null references public.users(id) on delete cascade,
-  type text not null, severity public.alert_level not null, title text not null, body text,
-  entity_type text, entity_id uuid, read_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
-);
-create table if not exists public.activity_logs (
-  id uuid primary key default gen_random_uuid(), actor_id uuid references public.users(id) on delete set null,
-  project_id uuid references public.projects(id) on delete cascade, action text not null, entity_type text not null,
-  entity_id uuid, metadata jsonb not null default '{}', created_at timestamptz not null default now()
-);
 
-create index if not exists idx_projects_leader_status on public.projects(leader_id,status);
-create index if not exists idx_project_members_user on public.project_members(user_id);
-create index if not exists idx_tasks_assignee_status on public.tasks(assignee_id,status);
-create index if not exists idx_tasks_project_due on public.tasks(project_id,due_at);
-create index if not exists idx_notifications_user_unread on public.notifications(user_id,read_at);
-create index if not exists idx_activity_project_created on public.activity_logs(project_id,created_at desc);
 
--- Keep assignees informed when work is assigned or moves through the workflow.
-create or replace function public.notify_task_changes()
-returns trigger language plpgsql security definer set search_path=public as $$
-declare
-  project_name text;
-begin
-  if new.assignee_id is null then
-    return new;
-  end if;
-  select name into project_name from public.projects where id=new.project_id;
-  if tg_op = 'INSERT' then
-    insert into public.notifications(user_id,type,severity,title,body,entity_type,entity_id)
-    values(new.assignee_id,'task_assigned','information','New task assigned',
-      coalesce(new.title,'A task') || coalesce(' in ' || project_name,''),
-      'task',new.id);
-  elsif old.assignee_id is distinct from new.assignee_id then
-    insert into public.notifications(user_id,type,severity,title,body,entity_type,entity_id)
-    values(new.assignee_id,'task_assigned','information','New task assigned',
-      coalesce(new.title,'A task') || coalesce(' in ' || project_name,''),
-      'task',new.id);
-  elsif old.status is distinct from new.status then
-    insert into public.notifications(user_id,type,severity,title,body,entity_type,entity_id)
-    values(new.assignee_id,'task_status_changed','information','Task status updated',
-      coalesce(new.title,'A task') || ' is now ' || replace(new.status,'_',' '),
-      'task',new.id);
-  end if;
-  return new;
-end;
+CREATE TRIGGER on_auth_user_created
+AFTER INSERT ON auth.users
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_new_auth_user();
+
+
+-- ============================================================
+-- CURRENT LOGGED-IN PROFILE
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.current_profile()
+RETURNS public.users
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+
+    SELECT *
+    FROM public.users
+
+    WHERE auth_user_id = auth.uid()
+      AND active = true
+
+    LIMIT 1;
+
 $$;
-drop trigger if exists tasks_notify_assignee on public.tasks;
-create trigger tasks_notify_assignee
-after insert or update of assignee_id,status on public.tasks
-for each row execute function public.notify_task_changes();
 
--- A delivered project can become active again when a client requests changes.
--- `revision` is intentionally separate from `active` and `completed` so the
--- dashboard never presents reopened work as a finished project.
-create or replace function public.reopen_completed_project_for_revision()
-returns trigger language plpgsql security definer set search_path=public as $$
-begin
-  update public.projects
-     set status = 'revision', last_activity_at = now(), updated_at = now()
-   where id = new.project_id and status = 'completed';
-  return new;
-end;
+
+-- ============================================================
+-- ADMIN CHECK
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+
+    SELECT COALESCE(
+        (
+            SELECT role = 'admin'
+            FROM public.users
+
+            WHERE auth_user_id = auth.uid()
+              AND active = true
+
+            LIMIT 1
+        ),
+        false
+    );
+
 $$;
-drop trigger if exists revisions_reopen_completed_project on public.revisions;
-create trigger revisions_reopen_completed_project
-after insert on public.revisions
-for each row execute function public.reopen_completed_project_for_revision();
 
--- When an invited person accepts a Supabase Auth invitation, connect the
--- account to the member profile the Admin already created with that email.
-create or replace function public.link_auth_user_to_profile()
-returns trigger language plpgsql security definer set search_path=public as $$
-begin
-  update public.users
-     set auth_user_id = new.id, updated_at = now()
-   where lower(email) = lower(new.email) and auth_user_id is null;
-  if not found then
-    insert into public.users(auth_user_id,email,name,role)
-    values(new.id,new.email,coalesce(new.raw_user_meta_data->>'name',split_part(new.email,'@',1)),'team_member')
-    on conflict (email) do update set auth_user_id=excluded.auth_user_id, updated_at=now();
-  end if;
-  return new;
-end;
+
+-- ============================================================
+-- PROJECT ACCESS CHECK
+-- ============================================================
+
+CREATE OR REPLACE FUNCTION public.can_access_project(pid uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+
+    SELECT
+
+        public.is_admin()
+
+        OR EXISTS (
+
+            SELECT 1
+
+            FROM public.projects p
+
+            JOIN public.users u
+                ON u.auth_user_id = auth.uid()
+
+            WHERE p.id = pid
+              AND p.leader_id = u.id
+              AND u.active = true
+        )
+
+        OR EXISTS (
+
+            SELECT 1
+
+            FROM public.project_members pm
+
+            JOIN public.users u
+                ON u.id = pm.user_id
+
+            WHERE pm.project_id = pid
+              AND u.auth_user_id = auth.uid()
+              AND u.active = true
+        )
+
+        OR EXISTS (
+
+            SELECT 1
+
+            FROM public.tasks t
+
+            JOIN public.users u
+                ON u.id = t.assignee_id
+
+            WHERE t.project_id = pid
+              AND u.auth_user_id = auth.uid()
+              AND u.active = true
+        );
+
 $$;
-drop trigger if exists auth_user_links_company_profile on auth.users;
-create trigger auth_user_links_company_profile
-after insert on auth.users
-for each row execute function public.link_auth_user_to_profile();
 
-create or replace function public.current_profile() returns public.users language sql stable security definer set search_path=public as
-$$ select * from public.users where auth_user_id=auth.uid() and active limit 1 $$;
-create or replace function public.is_admin() returns boolean language sql stable security definer set search_path=public as
-$$ select coalesce((select role='admin' from public.users where auth_user_id=auth.uid() and active),false) $$;
-create or replace function public.can_access_project(pid uuid) returns boolean language sql stable security definer set search_path=public as
-$$ select public.is_admin() or exists(select 1 from public.projects p join public.users u on u.auth_user_id=auth.uid() where p.id=pid and p.leader_id=u.id)
-  or exists(select 1 from public.project_members pm join public.users u on u.auth_user_id=auth.uid() where pm.project_id=pid and pm.user_id=u.id)
-  or exists(select 1 from public.tasks t join public.users u on u.auth_user_id=auth.uid() where t.project_id=pid and t.assignee_id=u.id) $$;
 
-alter table public.users enable row level security; alter table public.projects enable row level security;
-alter table public.teams enable row level security; alter table public.team_members enable row level security;
-alter table public.project_members enable row level security; alter table public.project_phases enable row level security;
-alter table public.project_phase_history enable row level security; alter table public.tasks enable row level security;
-alter table public.task_checklists enable row level security; alter table public.task_comments enable row level security;
-alter table public.revisions enable row level security; alter table public.revision_comments enable row level security;
-alter table public.daily_updates enable row level security; alter table public.notifications enable row level security;
-alter table public.activity_logs enable row level security;
+-- ============================================================
+-- ENABLE ROW LEVEL SECURITY
+-- ============================================================
 
-drop policy if exists users_read on public.users; create policy users_read on public.users for select to authenticated using (true);
-drop policy if exists users_admin_write on public.users; create policy users_admin_write on public.users for all to authenticated using (public.is_admin()) with check (public.is_admin());
-drop policy if exists teams_read on public.teams; create policy teams_read on public.teams for select to authenticated using (true);
-drop policy if exists teams_admin_manage on public.teams; create policy teams_admin_manage on public.teams for all to authenticated using (public.is_admin()) with check (public.is_admin());
-drop policy if exists team_members_read on public.team_members; create policy team_members_read on public.team_members for select to authenticated using (true);
-drop policy if exists team_members_admin_manage on public.team_members; create policy team_members_admin_manage on public.team_members for all to authenticated using (public.is_admin()) with check (public.is_admin());
-drop policy if exists projects_read on public.projects; create policy projects_read on public.projects for select to authenticated using (public.can_access_project(id));
-drop policy if exists projects_admin_write on public.projects; create policy projects_admin_write on public.projects for all to authenticated using (public.is_admin()) with check (public.is_admin());
-drop policy if exists projects_leader_update on public.projects; create policy projects_leader_update on public.projects for update to authenticated using (leader_id=(select id from public.current_profile())) with check (leader_id=(select id from public.current_profile()));
-drop policy if exists members_access on public.project_members; create policy members_access on public.project_members for select to authenticated using (public.can_access_project(project_id));
-drop policy if exists members_manage on public.project_members; create policy members_manage on public.project_members for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
-drop policy if exists phases_access on public.project_phases; create policy phases_access on public.project_phases for select to authenticated using (public.can_access_project(project_id));
-drop policy if exists phases_manage on public.project_phases; create policy phases_manage on public.project_phases for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
-drop policy if exists tasks_read on public.tasks; create policy tasks_read on public.tasks for select to authenticated using (
-  public.is_admin()
-  or assignee_id=(select id from public.current_profile())
-  or exists(
-    select 1 from public.projects p
-    where p.id=project_id
-      and p.leader_id=(select id from public.current_profile())
-  )
+ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_phases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.project_phase_history ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.task_checklists ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.task_comments ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.revisions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.revision_comments ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE public.daily_updates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.activity_logs ENABLE ROW LEVEL SECURITY;
+
+
+-- ============================================================
+-- BASIC RLS POLICIES
+-- ============================================================
+
+-- All authenticated employees can see employee directory.
+CREATE POLICY users_read
+ON public.users
+FOR SELECT
+TO authenticated
+USING (true);
+
+
+-- Only admins manage profiles.
+CREATE POLICY users_admin_manage
+ON public.users
+FOR ALL
+TO authenticated
+USING (public.is_admin())
+WITH CHECK (public.is_admin());
+
+
+-- Admins see all projects.
+-- Leaders/members/assignees see projects they participate in.
+CREATE POLICY projects_read
+ON public.projects
+FOR SELECT
+TO authenticated
+USING (
+    public.can_access_project(id)
 );
-drop policy if exists tasks_manage on public.tasks; create policy tasks_manage on public.tasks for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
-drop policy if exists notifications_own on public.notifications; create policy notifications_own on public.notifications for all to authenticated using (user_id=(select id from public.current_profile()) or public.is_admin()) with check (user_id=(select id from public.current_profile()) or public.is_admin());
-drop policy if exists updates_access on public.daily_updates; create policy updates_access on public.daily_updates for select to authenticated using (project_id is null or public.can_access_project(project_id));
-drop policy if exists updates_own_write on public.daily_updates; create policy updates_own_write on public.daily_updates for all to authenticated using (user_id=(select id from public.current_profile()) or public.is_admin()) with check (user_id=(select id from public.current_profile()) or public.is_admin());
-
--- Child records inherit access from their project/task/revision.
-drop policy if exists checklist_access on public.task_checklists; create policy checklist_access on public.task_checklists for all to authenticated using (exists(select 1 from public.tasks t where t.id=task_id and public.can_access_project(t.project_id))) with check (exists(select 1 from public.tasks t where t.id=task_id and public.can_access_project(t.project_id)));
-drop policy if exists task_comments_access on public.task_comments; create policy task_comments_access on public.task_comments for all to authenticated using (exists(select 1 from public.tasks t where t.id=task_id and public.can_access_project(t.project_id))) with check (exists(select 1 from public.tasks t where t.id=task_id and public.can_access_project(t.project_id)));
-drop policy if exists revisions_read on public.revisions; create policy revisions_read on public.revisions for select to authenticated using (public.can_access_project(project_id));
-drop policy if exists revisions_manage on public.revisions; create policy revisions_manage on public.revisions for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
-drop policy if exists revision_comments_access on public.revision_comments; create policy revision_comments_access on public.revision_comments for all to authenticated using (exists(select 1 from public.revisions r where r.id=revision_id and public.can_access_project(r.project_id))) with check (exists(select 1 from public.revisions r where r.id=revision_id and public.can_access_project(r.project_id)));
-drop policy if exists phase_history_read on public.project_phase_history; create policy phase_history_read on public.project_phase_history for select to authenticated using (public.can_access_project(project_id));
-drop policy if exists phase_history_request on public.project_phase_history; create policy phase_history_request on public.project_phase_history for insert to authenticated with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
-drop policy if exists phase_history_approve on public.project_phase_history; create policy phase_history_approve on public.project_phase_history for update to authenticated using (public.is_admin()) with check (public.is_admin());
-drop policy if exists activity_access on public.activity_logs; create policy activity_access on public.activity_logs for select to authenticated using (project_id is null or public.can_access_project(project_id));
 
 
+-- Admin creates/deletes/manages projects.
+CREATE POLICY projects_admin_manage
+ON public.projects
+FOR ALL
+TO authenticated
+USING (
+    public.is_admin()
+)
+WITH CHECK (
+    public.is_admin()
+);
 
+
+-- Project leader can update own project.
+CREATE POLICY projects_leader_update
+ON public.projects
+FOR UPDATE
+TO authenticated
+USING (
+    leader_id = (
+        SELECT id
+        FROM public.current_profile()
+    )
+)
+WITH CHECK (
+    leader_id = (
+        SELECT id
+        FROM public.current_profile()
+    )
+);
+
+
+-- Project members.
+CREATE POLICY project_members_read
+ON public.project_members
+FOR SELECT
+TO authenticated
+USING (
+    public.can_access_project(project_id)
+);
+
+
+CREATE POLICY project_members_manage
+ON public.project_members
+FOR ALL
+TO authenticated
+USING (
+    public.is_admin()
+
+    OR EXISTS (
+        SELECT 1
+        FROM public.projects p
+
+        WHERE p.id = project_id
+
+        AND p.leader_id = (
+            SELECT id
+            FROM public.current_profile()
+        )
+    )
+)
+WITH CHECK (
+    public.is_admin()
+
+    OR EXISTS (
+        SELECT 1
+        FROM public.projects p
+
+        WHERE p.id = project_id
+
+        AND p.leader_id = (
+            SELECT id
+            FROM public.current_profile()
+        )
+    )
+);
+
+
+-- ============================================================
+-- FINISHED
+-- ============================================================
