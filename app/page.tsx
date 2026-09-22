@@ -1366,7 +1366,7 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session?.access_token}` },
       body: JSON.stringify(memberForm),
     });
-    const result = await response.json();
+    const result = (await response.json()) as { error?: string };
     if (!response.ok) return notify(result.error || "Could not create user");
     setMemberForm({ name: "", email: "", role: "team_member" });
     notify("User created with temporary password #RSD2026");
@@ -1387,7 +1387,7 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session?.access_token}` },
       body: JSON.stringify({ profileId: member.id }),
     });
-    const result = await response.json();
+    const result = (await response.json()) as { error?: string };
     if (!response.ok) return notify(result.error || "Could not remove member");
     setMembers((items) => items.filter((item) => item.id !== member.id));
     notify("Member access removed");
