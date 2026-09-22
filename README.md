@@ -22,7 +22,7 @@ Private internal project-management system for Red Shadow Designs.
 
 ## Vercel
 
-Import this repository into Vercel. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as environment variables. Do not expose the service-role key in the browser.
+Import this repository into Vercel. In **Project Settings → Environment Variables**, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` for Production, Preview, and Development, then redeploy. Vercel does not read deployment values from `.env.example`; that file is only a template. Do not expose the service-role key in the browser.
 
 Initial profiles: Daniyal Ahmad (Admin), Ahmad Shujaat (Project Leader), and four editable team-member placeholders.
 
