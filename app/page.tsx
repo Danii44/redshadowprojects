@@ -290,7 +290,7 @@ export default function Home() {
         await Promise.all([
           client
             .from("projects")
-            .select("*, project_phases(*), project_members(user_id)"),
+            .select("*, project_phases(*), project_members(user_id), revisions(number,state,created_at)"),
           client.from("tasks").select("*"),
           client.from("users").select("id,name"),
         ]);
@@ -312,7 +312,9 @@ export default function Home() {
             return {
               ...project,
               phase: phase?.name ?? "Requirements",
-              revision: "R1",
+              revision: project.revisions?.length
+                ? `R${Math.max(...project.revisions.map((item: any) => item.number))}`
+                : "No revision",
               leader: peopleById.get(project.leader_id) ?? "Unassigned",
               team: (project.project_members ?? []).map((member: any) =>
                 String(peopleById.get(member.user_id) ?? "TM")
@@ -573,6 +575,9 @@ function Dashboard({
   setView: (v: View) => void;
   notify: (s: string) => void;
 }) {
+  const activeProjects = projects.filter(
+    (project) => !["completed", "archived"].includes(project.status),
+  );
   const liveAttention = tasks
     .filter((task) => task.state === "Blocked" || task.state === "Review")
     .slice(0, role === "Team Member" ? 2 : 4)
@@ -625,16 +630,20 @@ function Dashboard({
           </h1>
           <p className="mt-2 text-slate-500">
             {role === "Admin"
-              ? `${projects.length} active projects are visible across the company.`
+              ? `${projects.length} total projects are visible across the company.`
               : role === "Project Leader"
-                ? "Two projects are moving; one decision is waiting on you."
-                : "Focus on the next right task. Your team can see your updates."}
+                ? `${activeProjects.length} projects you lead or work on are currently active.`
+                : `${activeProjects.length} assigned projects are currently active.`}
           </p>
         </div>
       </section>
       <section className="mb-7 grid grid-cols-2 gap-3 xl:grid-cols-5">
         {[
-          [String(projects.length), "Active projects", "blue"],
+          [
+            String(role === "Admin" ? projects.length : activeProjects.length),
+            role === "Admin" ? "Total projects" : "My active projects",
+            "blue",
+          ],
           [String(tasks.filter((task) => task.state === "Review").length), "In review", "purple"],
           [String(projects.filter((project) => project.phase === "Client Review").length), "Waiting on client", "amber"],
           [String(tasks.filter((task) => task.state === "Blocked").length), "Blocked tasks", "red"],
@@ -746,7 +755,9 @@ function Dashboard({
       <section className="mt-6 rounded-[22px] border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between p-5">
           <div>
-            <h2 className="font-black">Active projects</h2>
+            <h2 className="font-black">
+              {role === "Admin" ? "Company projects" : "My projects"}
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               Live phase, revision and delivery health
             </p>
@@ -779,10 +790,13 @@ function ProjectCard({ p, onClick }: { p: any; onClick: () => void }) {
     >
       <div className="mb-4 flex items-start justify-between">
         <span className="text-xs font-black text-slate-400">{p.code}</span>
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ background: p.color }}
-        />
+        <Pill color={p.status === "revision" ? "purple" : p.status === "completed" ? "green" : "blue"}>
+          {p.status === "revision"
+            ? "Revision reopened"
+            : p.status === "completed"
+              ? "Completed"
+              : "Active"}
+        </Pill>
       </div>
       <h3 className="font-black">{p.name}</h3>
       <p className="mt-1 text-sm text-slate-500">{p.client}</p>
@@ -913,6 +927,18 @@ function ProjectsView({
               <Info label="Deadline" value={selected.due} />
               <Info label="Revision" value={selected.revision + " · Active"} />
               <Info label="Priority" value={selected.priority} />
+            </div>
+            <div className="mt-4">
+              <Info
+                label="Project status"
+                value={
+                  selected.status === "revision"
+                    ? "Revision reopened"
+                    : selected.status === "completed"
+                      ? "Completed"
+                      : "Active"
+                }
+              />
             </div>
             <div className="mt-5 rounded-2xl bg-slate-50 p-5">
               <p className="text-xs font-black uppercase tracking-wider text-slate-400">
