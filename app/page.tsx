@@ -214,6 +214,8 @@ export default function Home() {
   const [liveProjects, setLiveProjects] = useState<any[]>([]);
   const [ready, setReady] = useState(false);
   const [userName, setUserName] = useState("Team member");
+  const [profileId, setProfileId] = useState("");
+  const [people, setPeople] = useState<any[]>([]);
   const [connectionError, setConnectionError] = useState("");
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
@@ -227,9 +229,8 @@ export default function Home() {
     setToast(s);
     setTimeout(() => setToast(""), 2400);
   };
-  const updateTask = async (id: string | number) => {
+  const updateTask = async (id: string | number, nextState: string) => {
     const current = tasks.find((task) => task.id === id);
-    const nextState = current?.state === "Review" ? "Done" : "Review";
     setTasks((v) =>
       v.map((t) =>
         t.id === id
@@ -238,8 +239,7 @@ export default function Home() {
       ),
     );
     if (supabase && typeof id === "string") {
-      const databaseState =
-        nextState === "Done" ? "done" : nextState === "Review" ? "review" : "in_progress";
+      const databaseState = nextState.toLowerCase().replace(" ", "_");
       const { error } = await supabase
         .from("tasks")
         .update({
@@ -258,7 +258,7 @@ export default function Home() {
         return;
       }
     }
-    notify("Task moved to review");
+    notify(`Task moved to ${nextState}`);
   };
   useEffect(() => {
     const client = supabase;
@@ -283,6 +283,7 @@ export default function Home() {
         return;
       }
       setUserName(profile.name);
+      setProfileId(profile.id);
       if (profile?.role === "project_leader") setRole("Project Leader");
       else if (profile?.role === "team_member") setRole("Team Member");
       else setRole("Admin");
@@ -292,12 +293,13 @@ export default function Home() {
             .from("projects")
             .select("*, project_phases(*), project_members(user_id), revisions(number,state,created_at)"),
           client.from("tasks").select("*"),
-          client.from("users").select("id,name"),
+          client.from("users").select("id,name,role"),
         ]);
       if (!mounted) return;
       const peopleById = new Map(
         (people ?? []).map((person: any) => [person.id, person.name]),
       );
+      setPeople(people ?? []);
       if (projectRows?.length) {
         const projectById = new Map(
           projectRows.map((project: any) => [project.id, project.name]),
@@ -526,11 +528,21 @@ export default function Home() {
             />
           )}{" "}
           {view === "Projects" && (
-            <ProjectsView projects={filtered} notify={notify} />
+            <ProjectsView
+              projects={filtered}
+              role={role}
+              people={people}
+              profileId={profileId}
+              notify={notify}
+            />
           )}{" "}
           {(view === "Tasks" || view === "Kanban") && (
             <TasksView
               tasks={vt}
+              projects={vp}
+              people={people}
+              profileId={profileId}
+              role={role}
               kanban={view === "Kanban"}
               updateTask={updateTask}
             />
@@ -824,16 +836,102 @@ function ProjectCard({ p, onClick }: { p: any; onClick: () => void }) {
 }
 function ProjectsView({
   projects,
+  role,
+  people,
+  profileId,
   notify,
 }: {
   projects: any[];
+  role: Role;
+  people: any[];
+  profileId: string;
   notify: (s: string) => void;
 }) {
   const [selected, setSelected] = useState(projects[0]);
+  const [creating, setCreating] = useState(false);
+  const [projectForm, setProjectForm] = useState({
+    name: "",
+    code: "",
+    client: "",
+    leaderId: "",
+  });
+  const changeStatus = async (status: string) => {
+    if (!supabase || !selected) return;
+    const { error } = await supabase
+      .from("projects")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", selected.id);
+    if (error) return notify(error.message);
+    setSelected({ ...selected, status });
+    notify("Project status updated");
+  };
+  const createProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const leaderId = projectForm.leaderId || profileId;
+    const { data, error } = await supabase
+      .from("projects")
+      .insert({
+        name: projectForm.name,
+        code: projectForm.code,
+        client: projectForm.client,
+        leader_id: leaderId,
+        status: "active",
+        priority: "normal",
+      })
+      .select("id")
+      .single();
+    if (error) return notify(error.message);
+    await supabase.from("project_members").insert({
+      project_id: data.id,
+      user_id: leaderId,
+      project_role: "Project Leader",
+    });
+    await supabase.from("project_phases").insert(
+      ["Requirements", "Concept", "Detailed Design", "Client Review", "Final"].map(
+        (name, index) => ({
+          project_id: data.id,
+          name,
+          position: index + 1,
+          state: index === 0 ? "active" : "upcoming",
+          started_at: index === 0 ? new Date().toISOString() : null,
+        }),
+      ),
+    );
+    notify("Project created");
+    window.location.reload();
+  };
+  const deleteProject = async () => {
+    if (!supabase || !selected || role !== "Admin") return;
+    if (!window.confirm(`Delete ${selected.name}? This cannot be undone.`)) return;
+    const { error } = await supabase.from("projects").delete().eq("id", selected.id);
+    if (error) return notify(error.message);
+    notify("Project deleted");
+    window.location.reload();
+  };
   return (
     <>
       <p className="text-sm font-bold text-red-600">Portfolio</p>
-      <h1 className="mb-6 text-3xl font-black">Projects</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="text-3xl font-black">Projects</h1>
+        {role === "Admin" && (
+          <button onClick={() => setCreating(!creating)} className="rounded-xl bg-[#e3292f] px-4 py-2.5 text-sm font-bold text-white">
+            {creating ? "Cancel" : "+ New project"}
+          </button>
+        )}
+      </div>
+      {creating && (
+        <form onSubmit={createProject} className="mb-6 grid gap-3 rounded-2xl border border-red-100 bg-white p-5 shadow-sm md:grid-cols-4">
+          <input required placeholder="Project name" value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+          <input required placeholder="Code, e.g. RSD-2501" value={projectForm.code} onChange={(e) => setProjectForm({ ...projectForm, code: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+          <input required placeholder="Client" value={projectForm.client} onChange={(e) => setProjectForm({ ...projectForm, client: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+          <select required value={projectForm.leaderId} onChange={(e) => setProjectForm({ ...projectForm, leaderId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5">
+            <option value="">Select leader</option>
+            {people.filter((person) => person.role === "admin" || person.role === "project_leader").map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+          </select>
+          <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white md:col-span-4">Create project</button>
+        </form>
+      )}
       <div className="grid gap-6 xl:grid-cols-[.8fr_1.4fr]">
         <div className="space-y-3">
           {projects.map((p) => (
@@ -877,12 +975,18 @@ function ProjectsView({
                   {selected.client} · Led by {selected.leader}
                 </p>
               </div>
-              <button
-                onClick={() => notify("Project status updated")}
-                className="h-11 rounded-xl bg-slate-900 px-4 text-sm font-bold text-white"
-              >
-                Update status
-              </button>
+              {role !== "Team Member" && (
+                <div className="flex flex-wrap gap-2">
+                  <select value={selected.status} onChange={(e) => changeStatus(e.target.value)} className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold">
+                    <option value="active">Active</option>
+                    <option value="waiting_client">Waiting for client</option>
+                    <option value="revision">Revision reopened</option>
+                    <option value="completed">Completed</option>
+                    <option value="on_hold">On hold</option>
+                  </select>
+                  {role === "Admin" && <button onClick={deleteProject} className="h-11 rounded-xl border border-red-200 px-4 text-sm font-bold text-red-600">Delete</button>}
+                </div>
+              )}
             </div>
             <p className="mb-4 mt-7 text-xs font-black uppercase tracking-wider text-slate-400">
               Phase timeline
@@ -967,14 +1071,40 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 function TasksView({
   tasks,
+  projects,
+  people,
+  profileId,
+  role,
   kanban,
   updateTask,
 }: {
   tasks: any[];
+  projects: any[];
+  people: any[];
+  profileId: string;
+  role: Role;
   kanban: boolean;
-  updateTask: (id: string | number) => void;
+  updateTask: (id: string | number, state: string) => void;
 }) {
   const cols = ["To Do", "In Progress", "Review", "Blocked", "Done"];
+  const [creating, setCreating] = useState(false);
+  const [taskForm, setTaskForm] = useState({ title: "", projectId: "", assigneeId: "" });
+  const createTask = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const { error } = await supabase.from("tasks").insert({
+      title: taskForm.title,
+      project_id: taskForm.projectId,
+      assignee_id: taskForm.assigneeId || null,
+      created_by: profileId,
+      status: "todo",
+      priority: "normal",
+    });
+    if (error) return window.alert(error.message);
+    window.location.reload();
+  };
+  const canEdit = (task: any) =>
+    role !== "Team Member" || task.assignee_id === profileId;
   if (kanban)
     return (
       <>
@@ -991,7 +1121,7 @@ function TasksView({
               {tasks
                 .filter((t) => t.state === c)
                 .map((t) => (
-                  <TaskCard key={t.id} t={t} updateTask={updateTask} />
+                  <TaskCard key={t.id} t={t} updateTask={updateTask} editable={canEdit(t)} />
                 ))}
             </div>
           ))}
@@ -1000,7 +1130,18 @@ function TasksView({
     );
   return (
     <>
-      <h1 className="mb-6 text-3xl font-black">Tasks</h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <h1 className="text-3xl font-black">Tasks</h1>
+        {role !== "Team Member" && <button onClick={() => setCreating(!creating)} className="rounded-xl bg-[#e3292f] px-4 py-2.5 text-sm font-bold text-white">{creating ? "Cancel" : "+ New task"}</button>}
+      </div>
+      {creating && (
+        <form onSubmit={createTask} className="mb-5 grid gap-3 rounded-2xl border border-red-100 bg-white p-5 md:grid-cols-3">
+          <input required placeholder="Task title" value={taskForm.title} onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+          <select required value={taskForm.projectId} onChange={(e) => setTaskForm({ ...taskForm, projectId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</select>
+          <select value={taskForm.assigneeId} onChange={(e) => setTaskForm({ ...taskForm, assigneeId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Unassigned</option>{people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select>
+          <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white md:col-span-3">Create task</button>
+        </form>
+      )}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="divide-y divide-slate-100">
           {tasks.map((t) => (
@@ -1008,31 +1149,15 @@ function TasksView({
               key={t.id}
               className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
             >
-              <button
-                onClick={() => updateTask(t.id)}
-                className="grid h-6 w-6 place-items-center rounded-md border-2 border-slate-300"
-              >
-                <Check size={13} className="text-transparent" />
-              </button>
               <div className="flex-1">
                 <p className="font-bold">{t.title}</p>
                 <p className="mt-1 text-sm text-slate-500">
                   {t.project} · {t.checklist} checklist
                 </p>
               </div>
-              <Pill
-                color={
-                  t.state === "Blocked"
-                    ? "red"
-                    : t.state === "Review"
-                      ? "purple"
-                      : t.state === "In Progress"
-                        ? "blue"
-                        : "slate"
-                }
-              >
-                {t.state}
-              </Pill>
+              <select disabled={!canEdit(t)} value={t.state} onChange={(e) => updateTask(t.id, e.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-bold disabled:bg-slate-100 disabled:text-slate-400">
+                {cols.map((state) => <option key={state} value={state}>{state}</option>)}
+              </select>
               <span
                 className={`text-sm font-bold ${t.due.includes("overdue") ? "text-red-600" : "text-slate-500"}`}
               >
@@ -1051,15 +1176,14 @@ function TasksView({
 function TaskCard({
   t,
   updateTask,
+  editable,
 }: {
   t: any;
-  updateTask: (id: string | number) => void;
+  updateTask: (id: string | number, state: string) => void;
+  editable: boolean;
 }) {
   return (
-    <button
-      onClick={() => updateTask(t.id)}
-      className="mb-3 w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm"
-    >
+    <div className="mb-3 w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm">
       <p className="text-sm font-bold leading-5">{t.title}</p>
       <p className="mt-2 text-xs text-slate-400">{t.project}</p>
       <div className="mt-3 flex items-center justify-between">
@@ -1070,7 +1194,12 @@ function TaskCard({
           {t.initials}
         </span>
       </div>
-    </button>
+      {editable && (
+        <select value={t.state} onChange={(e) => updateTask(t.id, e.target.value)} className="mt-3 w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs font-bold">
+          {["To Do", "In Progress", "Review", "Blocked", "Done"].map((state) => <option key={state}>{state}</option>)}
+        </select>
+      )}
+    </div>
   );
 }
 function RevisionsView({ notify }: { notify: (s: string) => void }) {
