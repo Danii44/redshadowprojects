@@ -37,7 +37,7 @@ type View =
   | "Notifications"
   | "Activity"
   | "Settings";
-const demoProjects = [
+const projects = [
   {
     name: "Atlas Tow Dolly",
     code: "RSD-2408",
