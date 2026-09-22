@@ -216,24 +216,13 @@ function Pill({
 export default function Home() {
   const [role, setRole] = useState<Role>("Admin");
   const [view, setView] = useState<View>("Dashboard");
-  const [tasks, setTasks] = useState(seedTasks);
+  const [tasks, setTasks] = useState<any[]>(seedTasks);
+  const [liveProjects, setLiveProjects] = useState<any[]>(projects);
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
   const [query, setQuery] = useState("");
-  const vp =
-    role === "Project Leader"
-      ? projects.filter((p) => p.leader === "Danish R.")
-      : role === "Team Member"
-        ? projects.filter((p) => p.team.includes("SK"))
-        : projects;
-  const vt =
-    role === "Team Member"
-      ? tasks.filter((t) => t.initials === "SK")
-      : role === "Project Leader"
-        ? tasks.filter((t) =>
-            ["Atlas Tow Dolly", "Nova Assembly"].includes(t.project),
-          )
-        : tasks;
+  const vp = liveProjects;
+  const vt = tasks;
   const filtered = vp.filter((p) =>
     (p.name + p.client + p.code).toLowerCase().includes(query.toLowerCase()),
   );
@@ -241,14 +230,37 @@ export default function Home() {
     setToast(s);
     setTimeout(() => setToast(""), 2400);
   };
-  const updateTask = (id: number) => {
+  const updateTask = async (id: string | number) => {
+    const current = tasks.find((task) => task.id === id);
+    const nextState = current?.state === "Review" ? "Done" : "Review";
     setTasks((v) =>
       v.map((t) =>
         t.id === id
-          ? { ...t, state: t.state === "Review" ? "Done" : "Review" }
+          ? { ...t, state: nextState }
           : t,
       ),
     );
+    if (supabase && typeof id === "string") {
+      const databaseState =
+        nextState === "Done" ? "done" : nextState === "Review" ? "review" : "in_progress";
+      const { error } = await supabase
+        .from("tasks")
+        .update({
+          status: databaseState,
+          submitted_at: databaseState === "review" ? new Date().toISOString() : null,
+          reviewed_at: databaseState === "done" ? new Date().toISOString() : null,
+        })
+        .eq("id", id);
+      if (error) {
+        setTasks((v) =>
+          v.map((task) =>
+            task.id === id ? { ...task, state: current?.state } : task,
+          ),
+        );
+        notify("Could not save task update");
+        return;
+      }
+    }
     notify("Task moved to review");
   };
   useEffect(() => {
@@ -263,12 +275,94 @@ export default function Home() {
       }
       const { data: profile } = await client
         .from("users")
-        .select("role")
+        .select("id,role,name")
         .eq("auth_user_id", data.session.user.id)
         .single();
       if (profile?.role === "project_leader") setRole("Project Leader");
       else if (profile?.role === "team_member") setRole("Team Member");
       else setRole("Admin");
+      const [{ data: projectRows }, { data: taskRows }, { data: people }] =
+        await Promise.all([
+          client
+            .from("projects")
+            .select("*, project_phases(*), project_members(user_id)"),
+          client.from("tasks").select("*"),
+          client.from("users").select("id,name"),
+        ]);
+      if (!mounted) return;
+      const peopleById = new Map(
+        (people ?? []).map((person: any) => [person.id, person.name]),
+      );
+      if (projectRows?.length) {
+        const projectById = new Map(
+          projectRows.map((project: any) => [project.id, project.name]),
+        );
+        setLiveProjects(
+          projectRows.map((project: any) => {
+            const phase =
+              project.project_phases?.find((item: any) => item.state === "active") ??
+              project.project_phases?.sort(
+                (a: any, b: any) => a.position - b.position,
+              )[0];
+            return {
+              ...project,
+              phase: phase?.name ?? "Requirements",
+              revision: "R1",
+              leader: peopleById.get(project.leader_id) ?? "Unassigned",
+              team: (project.project_members ?? []).map((member: any) =>
+                String(peopleById.get(member.user_id) ?? "TM")
+                  .split(" ")
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase(),
+              ),
+              due: project.deadline
+                ? new Date(project.deadline).toLocaleDateString()
+                : "No deadline",
+              priority:
+                project.priority?.charAt(0).toUpperCase() +
+                  project.priority?.slice(1) || "Normal",
+              color:
+                project.priority === "critical"
+                  ? "#ef4444"
+                  : project.priority === "high"
+                    ? "#f59e0b"
+                    : "#3b82f6",
+              note: project.requirements ?? project.description ?? "No requirements added",
+            };
+          }),
+        );
+        if (taskRows?.length) {
+          setTasks(
+            taskRows.map((task: any) => {
+              const owner = peopleById.get(task.assignee_id) ?? "Unassigned";
+              return {
+                ...task,
+                title: task.title,
+                project: projectById.get(task.project_id) ?? "Project",
+                owner,
+                initials: String(owner)
+                  .split(" ")
+                  .map((part) => part[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase(),
+                state:
+                  task.status === "in_progress"
+                    ? "In Progress"
+                    : task.status === "todo"
+                      ? "To Do"
+                      : task.status.charAt(0).toUpperCase() + task.status.slice(1),
+                due: task.due_at
+                  ? new Date(task.due_at).toLocaleDateString()
+                  : "No deadline",
+                checklist: "0/0",
+              };
+            }),
+          );
+        }
+      }
     });
     const { data: listener } = client.auth.onAuthStateChange(
       (_event, session) => {
@@ -791,7 +885,7 @@ function TasksView({
 }: {
   tasks: any[];
   kanban: boolean;
-  updateTask: (id: number) => void;
+  updateTask: (id: string | number) => void;
 }) {
   const cols = ["To Do", "In Progress", "Review", "Blocked", "Done"];
   if (kanban)
@@ -872,7 +966,7 @@ function TaskCard({
   updateTask,
 }: {
   t: any;
-  updateTask: (id: number) => void;
+  updateTask: (id: string | number) => void;
 }) {
   return (
     <button
