@@ -142,6 +142,31 @@ insert into public.users(name,role) values
  ('Team Member 3','team_member'), ('Team Member 4','team_member')
 on conflict do nothing;
 
+do $$
+declare
+  admin_id uuid; leader_id uuid; member_id uuid; v_project_id uuid; v_phase_id uuid;
+begin
+  select id into admin_id from public.users where name='Daniyal Ahmad' limit 1;
+  select id into leader_id from public.users where name='Ahmad Shujaat' limit 1;
+  select id into member_id from public.users where name='Team Member 1' limit 1;
+  if not exists(select 1 from public.projects where code='RSD-2408') then
+    insert into public.projects(code,name,client,description,requirements,internal_notes,status,priority,leader_id,deadline)
+    values('RSD-2408','Atlas Tow Dolly','Northstar Mobility','Tow-dolly mechanical design and production package','Resolve chassis geometry and hitch clearance before client review.','Confirm manufacturability before releasing drawings.','active','critical',leader_id,now()+interval '7 days')
+    returning id into v_project_id;
+    insert into public.project_members(project_id,user_id,project_role) values(v_project_id,leader_id,'Project Leader'),(v_project_id,member_id,'Mechanical Design');
+    insert into public.project_phases(project_id,name,position,state,started_at) values
+      (v_project_id,'Requirements',1,'completed',now()-interval '20 days'),
+      (v_project_id,'Concept',2,'completed',now()-interval '14 days'),
+      (v_project_id,'Detailed Design',3,'active',now()-interval '7 days'),
+      (v_project_id,'Client Review',4,'upcoming',null),
+      (v_project_id,'Final',5,'upcoming',null);
+    select id into v_phase_id from public.project_phases where project_id=v_project_id and name='Detailed Design' limit 1;
+    insert into public.tasks(project_id,phase_id,title,description,assignee_id,created_by,reviewer_id,status,priority,due_at,blocked_reason,blocked_at)
+    values(v_project_id,v_phase_id,'Resolve hitch clearance conflict','Verify clearance across the full articulation range.',member_id,leader_id,leader_id,'blocked','critical',now()+interval '1 day','Waiting for revised chassis dimensions.',now());
+    insert into public.revisions(project_id,phase_id,number,notes,state,submitted_by) values(v_project_id,v_phase_id,2,'Chassis geometry refinement','open',leader_id);
+  end if;
+end $$;
+
 -- Link an invited Supabase Auth account to one of the seeded profiles:
 -- update public.users set auth_user_id=(select id from auth.users where email='person@company.com'), email='person@company.com' where name='Daniyal Ahmad';
 
