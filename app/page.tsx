@@ -296,7 +296,7 @@ export default function Home() {
             .from("projects")
             .select("*, project_phases(*), project_members(user_id), revisions(number,state,created_at)"),
           client.from("tasks").select("*"),
-          client.from("users").select("id,name,email,role,active"),
+          client.from("users").select("id,name,email,role,active").eq("active", true),
           client.from("notifications").select("*").order("created_at", { ascending: false }),
         ]);
       if (!mounted) return;
@@ -509,7 +509,7 @@ export default function Home() {
               {role}
             </div>
             <button
-              onClick={() => setView("Tasks")}
+              onClick={() => setView("Notifications")}
               className="relative grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white"
               aria-label="Open tasks requiring attention"
             >
@@ -696,7 +696,7 @@ function Dashboard({
             {liveAttention.map((a) => (
               <button
                 key={a.title}
-                onClick={() => notify(a.action)}
+                onClick={() => setView("Tasks")}
                 className="flex w-full items-center gap-4 p-4 text-left hover:bg-slate-50 sm:p-5"
               >
                 <div
@@ -1379,6 +1379,19 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
     setMembers((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
     notify("Member updated");
   };
+  const removeMember = async (member: any) => {
+    if (!supabase || !window.confirm(`Remove ${member.name}'s login and company access?`)) return;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const response = await fetch("/api/admin/users", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session?.access_token}` },
+      body: JSON.stringify({ profileId: member.id }),
+    });
+    const result = await response.json();
+    if (!response.ok) return notify(result.error || "Could not remove member");
+    setMembers((items) => items.filter((item) => item.id !== member.id));
+    notify("Member access removed");
+  };
   const createTeam = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!supabase) return;
@@ -1396,6 +1409,21 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
     setTeamMembers((items) => [...items, data]);
     notify("Member added to team");
   };
+  const removeFromTeam = async (membership: any) => {
+    if (!supabase) return;
+    const { error } = await supabase.from("team_members").delete().eq("id", membership.id);
+    if (error) return notify(error.message);
+    setTeamMembers((items) => items.filter((item) => item.id !== membership.id));
+    notify("Member removed from team");
+  };
+  const deleteTeam = async (team: any) => {
+    if (!supabase || !window.confirm(`Delete team ${team.name}?`)) return;
+    const { error } = await supabase.from("teams").delete().eq("id", team.id);
+    if (error) return notify(error.message);
+    setTeams((items) => items.filter((item) => item.id !== team.id));
+    setTeamMembers((items) => items.filter((item) => item.team_id !== team.id));
+    notify("Team deleted");
+  };
   return (
     <>
       <h1 className="text-3xl font-black">Admin settings</h1>
@@ -1407,16 +1435,16 @@ function SettingsView({ people, notify }: { people: any[]; notify: (s: string) =
             <input required placeholder="Full name" value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
             <input required type="email" placeholder="Email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
             <select value={memberForm.role} onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select>
-            <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-3">Create member profile</button>
+            <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-3">Create user</button>
           </form>
           <p className="mb-4 text-xs text-slate-400">New users can sign in immediately with temporary password #RSD2026. Ask them to change it after first login.</p>
-          <div className="space-y-2">{members.map((member) => <div key={member.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-40 flex-1"><p className="font-bold">{member.name}</p><p className="text-xs text-slate-500">{member.email || "Email not set"}</p></div><select value={member.role} onChange={(e) => updateMember(member.id, { role: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select><button onClick={() => updateMember(member.id, { active: !member.active })} className={`rounded-lg px-3 py-2 text-xs font-bold ${member.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{member.active ? "Active" : "Inactive"}</button></div>)}</div>
+          <div className="space-y-2">{members.map((member) => <div key={member.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-40 flex-1"><p className="font-bold">{member.name}</p><p className="text-xs text-slate-500">{member.email || "Email not set"}</p></div><select value={member.role} onChange={(e) => updateMember(member.id, { role: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select><button onClick={() => updateMember(member.id, { active: !member.active })} className={`rounded-lg px-3 py-2 text-xs font-bold ${member.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{member.active ? "Active" : "Inactive"}</button>{!["Daniyal Ahmad", "Ahmad Shujaat"].includes(member.name) && <button onClick={() => removeMember(member)} className="rounded-lg bg-red-50 px-3 py-2 text-xs font-bold text-red-700">Remove</button>}</div>)}</div>
         </section>
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-lg font-black">Teams</h2>
           <form onSubmit={createTeam} className="my-5 grid gap-3 sm:grid-cols-2"><input required placeholder="Team name" value={teamForm.name} onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" /><select value={teamForm.leaderId} onChange={(e) => setTeamForm({ ...teamForm, leaderId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select team leader</option>{members.filter((member) => member.role !== "team_member").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-2">Create team</button></form>
           <form onSubmit={addTeamMember} className="mb-5 grid gap-3 sm:grid-cols-2"><select required value={assignment.teamId} onChange={(e) => setAssignment({ ...assignment, teamId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select><select required value={assignment.userId} onChange={(e) => setAssignment({ ...assignment, userId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select member</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><button className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold sm:col-span-2">Add member to team</button></form>
-          <div className="space-y-3">{teams.map((team) => <div key={team.id} className="rounded-xl border border-slate-200 p-4"><p className="font-black">{team.name}</p><p className="mt-1 text-xs text-slate-500">Leader: {members.find((member) => member.id === team.leader_id)?.name || "Not assigned"}</p><div className="mt-3 flex flex-wrap gap-2">{teamMembers.filter((item) => item.team_id === team.id).map((item) => <Pill key={item.id}>{members.find((member) => member.id === item.user_id)?.name || "Member"}</Pill>)}</div></div>)}</div>
+          <div className="space-y-3">{teams.map((team) => <div key={team.id} className="rounded-xl border border-slate-200 p-4"><div className="flex items-center justify-between gap-3"><p className="font-black">{team.name}</p><button onClick={() => deleteTeam(team)} className="text-xs font-bold text-red-600">Delete team</button></div><p className="mt-1 text-xs text-slate-500">Leader: {members.find((member) => member.id === team.leader_id)?.name || "Not assigned"}</p><div className="mt-3 flex flex-wrap gap-2">{teamMembers.filter((item) => item.team_id === team.id).map((item) => <button key={item.id} onClick={() => removeFromTeam(item)} title="Remove from team"><Pill>{members.find((member) => member.id === item.user_id)?.name || "Member"} ×</Pill></button>)}</div></div>)}</div>
         </section>
       </div>
     </>
