@@ -36,6 +36,16 @@ create table if not exists public.project_members (
   user_id uuid not null references public.users(id) on delete cascade, project_role text,
   created_at timestamptz not null default now(), unique(project_id,user_id)
 );
+create table if not exists public.teams (
+  id uuid primary key default gen_random_uuid(), name text unique not null,
+  leader_id uuid references public.users(id) on delete set null,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now()
+);
+create table if not exists public.team_members (
+  id uuid primary key default gen_random_uuid(), team_id uuid not null references public.teams(id) on delete cascade,
+  user_id uuid not null references public.users(id) on delete cascade,
+  created_at timestamptz not null default now(), unique(team_id,user_id)
+);
 create table if not exists public.project_phases (
   id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
   name text not null, position integer not null, state text not null default 'upcoming',
@@ -126,6 +136,27 @@ create trigger revisions_reopen_completed_project
 after insert on public.revisions
 for each row execute function public.reopen_completed_project_for_revision();
 
+-- When an invited person accepts a Supabase Auth invitation, connect the
+-- account to the member profile the Admin already created with that email.
+create or replace function public.link_auth_user_to_profile()
+returns trigger language plpgsql security definer set search_path=public as $$
+begin
+  update public.users
+     set auth_user_id = new.id, updated_at = now()
+   where lower(email) = lower(new.email) and auth_user_id is null;
+  if not found then
+    insert into public.users(auth_user_id,email,name,role)
+    values(new.id,new.email,coalesce(new.raw_user_meta_data->>'name',split_part(new.email,'@',1)),'team_member')
+    on conflict (email) do update set auth_user_id=excluded.auth_user_id, updated_at=now();
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists auth_user_links_company_profile on auth.users;
+create trigger auth_user_links_company_profile
+after insert on auth.users
+for each row execute function public.link_auth_user_to_profile();
+
 create or replace function public.current_profile() returns public.users language sql stable security definer set search_path=public as
 $$ select * from public.users where auth_user_id=auth.uid() and active limit 1 $$;
 create or replace function public.is_admin() returns boolean language sql stable security definer set search_path=public as
@@ -135,6 +166,7 @@ $$ select public.is_admin() or exists(select 1 from public.projects p join publi
    or exists(select 1 from public.project_members pm join public.users u on u.auth_user_id=auth.uid() where pm.project_id=pid and pm.user_id=u.id) $$;
 
 alter table public.users enable row level security; alter table public.projects enable row level security;
+alter table public.teams enable row level security; alter table public.team_members enable row level security;
 alter table public.project_members enable row level security; alter table public.project_phases enable row level security;
 alter table public.project_phase_history enable row level security; alter table public.tasks enable row level security;
 alter table public.task_checklists enable row level security; alter table public.task_comments enable row level security;
@@ -144,6 +176,10 @@ alter table public.activity_logs enable row level security;
 
 drop policy if exists users_read on public.users; create policy users_read on public.users for select to authenticated using (true);
 drop policy if exists users_admin_write on public.users; create policy users_admin_write on public.users for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists teams_read on public.teams; create policy teams_read on public.teams for select to authenticated using (true);
+drop policy if exists teams_admin_manage on public.teams; create policy teams_admin_manage on public.teams for all to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists team_members_read on public.team_members; create policy team_members_read on public.team_members for select to authenticated using (true);
+drop policy if exists team_members_admin_manage on public.team_members; create policy team_members_admin_manage on public.team_members for all to authenticated using (public.is_admin()) with check (public.is_admin());
 drop policy if exists projects_read on public.projects; create policy projects_read on public.projects for select to authenticated using (public.can_access_project(id));
 drop policy if exists projects_admin_write on public.projects; create policy projects_admin_write on public.projects for all to authenticated using (public.is_admin()) with check (public.is_admin());
 drop policy if exists projects_leader_update on public.projects; create policy projects_leader_update on public.projects for update to authenticated using (leader_id=(select id from public.current_profile())) with check (leader_id=(select id from public.current_profile()));
