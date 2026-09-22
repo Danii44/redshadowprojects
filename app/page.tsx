@@ -37,7 +37,7 @@ type View =
   | "Notifications"
   | "Activity"
   | "Settings";
-const projects = [
+const demoProjects = [
   {
     name: "Atlas Tow Dolly",
     code: "RSD-2408",
@@ -183,12 +183,6 @@ const nav: { label: View; icon: any; group?: boolean }[] = [
   { label: "Projects", icon: Command },
   { label: "Tasks", icon: ListTodo },
   { label: "Kanban", icon: Columns3 },
-  { label: "Revisions", icon: FileClock },
-  { label: "Calendar", icon: CalendarDays },
-  { label: "Team", icon: Users, group: true },
-  { label: "Notifications", icon: Bell },
-  { label: "Activity", icon: Activity },
-  { label: "Settings", icon: Settings },
 ];
 const tone: any = {
   red: "bg-red-50 text-red-700 ring-red-200",
@@ -216,8 +210,11 @@ function Pill({
 export default function Home() {
   const [role, setRole] = useState<Role>("Admin");
   const [view, setView] = useState<View>("Dashboard");
-  const [tasks, setTasks] = useState<any[]>(seedTasks);
-  const [liveProjects, setLiveProjects] = useState<any[]>(projects);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [liveProjects, setLiveProjects] = useState<any[]>([]);
+  const [ready, setReady] = useState(false);
+  const [userName, setUserName] = useState("Team member");
+  const [connectionError, setConnectionError] = useState("");
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
   const [query, setQuery] = useState("");
@@ -278,6 +275,14 @@ export default function Home() {
         .select("id,role,name")
         .eq("auth_user_id", data.session.user.id)
         .single();
+      if (!profile) {
+        setConnectionError(
+          "Your signed-in account is not linked to a company profile. Ask an administrator to link it in Supabase.",
+        );
+        setReady(true);
+        return;
+      }
+      setUserName(profile.name);
       if (profile?.role === "project_leader") setRole("Project Leader");
       else if (profile?.role === "team_member") setRole("Team Member");
       else setRole("Admin");
@@ -363,6 +368,7 @@ export default function Home() {
           );
         }
       }
+      setReady(true);
     });
     const { data: listener } = client.auth.onAuthStateChange(
       (_event, session) => {
@@ -374,6 +380,40 @@ export default function Home() {
       listener.subscription.unsubscribe();
     };
   }, []);
+  if (!supabase) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#111419] p-5 text-white">
+        <section className="w-full max-w-xl rounded-3xl border border-white/10 bg-white/5 p-8">
+          <div className="mb-6 grid h-12 w-12 place-items-center rounded-xl bg-[#e3292f] text-xl font-black">
+            R
+          </div>
+          <h1 className="text-2xl font-black">Supabase connection required</h1>
+          <p className="mt-3 leading-7 text-white/65">
+            This deployment is missing its Supabase environment variables. Add
+            NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+            in Vercel, then redeploy.
+          </p>
+        </section>
+      </main>
+    );
+  }
+  if (!ready) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#111419] text-white">
+        <p className="text-sm font-bold">Loading your workspace…</p>
+      </main>
+    );
+  }
+  if (connectionError) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#111419] p-5 text-white">
+        <section className="max-w-lg rounded-3xl border border-red-500/30 bg-red-500/10 p-8">
+          <h1 className="text-xl font-black">Account setup incomplete</h1>
+          <p className="mt-3 leading-7 text-white/70">{connectionError}</p>
+        </section>
+      </main>
+    );
+  }
   return (
     <div className="min-h-screen bg-[#f4f5f7] text-[#18202a]">
       <aside
@@ -430,7 +470,7 @@ export default function Home() {
               DR
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold">Danish Raza</p>
+              <p className="truncate text-sm font-bold">{userName}</p>
               <p className="text-xs text-white/40">{role}</p>
             </div>
             <ChevronDown className="ml-auto text-white/30" size={16} />
@@ -462,18 +502,14 @@ export default function Home() {
               {role}
             </div>
             <button
-              onClick={() => setView("Notifications")}
+              onClick={() => setView("Tasks")}
               className="relative grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white"
+              aria-label="Open tasks requiring attention"
             >
               <Bell size={19} />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
-            </button>
-            <button
-              onClick={() => notify("New project flow opened")}
-              className="hidden h-11 items-center gap-2 rounded-xl bg-[#e3292f] px-4 text-sm font-bold text-white shadow-lg shadow-red-200 sm:flex"
-            >
-              <Plus size={17} />
-              New project
+              {tasks.some((task) => task.state === "Blocked" || task.state === "Review") && (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
+              )}
             </button>
           </div>
         </header>
@@ -482,6 +518,7 @@ export default function Home() {
             <Dashboard
               role={role}
               projects={vp}
+              tasks={vt}
               setView={setView}
               notify={notify}
             />
@@ -526,21 +563,58 @@ export default function Home() {
 function Dashboard({
   role,
   projects,
+  tasks,
   setView,
   notify,
 }: {
   role: Role;
   projects: any[];
+  tasks: any[];
   setView: (v: View) => void;
   notify: (s: string) => void;
 }) {
+  const liveAttention = tasks
+    .filter((task) => task.state === "Blocked" || task.state === "Review")
+    .slice(0, role === "Team Member" ? 2 : 4)
+    .map((task) => ({
+      level: task.state === "Blocked" ? "Critical" : "Warning",
+      icon: task.state === "Blocked" ? CircleAlert : FileClock,
+      title: task.title,
+      detail: `${task.project} · ${task.state}`,
+      action: "View task",
+    }));
+  const workload = Array.from(
+    tasks.reduce(
+      (map, task) => {
+        const owner = task.owner || "Unassigned";
+        const current = map.get(owner) ?? {
+          name: owner,
+          initials: task.initials || "TM",
+          count: 0,
+          blocked: false,
+        };
+        current.count += 1;
+        if (task.state === "Blocked") current.blocked = true;
+        map.set(owner, current);
+        return map;
+      },
+      new Map<
+        string,
+        { name: string; initials: string; count: number; blocked: boolean }
+      >(),
+    ).values(),
+  ).slice(0, 5);
   return (
     <>
       <section className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <p className="mb-2 flex items-center gap-2 text-sm font-bold text-[#e3292f]">
             <Sparkles size={16} />
-            Monday · September 21
+            {new Intl.DateTimeFormat("en", {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            }).format(new Date())}
           </p>
           <h1 className="text-3xl font-black tracking-tight sm:text-4xl">
             {role === "Team Member"
@@ -551,26 +625,20 @@ function Dashboard({
           </h1>
           <p className="mt-2 text-slate-500">
             {role === "Admin"
-              ? "Four items need a decision today. Everything else is moving."
+              ? `${projects.length} active projects are visible across the company.`
               : role === "Project Leader"
                 ? "Two projects are moving; one decision is waiting on you."
                 : "Focus on the next right task. Your team can see your updates."}
           </p>
         </div>
-        <button
-          onClick={() => notify("Daily update saved")}
-          className="h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold shadow-sm"
-        >
-          Post daily update
-        </button>
       </section>
       <section className="mb-7 grid grid-cols-2 gap-3 xl:grid-cols-5">
         {[
-          [role === "Admin" ? "12" : "4", "Active projects", "blue"],
-          ["4", "In revision", "purple"],
-          ["3", "Waiting on client", "amber"],
-          ["2", "Overdue", "red"],
-          ["5", "Due this week", "green"],
+          [String(projects.length), "Active projects", "blue"],
+          [String(tasks.filter((task) => task.state === "Review").length), "In review", "purple"],
+          [String(projects.filter((project) => project.phase === "Client Review").length), "Waiting on client", "amber"],
+          [String(tasks.filter((task) => task.state === "Blocked").length), "Blocked tasks", "red"],
+          [String(tasks.filter((task) => task.state !== "Done").length), "Open tasks", "green"],
         ].map(([n, l, c]) => (
           <div
             key={l}
@@ -595,10 +663,12 @@ function Dashboard({
                 Ordered by urgency and business impact
               </p>
             </div>
-            <Pill color="red">4 open</Pill>
+            <Pill color={liveAttention.length ? "red" : "green"}>
+              {liveAttention.length} open
+            </Pill>
           </div>
           <div className="divide-y divide-slate-100">
-            {attention.slice(0, role === "Team Member" ? 2 : 4).map((a) => (
+            {liveAttention.map((a) => (
               <button
                 key={a.title}
                 onClick={() => notify(a.action)}
@@ -631,6 +701,11 @@ function Dashboard({
                 </span>
               </button>
             ))}
+            {!liveAttention.length && (
+              <div className="p-8 text-center text-sm font-semibold text-slate-500">
+                Nothing urgent right now.
+              </div>
+            )}
           </div>
         </section>
         <section className="rounded-[22px] bg-[#15181d] p-5 text-white shadow-xl">
@@ -640,32 +715,32 @@ function Dashboard({
           <h2 className="mb-5 mt-1 text-lg font-black">
             Today&apos;s workload
           </h2>
-          {[
-            ["Danish R.", "DR", "Reviewing", "3 tasks"],
-            ["Ali Raza", "AR", "Blocked", "4 tasks"],
-            ["Sara Khan", "SK", "Focused", "3 tasks"],
-            ["Usman M.", "UM", "Available", "2 tasks"],
-          ].map((m) => (
+          {workload.map((member) => (
             <div
-              key={m[0]}
+              key={member.name}
               className="mb-3 flex items-center gap-3 rounded-xl bg-white/[.06] p-3"
             >
               <div className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-xs font-black">
-                {m[1]}
+                {member.initials}
               </div>
               <div className="flex-1">
-                <p className="text-sm font-bold">{m[0]}</p>
+                <p className="text-sm font-bold">{member.name}</p>
                 <p
-                  className={`text-xs ${m[2] === "Blocked" ? "text-red-400" : "text-white/40"}`}
+                  className={`text-xs ${member.blocked ? "text-red-400" : "text-white/40"}`}
                 >
-                  {m[2]}
+                  {member.blocked ? "Blocked" : "Active"}
                 </p>
               </div>
               <span className="text-xs font-semibold text-white/40">
-                {m[3]}
+                {member.count} {member.count === 1 ? "task" : "tasks"}
               </span>
             </div>
           ))}
+          {!workload.length && (
+            <p className="rounded-xl bg-white/[.06] p-4 text-sm text-white/45">
+              Workload appears after tasks are assigned.
+            </p>
+          )}
         </section>
       </div>
       <section className="mt-6 rounded-[22px] border border-slate-200 bg-white shadow-sm">
