@@ -1,0 +1,30 @@
+import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server";
+
+export async function POST(request: Request) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !publicKey || !serviceKey) {
+    return NextResponse.json({ error: "Server user creation is not configured." }, { status: 503 });
+  }
+  const token = request.headers.get("authorization")?.replace("Bearer ", "");
+  if (!token) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
+  const publicClient = createClient(url, publicKey);
+  const { data: authData } = await publicClient.auth.getUser(token);
+  if (!authData.user) return NextResponse.json({ error: "Invalid session." }, { status: 401 });
+  const adminClient = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
+  const { data: profile } = await adminClient.from("users").select("role").eq("auth_user_id", authData.user.id).single();
+  if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+  const { name, email, role } = await request.json();
+  const { data, error } = await adminClient.auth.admin.createUser({
+    email,
+    password: "#RSD2026",
+    email_confirm: true,
+    user_metadata: { name, must_change_password: true },
+  });
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  await adminClient.from("users").update({ name, role, active: true }).eq("auth_user_id", data.user.id);
+  return NextResponse.json({ id: data.user.id });
+}
+
