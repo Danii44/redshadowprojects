@@ -458,21 +458,8 @@ export default function Home() {
             />
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden rounded-xl border border-slate-200 bg-white p-1 sm:flex">
-              {(["Admin", "Project Leader", "Team Member"] as Role[]).map(
-                (r) => (
-                  <button
-                    key={r}
-                    onClick={() => {
-                      setRole(r);
-                      setView("Dashboard");
-                    }}
-                    className={`rounded-lg px-3 py-2 text-xs font-bold ${role === r ? "bg-slate-900 text-white" : "text-slate-500"}`}
-                  >
-                    {r}
-                  </button>
-                ),
-              )}
+            <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 sm:block">
+              {role}
             </div>
             <button
               onClick={() => setView("Notifications")}
