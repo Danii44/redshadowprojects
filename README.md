@@ -25,3 +25,4 @@ Private internal project-management system for Red Shadow Designs.
 Import this repository into Vercel. Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` as environment variables. Do not expose the service-role key in the browser.
 
 Initial profiles: Daniyal Ahmad (Admin), Ahmad Shujaat (Project Leader), and four editable team-member placeholders.
+
