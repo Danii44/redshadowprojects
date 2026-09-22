@@ -183,6 +183,8 @@ const nav: { label: View; icon: any; group?: boolean }[] = [
   { label: "Projects", icon: Command },
   { label: "Tasks", icon: ListTodo },
   { label: "Kanban", icon: Columns3 },
+  { label: "Notifications", icon: Bell, group: true },
+  { label: "Settings", icon: Settings },
 ];
 const tone: any = {
   red: "bg-red-50 text-red-700 ring-red-200",
@@ -216,6 +218,7 @@ export default function Home() {
   const [userName, setUserName] = useState("Team member");
   const [profileId, setProfileId] = useState("");
   const [people, setPeople] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
   const [connectionError, setConnectionError] = useState("");
   const [menu, setMenu] = useState(false);
   const [toast, setToast] = useState("");
@@ -287,19 +290,21 @@ export default function Home() {
       if (profile?.role === "project_leader") setRole("Project Leader");
       else if (profile?.role === "team_member") setRole("Team Member");
       else setRole("Admin");
-      const [{ data: projectRows }, { data: taskRows }, { data: people }] =
+      const [{ data: projectRows }, { data: taskRows }, { data: people }, { data: notificationRows }] =
         await Promise.all([
           client
             .from("projects")
             .select("*, project_phases(*), project_members(user_id), revisions(number,state,created_at)"),
           client.from("tasks").select("*"),
-          client.from("users").select("id,name,role"),
+          client.from("users").select("id,name,email,role,active"),
+          client.from("notifications").select("*").order("created_at", { ascending: false }),
         ]);
       if (!mounted) return;
       const peopleById = new Map(
         (people ?? []).map((person: any) => [person.id, person.name]),
       );
       setPeople(people ?? []);
+      setNotifications(notificationRows ?? []);
       if (projectRows?.length) {
         const projectById = new Map(
           projectRows.map((project: any) => [project.id, project.name]),
@@ -440,7 +445,7 @@ export default function Home() {
             Workspace
           </p>
           <nav className="space-y-1">
-            {nav.map((n) => (
+            {nav.filter((n) => n.label !== "Settings" || role === "Admin").map((n) => (
               <div key={n.label}>
                 {n.group && (
                   <p className="mb-2 mt-6 px-3 text-[11px] font-bold uppercase tracking-[.16em] text-white/30">
@@ -458,7 +463,7 @@ export default function Home() {
                   {n.label}
                   {n.label === "Notifications" && (
                     <span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-[11px]">
-                      4
+                      {notifications.filter((item) => !item.read_at).length}
                     </span>
                   )}
                 </button>
@@ -546,7 +551,8 @@ export default function Home() {
             />
           )}{" "}
           {view === "Revisions" && <RevisionsView notify={notify} />}{" "}
-          {view === "Notifications" && <AttentionView notify={notify} />}{" "}
+          {view === "Notifications" && <NotificationsView notifications={notifications} setNotifications={setNotifications} notify={notify} />}{" "}
+          {view === "Settings" && role === "Admin" && <SettingsView people={people} notify={notify} />}{" "}
           {![
             "Dashboard",
             "Projects",
@@ -554,6 +560,7 @@ export default function Home() {
             "Kanban",
             "Revisions",
             "Notifications",
+            "Settings",
           ].includes(view) && <GenericView view={view} notify={notify} />}
         </div>
       </main>
@@ -1292,6 +1299,119 @@ function AttentionView({ notify }: { notify: (s: string) => void }) {
             </button>
           </div>
         ))}
+      </div>
+    </>
+  );
+}
+function NotificationsView({
+  notifications,
+  setNotifications,
+  notify,
+}: {
+  notifications: any[];
+  setNotifications: React.Dispatch<React.SetStateAction<any[]>>;
+  notify: (s: string) => void;
+}) {
+  const markRead = async (id: string) => {
+    if (!supabase) return;
+    const readAt = new Date().toISOString();
+    const { error } = await supabase.from("notifications").update({ read_at: readAt }).eq("id", id);
+    if (error) return notify(error.message);
+    setNotifications((items) => items.map((item) => item.id === id ? { ...item, read_at: readAt } : item));
+  };
+  return (
+    <>
+      <h1 className="mb-2 text-3xl font-black">Notifications</h1>
+      <p className="mb-6 text-slate-500">Your project alerts and required actions.</p>
+      <div className="max-w-4xl space-y-3">
+        {notifications.map((item) => (
+          <div key={item.id} className={`flex items-center gap-4 rounded-2xl border bg-white p-5 ${item.read_at ? "border-slate-200 opacity-70" : "border-red-200"}`}>
+            <CircleAlert className={item.severity === "critical" ? "text-red-600" : item.severity === "warning" ? "text-amber-500" : "text-blue-500"} />
+            <div className="flex-1">
+              <p className="font-black">{item.title}</p>
+              {item.body && <p className="mt-1 text-sm text-slate-500">{item.body}</p>}
+              <p className="mt-2 text-xs font-semibold text-slate-400">{new Date(item.created_at).toLocaleString()}</p>
+            </div>
+            {!item.read_at && <button onClick={() => markRead(item.id)} className="text-sm font-black text-red-600">Mark read</button>}
+          </div>
+        ))}
+        {!notifications.length && <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">No notifications yet.</div>}
+      </div>
+    </>
+  );
+}
+function SettingsView({ people, notify }: { people: any[]; notify: (s: string) => void }) {
+  const [members, setMembers] = useState(people);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [memberForm, setMemberForm] = useState({ name: "", email: "", role: "team_member" });
+  const [teamForm, setTeamForm] = useState({ name: "", leaderId: "" });
+  const [assignment, setAssignment] = useState({ teamId: "", userId: "" });
+  useEffect(() => {
+    if (!supabase) return;
+    Promise.all([
+      supabase.from("teams").select("*"),
+      supabase.from("team_members").select("*"),
+    ]).then(([teamResult, memberResult]) => {
+      setTeams(teamResult.data ?? []);
+      setTeamMembers(memberResult.data ?? []);
+    });
+  }, []);
+  const createMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const { data, error } = await supabase.from("users").insert({ ...memberForm, active: true }).select().single();
+    if (error) return notify(error.message);
+    setMembers((items) => [...items, data]);
+    setMemberForm({ name: "", email: "", role: "team_member" });
+    notify("Member profile created");
+  };
+  const updateMember = async (id: string, changes: Record<string, unknown>) => {
+    if (!supabase) return;
+    const { error } = await supabase.from("users").update(changes).eq("id", id);
+    if (error) return notify(error.message);
+    setMembers((items) => items.map((item) => item.id === id ? { ...item, ...changes } : item));
+    notify("Member updated");
+  };
+  const createTeam = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const { data, error } = await supabase.from("teams").insert({ name: teamForm.name, leader_id: teamForm.leaderId || null }).select().single();
+    if (error) return notify(error.message);
+    setTeams((items) => [...items, data]);
+    setTeamForm({ name: "", leaderId: "" });
+    notify("Team created");
+  };
+  const addTeamMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const { data, error } = await supabase.from("team_members").insert({ team_id: assignment.teamId, user_id: assignment.userId }).select().single();
+    if (error) return notify(error.message);
+    setTeamMembers((items) => [...items, data]);
+    notify("Member added to team");
+  };
+  return (
+    <>
+      <h1 className="text-3xl font-black">Admin settings</h1>
+      <p className="mb-7 mt-2 text-slate-500">Manage company members, access roles, and teams.</p>
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-black">Members and roles</h2>
+          <form onSubmit={createMember} className="my-5 grid gap-3 sm:grid-cols-3">
+            <input required placeholder="Full name" value={memberForm.name} onChange={(e) => setMemberForm({ ...memberForm, name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+            <input required type="email" placeholder="Email" value={memberForm.email} onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" />
+            <select value={memberForm.role} onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select>
+            <button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-3">Create member profile</button>
+          </form>
+          <p className="mb-4 text-xs text-slate-400">After creating a profile, invite the same email from Supabase Authentication. It will link automatically.</p>
+          <div className="space-y-2">{members.map((member) => <div key={member.id} className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-50 p-3"><div className="min-w-40 flex-1"><p className="font-bold">{member.name}</p><p className="text-xs text-slate-500">{member.email || "Email not set"}</p></div><select value={member.role} onChange={(e) => updateMember(member.id, { role: e.target.value })} className="rounded-lg border border-slate-200 bg-white px-2 py-2 text-xs font-bold"><option value="admin">Admin</option><option value="project_leader">Project Leader</option><option value="team_member">Team Member</option></select><button onClick={() => updateMember(member.id, { active: !member.active })} className={`rounded-lg px-3 py-2 text-xs font-bold ${member.active ? "bg-emerald-50 text-emerald-700" : "bg-slate-200 text-slate-600"}`}>{member.active ? "Active" : "Inactive"}</button></div>)}</div>
+        </section>
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="text-lg font-black">Teams</h2>
+          <form onSubmit={createTeam} className="my-5 grid gap-3 sm:grid-cols-2"><input required placeholder="Team name" value={teamForm.name} onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5" /><select value={teamForm.leaderId} onChange={(e) => setTeamForm({ ...teamForm, leaderId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select team leader</option>{members.filter((member) => member.role !== "team_member").map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white sm:col-span-2">Create team</button></form>
+          <form onSubmit={addTeamMember} className="mb-5 grid gap-3 sm:grid-cols-2"><select required value={assignment.teamId} onChange={(e) => setAssignment({ ...assignment, teamId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select team</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select><select required value={assignment.userId} onChange={(e) => setAssignment({ ...assignment, userId: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2.5"><option value="">Select member</option>{members.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</select><button className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold sm:col-span-2">Add member to team</button></form>
+          <div className="space-y-3">{teams.map((team) => <div key={team.id} className="rounded-xl border border-slate-200 p-4"><p className="font-black">{team.name}</p><p className="mt-1 text-xs text-slate-500">Leader: {members.find((member) => member.id === team.leader_id)?.name || "Not assigned"}</p><div className="mt-3 flex flex-wrap gap-2">{teamMembers.filter((item) => item.team_id === team.id).map((item) => <Pill key={item.id}>{members.find((member) => member.id === item.user_id)?.name || "Member"}</Pill>)}</div></div>)}</div>
+        </section>
       </div>
     </>
   );
