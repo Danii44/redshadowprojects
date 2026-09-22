@@ -1,6 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+type CreateUserBody = { name: string; email: string; role: "admin" | "project_leader" | "team_member" };
+type DeleteUserBody = { profileId: string };
+
 export async function POST(request: Request) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const publicKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
@@ -16,7 +19,7 @@ export async function POST(request: Request) {
   const adminClient = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: profile } = await adminClient.from("users").select("role").eq("auth_user_id", authData.user.id).single();
   if (profile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-  const { name, email, role } = await request.json();
+  const { name, email, role } = (await request.json()) as CreateUserBody;
   const { data, error } = await adminClient.auth.admin.createUser({
     email,
     password: "#RSD2026",
@@ -41,7 +44,7 @@ export async function DELETE(request: Request) {
   const adminClient = createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
   const { data: adminProfile } = await adminClient.from("users").select("role").eq("auth_user_id", authData.user.id).single();
   if (adminProfile?.role !== "admin") return NextResponse.json({ error: "Admin access required." }, { status: 403 });
-  const { profileId } = await request.json();
+  const { profileId } = (await request.json()) as DeleteUserBody;
   const { data: member } = await adminClient.from("users").select("id,name,auth_user_id").eq("id", profileId).single();
   if (!member) return NextResponse.json({ error: "Member not found." }, { status: 404 });
   if (["Daniyal Ahmad", "Ahmad Shujaat"].includes(member.name)) return NextResponse.json({ error: "Core company accounts cannot be removed." }, { status: 400 });
