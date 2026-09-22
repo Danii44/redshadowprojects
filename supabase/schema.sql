@@ -4,6 +4,12 @@ create extension if not exists pgcrypto;
 
 do $$ begin create type public.app_role as enum ('admin','project_leader','team_member'); exception when duplicate_object then null; end $$;
 do $$ begin create type public.task_state as enum ('todo','in_progress','review','blocked','done'); exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'open'; exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'in_review'; exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'in_revision'; exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'closed'; exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'cancelled'; exception when duplicate_object then null; end $$;
+do $$ begin alter type public.task_state add value if not exists 'completed'; exception when duplicate_object then null; end $$;
 do $$ begin create type public.alert_level as enum ('critical','warning','information'); exception when duplicate_object then null; end $$;
 
 create table if not exists public.users (
@@ -46,7 +52,7 @@ create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(), project_id uuid not null references public.projects(id) on delete cascade,
   phase_id uuid references public.project_phases(id) on delete set null, title text not null, description text,
   assignee_id uuid references public.users(id), created_by uuid not null references public.users(id),
-  reviewer_id uuid references public.users(id), status public.task_state not null default 'todo',
+  reviewer_id uuid references public.users(id), status text not null default 'open',
   priority text not null default 'normal', due_at timestamptz, blocked_reason text, blocked_at timestamptz,
   submitted_at timestamptz, reviewed_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
@@ -55,6 +61,16 @@ create table if not exists public.task_checklists (
   label text not null, position integer not null, completed boolean not null default false,
   completed_by uuid references public.users(id), completed_at timestamptz, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
 );
+alter table public.tasks alter column status drop default;
+alter table public.tasks alter column status type text using status::text;
+alter table public.tasks alter column status set default 'open';
+update public.tasks set status = case status
+  when 'todo' then 'open'
+  when 'review' then 'in_review'
+  when 'blocked' then 'in_revision'
+  when 'done' then 'completed'
+  else status
+end where status in ('todo','review','blocked','done');
 create table if not exists public.task_comments (
   id uuid primary key default gen_random_uuid(), task_id uuid not null references public.tasks(id) on delete cascade,
   author_id uuid not null references public.users(id), body text not null, created_at timestamptz not null default now(), updated_at timestamptz not null default now()
@@ -136,7 +152,7 @@ drop policy if exists members_manage on public.project_members; create policy me
 drop policy if exists phases_access on public.project_phases; create policy phases_access on public.project_phases for select to authenticated using (public.can_access_project(project_id));
 drop policy if exists phases_manage on public.project_phases; create policy phases_manage on public.project_phases for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
 drop policy if exists tasks_read on public.tasks; create policy tasks_read on public.tasks for select to authenticated using (public.can_access_project(project_id));
-drop policy if exists tasks_manage on public.tasks; create policy tasks_manage on public.tasks for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())) or assignee_id=(select id from public.current_profile())) with check (public.can_access_project(project_id));
+drop policy if exists tasks_manage on public.tasks; create policy tasks_manage on public.tasks for all to authenticated using (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile()))) with check (public.is_admin() or exists(select 1 from public.projects p where p.id=project_id and p.leader_id=(select id from public.current_profile())));
 drop policy if exists notifications_own on public.notifications; create policy notifications_own on public.notifications for all to authenticated using (user_id=(select id from public.current_profile()) or public.is_admin()) with check (user_id=(select id from public.current_profile()) or public.is_admin());
 drop policy if exists updates_access on public.daily_updates; create policy updates_access on public.daily_updates for select to authenticated using (project_id is null or public.can_access_project(project_id));
 drop policy if exists updates_own_write on public.daily_updates; create policy updates_own_write on public.daily_updates for all to authenticated using (user_id=(select id from public.current_profile()) or public.is_admin()) with check (user_id=(select id from public.current_profile()) or public.is_admin());
@@ -179,7 +195,7 @@ begin
       (v_project_id,'Final',5,'upcoming',null);
     select id into v_phase_id from public.project_phases where project_id=v_project_id and name='Detailed Design' limit 1;
     insert into public.tasks(project_id,phase_id,title,description,assignee_id,created_by,reviewer_id,status,priority,due_at,blocked_reason,blocked_at)
-    values(v_project_id,v_phase_id,'Resolve hitch clearance conflict','Verify clearance across the full articulation range.',member_id,leader_id,leader_id,'blocked','critical',now()+interval '1 day','Waiting for revised chassis dimensions.',now());
+    values(v_project_id,v_phase_id,'Resolve hitch clearance conflict','Verify clearance across the full articulation range.',member_id,leader_id,leader_id,'in_revision','critical',now()+interval '1 day','Waiting for revised chassis dimensions.',now());
     insert into public.revisions(project_id,phase_id,number,notes,state,submitted_by) values(v_project_id,v_phase_id,2,'Chassis geometry refinement','open',leader_id);
   end if;
 end $$;
