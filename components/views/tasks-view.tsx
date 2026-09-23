@@ -1,13 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { Layers, GripVertical, AlertCircle } from "lucide-react";
+import React, { useState } from "react";
+import { Layers, List, Columns3, Plus, Search, Clock } from "lucide-react";
 import { TaskCard } from "@/components/task-card";
 import type { Project, Role, Task, User } from "@/lib/types";
-import {
-  canEdit,
-  calculateTimeLeft,
-  normalizeProjectStatus,
-  getInitials,
-} from "@/lib/utils";
+import { canEdit, getInitials } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface TasksViewProps {
@@ -16,7 +11,6 @@ interface TasksViewProps {
   people: User[];
   profileId: string;
   role: Role;
-  kanban: boolean;
   updateTask: (id: string | number, state: string) => void;
   notify: (message: string) => void;
   onRefresh?: () => void;
@@ -28,21 +22,13 @@ export function TasksView({
   people,
   profileId,
   role,
-  kanban,
   updateTask,
   notify,
   onRefresh,
 }: TasksViewProps) {
-  const cols = [
-    "Open",
-    "In Progress",
-    "In Review",
-    "In Revision",
-    "Closed",
-    "Cancelled",
-    "Completed",
-  ];
-
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
   const [creating, setCreating] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: "",
@@ -51,123 +37,70 @@ export function TasksView({
     deadline: "",
   });
 
-  const [draggedTaskId, setDraggedTaskId] = useState<string | number | null>(
-    null,
-  );
-  const [draggedProjectId, setDraggedProjectId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState("all");
-
-  useEffect(() => {
-    if (selectedProjectId === "all" && projects.length) {
-      setSelectedProjectId("all");
-    }
-  }, [projects, selectedProjectId]);
-
   const userCanEdit = canEdit(role);
-  const userCanChangeStatus = userCanEdit || role === "Team Member";
+
+  // Filter tasks according to user role, search, and project
+  const visibleTasks = tasks.filter((task) => {
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.project ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesProject =
+      selectedProjectId === "all" || task.project_id === selectedProjectId;
+
+    return matchesSearch && matchesProject;
+  });
 
   const refresh = () => {
-    if (onRefresh) onRefresh();
-    else window.location.reload();
+    onRefresh?.();
   };
 
-  const updateProjectStatus = async (projectId: string, newStatus: string) => {
-    if (!supabase || !userCanEdit) return;
-    const { error } = await supabase
-      .from("projects")
-      .update({ status: newStatus, updated_at: new Date().toISOString() })
-      .eq("id", projectId);
-    if (error) return notify(`Could not update project: ${error.message}`);
-    const label = newStatus
-      .split("_")
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
-    notify(`Project moved to ${label}`);
-    refresh();
-  };
+  const handleCreateTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!taskForm.title.trim()) return notify("Please enter a task title");
+    if (!taskForm.projectId) return notify("Please select a project");
 
-  const createTask = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!supabase) return;
+    if (supabase) {
+      const { error } = await supabase.from("tasks").insert([
+        {
+          title: taskForm.title.trim(),
+          project_id: taskForm.projectId,
+          assignee_id: taskForm.assigneeId || null,
+          due_at: taskForm.deadline
+            ? new Date(taskForm.deadline).toISOString()
+            : null,
+          status: "open",
+        },
+      ]);
 
-    const { data: task, error } = await supabase
-      .from("tasks")
-      .insert({
-        title: taskForm.title,
-        project_id: taskForm.projectId || null,
-        assignee_id: taskForm.assigneeId || null,
-        created_by: profileId,
-        status: "open",
-        priority: "normal",
-        due_at: taskForm.deadline
-          ? new Date(`${taskForm.deadline}T17:00:00`).toISOString()
-          : null,
-      })
-      .select("id")
-      .single();
-
-    if (error) return notify(error.message);
-
-    if (taskForm.assigneeId && taskForm.projectId) {
-      const { error: memberError } = await supabase
-        .from("project_members")
-        .upsert(
-          {
-            project_id: taskForm.projectId,
-            user_id: taskForm.assigneeId,
-            project_role: "Team Member",
-          },
-          { onConflict: "project_id,user_id" },
-        );
-
-      if (memberError && task) {
-        await supabase.from("tasks").delete().eq("id", task.id);
-        return notify(`Task was not assigned: ${memberError.message}`);
-      }
+      if (error) return notify(`Error creating task: ${error.message}`);
     }
 
-    notify("Task created");
+    notify("Task created successfully");
     setCreating(false);
     setTaskForm({ title: "", projectId: "", assigneeId: "", deadline: "" });
     refresh();
   };
 
-  const assignTask = async (taskId: string, assigneeId: string) => {
+  const updateAssignee = async (taskId: string, assigneeId: string) => {
     if (!supabase || !userCanEdit) return;
-    const task = tasks.find((item) => String(item.id) === taskId);
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
 
     const { error } = await supabase
       .from("tasks")
-      .update({
-        assignee_id: assigneeId || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ assignee_id: assigneeId || null })
       .eq("id", taskId);
 
     if (error) return notify(error.message);
 
-    if (assigneeId && task?.project_id) {
-      const { error: memberError } = await supabase
-        .from("project_members")
-        .upsert(
-          {
-            project_id: task.project_id,
-            user_id: assigneeId,
-            project_role: "Team Member",
-          },
-          { onConflict: "project_id,user_id" },
-        );
-
-      if (memberError) {
-        await supabase
-          .from("tasks")
-          .update({ assignee_id: task.assignee_id ?? null })
-          .eq("id", taskId);
-        return notify(`Assignment was not saved: ${memberError.message}`);
-      }
+    if (assigneeId && task.project_id) {
+      await supabase.from("project_members").upsert(
+        { project_id: task.project_id, user_id: assigneeId },
+        { onConflict: "project_id,user_id" },
+      );
     }
 
-    notify("Task assignee updated");
+    notify("Assignee updated");
     refresh();
   };
 
@@ -179,340 +112,246 @@ export function TasksView({
     )
       return;
 
-    const { error } = await supabase
-      .from("tasks")
-      .delete()
-      .eq("id", task.id);
-
+    const { error } = await supabase.from("tasks").delete().eq("id", task.id);
     if (error) return notify(error.message);
     notify("Task deleted");
     refresh();
   };
 
-  const boardColumns = [
-    { label: "Backlog", states: ["Open"] },
-    { label: "In progress", states: ["In Progress"] },
-    { label: "Review", states: ["In Review", "In Revision"] },
-    { label: "Done", states: ["Closed", "Completed"] },
-    { label: "Cancelled", states: ["Cancelled"] },
+  const taskBoardColumns = [
+    {
+      label: "To Do",
+      states: ["Open"],
+      color: "border-t-sky-500",
+      badge: "bg-sky-50 text-sky-700",
+    },
+    {
+      label: "In Progress",
+      states: ["In Progress"],
+      color: "border-t-blue-500",
+      badge: "bg-blue-50 text-blue-700",
+    },
+    {
+      label: "In Review",
+      states: ["In Review", "In Revision"],
+      color: "border-t-amber-500",
+      badge: "bg-amber-50 text-amber-700",
+    },
+    {
+      label: "Completed",
+      states: ["Closed", "Completed"],
+      color: "border-t-emerald-500",
+      badge: "bg-emerald-50 text-emerald-700",
+    },
   ];
 
-  const boardTasks =
-    selectedProjectId === "all"
-      ? tasks
-      : tasks.filter((task) => task.project_id === selectedProjectId);
-
-  // ─── PROJECT PIPELINE KANBAN (Admin / Project Leader) ──────────────────
-  if (kanban && role !== "Team Member") {
-    const pipelineColumns = [
-      {
-        label: "Open",
-        status: "open",
-        accentClass: "border-t-sky-400",
-        dotClass: "bg-sky-400",
-        headerClass: "text-sky-700",
-      },
-      {
-        label: "In Progress",
-        status: "in_progress",
-        accentClass: "border-t-blue-500",
-        dotClass: "bg-blue-500",
-        headerClass: "text-blue-700",
-      },
-      {
-        label: "In Review",
-        status: "in_review",
-        accentClass: "border-t-amber-400",
-        dotClass: "bg-amber-400",
-        headerClass: "text-amber-700",
-      },
-      {
-        label: "Revisions",
-        status: "revisions",
-        accentClass: "border-t-violet-500",
-        dotClass: "bg-violet-500",
-        headerClass: "text-violet-700",
-      },
-      {
-        label: "On Hold",
-        status: "on_hold",
-        accentClass: "border-t-orange-400",
-        dotClass: "bg-orange-400",
-        headerClass: "text-orange-700",
-      },
-      {
-        label: "Delivered",
-        status: "delivered",
-        accentClass: "border-t-emerald-500",
-        dotClass: "bg-emerald-500",
-        headerClass: "text-emerald-700",
-      },
-    ];
-
-    const priorityBadge = (priority: string) => {
-      if (priority === "critical")
-        return "bg-red-50 text-red-700 border-red-200";
-      if (priority === "high") return "bg-amber-50 text-amber-700 border-amber-200";
-      return "bg-slate-100 text-slate-500 border-slate-200";
-    };
-
-    const priorityBar = (priority: string) => {
-      if (priority === "critical") return "bg-red-500";
-      if (priority === "high") return "bg-amber-400";
-      return "bg-blue-400";
-    };
-
-    return (
-      <>
-        {/* Header */}
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-[#e3292f]">
-              Project Pipeline
-            </p>
-            <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">
-              Status Board
-            </h1>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">
-              Drag projects between columns to update their status. All{" "}
-              {projects.filter((p) => {
-                const s = normalizeProjectStatus(p.status);
-                return s !== "closed" && s !== "cancelled";
-              }).length}{" "}
-              active projects visible.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-600 shadow-2xs">
-            <Layers size={14} className="text-[#e3292f]" />
-            <span>{projects.length} total projects</span>
-          </div>
+  return (
+    <div className="space-y-6">
+      {/* Header & Controls */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest text-[#e3292f]">
+            Task Management
+          </p>
+          <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">
+            Tasks
+          </h1>
+          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+            {visibleTasks.length} {visibleTasks.length === 1 ? "task" : "tasks"}{" "}
+            visible
+          </p>
         </div>
 
-        {/* Pipeline board — compact & responsive grid, no horizontal scroll */}
-        <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
-          {pipelineColumns.map((col) => {
-            const colProjects = projects.filter(
-              (p) => normalizeProjectStatus(p.status) === col.status,
-            );
-
-            return (
-              <div
-                key={col.status}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (draggedProjectId) {
-                    updateProjectStatus(draggedProjectId, col.status);
-                    setDraggedProjectId(null);
-                  }
-                }}
-                className={`flex flex-col rounded-xl border border-t-4 border-slate-200 bg-slate-50/70 ${
-                  col.accentClass
-                }`}
-              >
-                {/* Column Header */}
-                <div className="flex items-center justify-between px-2.5 py-2 border-b border-slate-200">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${col.dotClass}`} />
-                    <span className={`text-[10px] font-black uppercase tracking-tight truncate ${col.headerClass}`}>
-                      {col.label}
-                    </span>
-                  </div>
-                  <span className="grid h-4 min-w-4 shrink-0 place-items-center rounded-full bg-white px-1 text-[9px] font-black text-slate-600 ring-1 ring-slate-200">
-                    {colProjects.length}
-                  </span>
-                </div>
-
-                {/* Cards */}
-                <div className="flex flex-col gap-2 p-1.5 min-h-[160px]">
-                  {colProjects.map((project) => {
-                    const timeLeft = calculateTimeLeft(project.deadline);
-                    const progress = project.completion_percentage ?? 0;
-                    const prio = (project.priority || "normal").toLowerCase();
-
-                    return (
-                      <div
-                        key={project.id}
-                        draggable={userCanEdit}
-                        onDragStart={() => setDraggedProjectId(project.id)}
-                        onDragEnd={() => setDraggedProjectId(null)}
-                        className={`group relative rounded-lg border border-slate-200 bg-white p-2 shadow-2xs transition ${
-                          userCanEdit
-                            ? "cursor-grab active:cursor-grabbing hover:shadow-sm hover:-translate-y-0.5"
-                            : ""
-                        }`}
-                      >
-                        {/* Priority left bar */}
-                        <div
-                          className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-r-full ${priorityBar(prio)}`}
-                        />
-
-                        {/* Top row: code + priority */}
-                        <div className="flex items-center justify-between gap-1 mb-1 pl-1.5">
-                          <span className="font-mono text-[9px] font-bold text-slate-400 truncate">
-                            {project.code}
-                          </span>
-                          <span
-                            className={`shrink-0 rounded border px-1 py-0.2 text-[7.5px] font-black uppercase tracking-tight ${
-                              priorityBadge(prio)
-                            }`}
-                          >
-                            {prio}
-                          </span>
-                        </div>
-
-                        {/* Project name */}
-                        <p className="pl-1.5 text-[11px] font-bold leading-snug text-slate-900 line-clamp-2 break-words">
-                          {project.name}
-                        </p>
-
-                        {/* Progress bar */}
-                        <div className="pl-1.5 mt-1.5 space-y-0.5">
-                          <div className="flex justify-between text-[8px] font-bold text-slate-400">
-                            <span>Progress</span>
-                            <span className="text-slate-700">{progress}%</span>
-                          </div>
-                          <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-[#e3292f] transition-all"
-                              style={{ width: `${progress}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Footer: team + deadline */}
-                        <div className="pl-1.5 mt-2 flex items-center justify-between gap-1">
-                          <div className="flex -space-x-1 shrink-0">
-                            {(project.team ?? []).slice(0, 2).map(
-                              (initials: string, idx: number) => (
-                                <span
-                                  key={idx}
-                                  className="grid h-3.5 w-3.5 place-items-center rounded-full bg-slate-800 text-[6px] font-black text-white ring-1 ring-white"
-                                >
-                                  {initials}
-                                </span>
-                              ),
-                            )}
-                            {(project.team?.length ?? 0) > 2 && (
-                              <span className="grid h-3.5 w-3.5 place-items-center rounded-full bg-slate-200 text-[6px] font-black text-slate-600 ring-1 ring-white">
-                                +{(project.team?.length ?? 0) - 2}
-                              </span>
-                            )}
-                          </div>
-                          <span className={`text-[8.5px] font-bold truncate ${timeLeft.tone}`}>
-                            {timeLeft.label}
-                          </span>
-                        </div>
-
-                        {/* Drag handle hint */}
-                        {userCanEdit && (
-                          <div className="absolute right-1 top-1 opacity-0 group-hover:opacity-40 transition">
-                            <GripVertical size={10} className="text-slate-500" />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {!colProjects.length && (
-                  <div className="m-1.5 flex flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-slate-300 py-4 text-center">
-                    <span className={`text-[9px] font-bold ${col.headerClass} opacity-50`}>
-                      Empty
-                    </span>
-                    <p className="mt-0.5 text-[8px] font-semibold text-slate-400">
-                      Drop here
-                    </p>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </>
-    );
-  }
-
-  // ─── TASK BOARD (Team Member) ────────────────────────────────────────────
-  if (kanban && role === "Team Member") {
-    const myTasks = tasks.filter(
-      (t) => t.assignee_id === profileId || t.owner !== "Unassigned",
-    );
-    const boardTasks =
-      selectedProjectId === "all"
-        ? myTasks
-        : myTasks.filter((t) => t.project_id === selectedProjectId);
-
-    const taskBoardColumns = [
-      { label: "To Do", states: ["Open"], color: "border-t-slate-400" },
-      { label: "In Progress", states: ["In Progress"], color: "border-t-blue-500" },
-      { label: "In Review", states: ["In Review", "In Revision"], color: "border-t-amber-400" },
-      { label: "Done", states: ["Closed", "Completed"], color: "border-t-emerald-500" },
-    ];
-
-    return (
-      <>
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-[#e3292f]">My Work</p>
-            <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">Task Board</h1>
-            <p className="mt-0.5 text-xs font-semibold text-slate-500">
-              Drag tasks between columns to update their status.
-            </p>
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          {/* Search */}
+          <div className="relative flex-1 sm:w-56 sm:flex-none">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search tasks..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+            />
           </div>
+
+          {/* Project Filter */}
           <select
             value={selectedProjectId}
             onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 w-full sm:w-auto min-w-48 cursor-pointer"
+            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
           >
-            <option value="all">All projects</option>
+            <option value="all">All Projects</option>
             {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
-        </div>
 
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-          {taskBoardColumns.map((column) => {
-            const columnTasks = boardTasks.filter((t) =>
-              column.states.includes(t.state),
+          {/* View Mode Toggle */}
+          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                viewMode === "list"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <List size={14} />
+              List
+            </button>
+            <button
+              onClick={() => setViewMode("board")}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                viewMode === "board"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              <Columns3 size={14} />
+              Board
+            </button>
+          </div>
+
+          {/* Create Task Button */}
+          {userCanEdit && (
+            <button
+              onClick={() => setCreating(true)}
+              className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
+            >
+              <Plus size={16} />
+              New Task
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Main View: List or Board */}
+      {viewMode === "list" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {visibleTasks.length === 0 ? (
+            <div className="col-span-full grid place-items-center rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+              <Layers className="h-10 w-10 text-slate-300 mb-3" />
+              <h3 className="text-sm font-bold text-slate-700">
+                No tasks found
+              </h3>
+              <p className="mt-1 text-xs text-slate-400 max-w-sm">
+                Try adjusting your search query or filters, or create a new
+                task.
+              </p>
+            </div>
+          ) : (
+            visibleTasks.map((task) => (
+              <TaskCard
+                key={task.id}
+                t={task}
+                people={people}
+                updateTask={updateTask}
+                assignTask={updateAssignee}
+                deleteTask={deleteTask}
+                editable={userCanEdit}
+                statusEditable={true}
+                onDragStart={() => {}}
+              />
+            ))
+          )}
+        </div>
+      ) : (
+        /* Board View (Kanban) */
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {taskBoardColumns.map((col) => {
+            const colTasks = visibleTasks.filter((t) =>
+              col.states.some(
+                (s) => s.toLowerCase() === t.state.toLowerCase(),
+              ),
             );
+
             return (
               <div
-                key={column.label}
+                key={col.label}
                 onDragOver={(e) => e.preventDefault()}
-                onDrop={() => {
-                  if (draggedTaskId !== null) {
-                    updateTask(draggedTaskId, column.states[0]);
-                    setDraggedTaskId(null);
+                onDrop={(e) => {
+                  e.preventDefault();
+                  const taskId = e.dataTransfer.getData("text/plain");
+                  if (taskId) {
+                    updateTask(taskId, col.states[0]);
                   }
                 }}
-                className={`min-h-[260px] rounded-2xl border border-t-4 border-slate-200 bg-slate-50/70 ${column.color}`}
+                className={`flex flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-3 border-t-4 ${col.color} min-h-[500px]`}
               >
-                <div className="flex items-center justify-between border-b border-slate-200 px-3.5 py-2.5">
-                  <span className="text-xs font-black text-slate-700 uppercase tracking-wide">
-                    {column.label}
-                  </span>
-                  <span className="grid h-5 min-w-5 place-items-center rounded-full bg-white px-1.5 text-[10px] font-black text-slate-600 ring-1 ring-slate-200">
-                    {columnTasks.length}
+                <div className="mb-3 flex items-center justify-between px-1">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                    {col.label}
+                  </h3>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${col.badge}`}
+                  >
+                    {colTasks.length}
                   </span>
                 </div>
-                <div className="space-y-2 p-2.5">
-                  {columnTasks.map((t) => (
-                    <TaskCard
-                      key={t.id}
-                      t={t}
-                      people={people}
-                      updateTask={updateTask}
-                      assignTask={assignTask}
-                      deleteTask={deleteTask}
-                      editable={false}
-                      statusEditable={true}
-                      onDragStart={() => setDraggedTaskId(t.id)}
-                    />
+
+                <div className="space-y-2.5 flex-1">
+                  {colTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      draggable
+                      onDragStart={(e) =>
+                        e.dataTransfer.setData("text/plain", String(task.id))
+                      }
+                      className="group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md transition cursor-grab active:cursor-grabbing"
+                    >
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate max-w-[140px]">
+                          {task.project || "General"}
+                        </span>
+                        {task.due && (
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                            <Clock size={10} />
+                            {task.due}
+                          </span>
+                        )}
+                      </div>
+
+                      <h4 className="text-xs font-bold text-slate-900 line-clamp-2">
+                        {task.title}
+                      </h4>
+
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-800 text-[8px] font-black text-white">
+                            {getInitials(task.owner)}
+                          </span>
+                          <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[90px]">
+                            {task.owner}
+                          </span>
+                        </div>
+
+                        {/* Status selector */}
+                        <select
+                          value={task.state}
+                          onChange={(e) => updateTask(task.id, e.target.value)}
+                          className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
+                        >
+                          <option value="Open">Open</option>
+                          <option value="In Progress">In Progress</option>
+                          <option value="In Review">In Review</option>
+                          <option value="In Revision">In Revision</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                      </div>
+                    </div>
                   ))}
-                  {!columnTasks.length && (
-                    <div className="rounded-xl border border-dashed border-slate-300 px-3 py-8 text-center text-xs font-semibold text-slate-400">
-                      Drop tasks here
+
+                  {colTasks.length === 0 && (
+                    <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-center">
+                      <p className="text-[10px] font-bold text-slate-400">
+                        No tasks
+                      </p>
                     </div>
                   )}
                 </div>
@@ -520,167 +359,110 @@ export function TasksView({
             );
           })}
         </div>
-      </>
-    );
-  }
-
-  // ─── TASKS LIST VIEW (view === "Tasks") ───────────────────────────────────
-  return (
-    <>
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900">Tasks</h1>
-          <p className="mt-0.5 text-xs font-semibold text-slate-500">
-            {tasks.length} total tasks across all projects & standalone assignments
-          </p>
-        </div>
-        {role !== "Team Member" && (
-          <button
-            onClick={() => setCreating(!creating)}
-            className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs cursor-pointer self-start sm:self-auto"
-          >
-            {creating ? "Cancel" : "+ New Task"}
-          </button>
-        )}
-      </div>
-
-      {creating && (
-        <form
-          onSubmit={createTask}
-          className="mb-5 grid gap-3 rounded-2xl border border-red-100 bg-white p-5 sm:grid-cols-2 md:grid-cols-4 shadow-xs"
-        >
-          <input
-            required
-            placeholder="Task title *"
-            value={taskForm.title}
-            onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-400 focus:ring-4 focus:ring-red-50 transition sm:col-span-2 md:col-span-1"
-          />
-          <select
-            value={taskForm.projectId}
-            onChange={(e) =>
-              setTaskForm({ ...taskForm, projectId: e.target.value })
-            }
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 transition cursor-pointer"
-          >
-            <option value="">General / Standalone Task (No Project)</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={taskForm.assigneeId}
-            onChange={(e) =>
-              setTaskForm({ ...taskForm, assigneeId: e.target.value })
-            }
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 transition cursor-pointer"
-          >
-            <option value="">Unassigned</option>
-            {people.map((person) => (
-              <option key={person.id} value={person.id}>
-                {person.name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="date"
-            aria-label="Task deadline"
-            value={taskForm.deadline}
-            onChange={(e) =>
-              setTaskForm({ ...taskForm, deadline: e.target.value })
-            }
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 transition"
-          />
-          <button className="h-10 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white sm:col-span-2 md:col-span-4 hover:bg-slate-800 transition cursor-pointer shadow-xs">
-            Create task
-          </button>
-        </form>
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
-        <div className="divide-y divide-slate-100">
-          {tasks.map((t) => (
-            <div
-              key={t.id}
-              className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between hover:bg-slate-50/80 transition"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-bold text-slate-900 text-sm">{t.title}</p>
-                  <span
-                    className={`shrink-0 rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
-                      t.priority === "critical"
-                        ? "bg-red-50 text-red-700"
-                        : t.priority === "high"
-                        ? "bg-amber-50 text-amber-700"
-                        : "bg-slate-100 text-slate-500"
-                    }`}
-                  >
-                    {t.priority || "normal"}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-slate-500 truncate">
-                  <span className="font-semibold text-slate-700">{t.project}</span> · Assigned to {t.owner}
-                </p>
+      {/* Create Task Modal */}
+      {creating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-black text-slate-900">
+              Create New Task
+            </h2>
+            <p className="mt-1 text-xs font-medium text-slate-500">
+              Add a new task to your workspace project.
+            </p>
+
+            <form onSubmit={handleCreateTask} className="mt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Task Title *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Design homepage wireframe"
+                  value={taskForm.title}
+                  onChange={(e) =>
+                    setTaskForm({ ...taskForm, title: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                />
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Project *
+                </label>
                 <select
-                  aria-label={`Assign ${t.title}`}
-                  disabled={!userCanEdit}
-                  value={t.assignee_id ?? ""}
-                  onChange={(e) => assignTask(String(t.id), e.target.value)}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
+                  required
+                  value={taskForm.projectId}
+                  onChange={(e) =>
+                    setTaskForm({ ...taskForm, projectId: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                >
+                  <option value="">Select a project...</option>
+                  {projects.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Assignee
+                </label>
+                <select
+                  value={taskForm.assigneeId}
+                  onChange={(e) =>
+                    setTaskForm({ ...taskForm, assigneeId: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
                 >
                   <option value="">Unassigned</option>
                   {people.map((person) => (
                     <option key={person.id} value={person.id}>
-                      {person.name}
+                      {person.name} ({person.role})
                     </option>
                   ))}
                 </select>
-                <select
-                  disabled={!userCanChangeStatus}
-                  value={t.state}
-                  onChange={(e) => updateTask(t.id, e.target.value)}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
-                >
-                  {cols.map((state) => (
-                    <option key={state} value={state}>
-                      {state}
-                    </option>
-                  ))}
-                </select>
-                {userCanEdit && (
-                  <button
-                    onClick={() => deleteTask(t)}
-                    className="h-9 rounded-lg border border-red-200 px-3 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
-                  >
-                    Delete
-                  </button>
-                )}
-                <span
-                  className={`text-xs font-bold whitespace-nowrap px-1 ${
-                    t.dueTone || "text-slate-500"
-                  }`}
-                >
-                  {t.due}
-                </span>
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-slate-900 text-[9px] font-black text-white">
-                  {t.initials}
-                </span>
               </div>
-            </div>
-          ))}
-          {!tasks.length && (
-            <div className="p-8 text-center text-xs font-semibold text-slate-400">
-              No tasks available.
-            </div>
-          )}
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Deadline
+                </label>
+                <input
+                  type="date"
+                  value={taskForm.deadline}
+                  onChange={(e) =>
+                    setTaskForm({ ...taskForm, deadline: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                />
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setCreating(false)}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-xl bg-[#e3292f] px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
+                >
+                  Create Task
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   );
 }

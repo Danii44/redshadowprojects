@@ -58,7 +58,7 @@ export function Sidebar({
           </div>
         </div>
         <button
-          className="ml-auto lg:hidden"
+          className="ml-auto lg:hidden cursor-pointer"
           onClick={() => setMenuOpen(false)}
         >
           <X size={20} />
@@ -82,7 +82,7 @@ export function Sidebar({
                   setView(n.label);
                   setMenuOpen(false);
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition cursor-pointer ${
                   view === n.label
                     ? "bg-[#e3292f] text-white"
                     : "text-white/55 hover:bg-white/10 hover:text-white"
@@ -91,8 +91,14 @@ export function Sidebar({
                 <n.icon size={18} />
                 {n.label}
                 {n.label === "Notifications" && unreadCount > 0 && (
-                  <span className="ml-auto rounded-full bg-white/15 px-2 py-0.5 text-[11px]">
-                    {unreadCount}
+                  <span
+                    className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black transition ${
+                      view === n.label
+                        ? "bg-white text-[#e3292f]"
+                        : "bg-[#e3292f] text-white"
+                    }`}
+                  >
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </button>
@@ -109,7 +115,7 @@ export function Sidebar({
                 setAccountPanel("profile");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white cursor-pointer"
             >
               View profile
             </button>
@@ -118,7 +124,7 @@ export function Sidebar({
                 setAccountPanel("password");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white cursor-pointer"
             >
               Change password
             </button>
@@ -127,7 +133,7 @@ export function Sidebar({
                 await supabase?.auth.signOut();
                 window.location.href = "/login";
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-red-500/15"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-red-500/15 cursor-pointer"
             >
               Sign out
             </button>
@@ -135,7 +141,7 @@ export function Sidebar({
         )}
         <button
           onClick={() => setAccountMenu((open) => !open)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left hover:bg-white/10"
+          className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left hover:bg-white/10 cursor-pointer"
         >
           <div className="grid h-9 w-9 place-items-center rounded-full bg-red-100 text-xs font-black text-red-700">
             {initials}

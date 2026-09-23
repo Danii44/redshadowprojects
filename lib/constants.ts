@@ -1,7 +1,6 @@
 import {
   Bell,
   CalendarCheck,
-  Columns3,
   Command,
   FileClock,
   LayoutDashboard,
@@ -36,12 +35,12 @@ export const LEGACY_PROJECT_STATUSES: Record<string, ProjectStatus> = {
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "Projects", icon: Command },
-  { label: "Daily Work", icon: CalendarCheck },
   { label: "Tasks", icon: ListTodo },
-  { label: "Kanban", icon: Columns3 },
+  { label: "Daily Work", icon: CalendarCheck },
   { label: "Revisions", icon: FileClock },
-  { label: "Team", icon: Users },
-  { label: "Notifications", icon: Bell, group: true },
+  { label: "Team", icon: Users, group: true },
+  { label: "Notifications", icon: Bell },
+  { label: "Settings", icon: Settings },
 ];
 
 /** Which views are visible to each role */
@@ -49,24 +48,24 @@ export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
   Admin: [
     "Dashboard",
     "Projects",
-    "Daily Work",
     "Tasks",
-    "Kanban",
+    "Daily Work",
     "Revisions",
     "Team",
     "Notifications",
+    "Settings",
   ],
   "Project Leader": [
     "Dashboard",
     "Projects",
-    "Daily Work",
     "Tasks",
-    "Kanban",
+    "Daily Work",
     "Revisions",
     "Team",
     "Notifications",
+    "Settings",
   ],
-  "Team Member": ["Dashboard", "Daily Work", "Tasks", "Notifications"],
+  "Team Member": ["Dashboard", "Tasks", "Daily Work", "Notifications"],
 };
 
 /** Pill/badge color classes keyed by color name */

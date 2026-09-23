@@ -5,14 +5,11 @@ export type Role = "Admin" | "Project Leader" | "Team Member";
 export type View =
   | "Dashboard"
   | "Projects"
-  | "Daily Work"
   | "Tasks"
-  | "Kanban"
+  | "Daily Work"
   | "Revisions"
-  | "Calendar"
   | "Team"
   | "Notifications"
-  | "Activity"
   | "Settings";
 
 /** Canonical project status values stored in the database */
@@ -98,12 +95,20 @@ export interface ProjectRow {
   revisions?: Revision[];
 }
 
+export interface ProjectMemberDetail {
+  id?: string;
+  user_id: string;
+  name: string;
+  role?: string;
+}
+
 /** Enriched project used in the UI */
 export interface Project extends ProjectRow {
   phase: string;
   revision: string;
   leader: string;
   team: string[];
+  members?: ProjectMemberDetail[];
   due: string;
   startDateFormatted?: string;
   timeLeftLabel?: string;

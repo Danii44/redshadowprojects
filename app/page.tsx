@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { Toast } from "@/components/ui/toast";
@@ -14,7 +14,6 @@ import { TasksView } from "@/components/views/tasks-view";
 import { RevisionsView } from "@/components/views/revisions-view";
 import { NotificationsView } from "@/components/views/notifications-view";
 import { SettingsView } from "@/components/views/settings-view";
-import { GenericView } from "@/components/views/generic-view";
 
 // Hooks & Types
 import { useWorkspace } from "@/hooks/use-workspace";
@@ -47,6 +46,22 @@ export default function Home() {
   const [accountPanel, setAccountPanel] = useState<"profile" | "password" | null>(
     null,
   );
+  const [hasNotifiedLogin, setHasNotifiedLogin] = useState(false);
+
+  // Notify user upon login / initial load if unread notifications exist
+  useEffect(() => {
+    if (ready && !hasNotifiedLogin && notifications.length > 0) {
+      const unreadCount = notifications.filter((n) => !n.read_at).length;
+      if (unreadCount > 0) {
+        notify(
+          `📢 Welcome back, ${userName}! You have ${unreadCount} unread ${
+            unreadCount === 1 ? "notification" : "notifications"
+          }.`,
+        );
+      }
+      setHasNotifiedLogin(true);
+    }
+  }, [ready, notifications, userName, hasNotifiedLogin, notify]);
 
   const filteredProjects = projects.filter((p) =>
     (p.name + (p.client ?? "") + p.code)
@@ -181,14 +196,13 @@ export default function Home() {
             />
           )}
 
-          {(view === "Tasks" || view === "Kanban") && (
+          {view === "Tasks" && (
             <TasksView
               tasks={tasks}
               projects={projects}
               people={people}
               profileId={profileId}
               role={role}
-              kanban={view === "Kanban"}
               updateTask={updateTaskStatus}
               notify={notify}
               onRefresh={refreshData}
@@ -224,18 +238,6 @@ export default function Home() {
               onRefresh={refreshData}
             />
           )}
-
-          {![
-            "Dashboard",
-            "Projects",
-            "Daily Work",
-            "Tasks",
-            "Kanban",
-            "Revisions",
-            "Team",
-            "Notifications",
-            "Settings",
-          ].includes(view) && <GenericView view={view} notify={notify} />}
         </div>
       </main>
 

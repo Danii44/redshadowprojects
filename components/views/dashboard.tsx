@@ -1,8 +1,18 @@
 import React from "react";
-import { ArrowRight, CheckCircle2, Clock, FileClock, Plus, UserCheck } from "lucide-react";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  FileClock,
+  Layers,
+  ListTodo,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import {
   calculateTimeLeft,
+  getInitials,
   normalizeProjectStatus,
   projectStatusColor,
   projectStatusLabel,
@@ -30,7 +40,246 @@ export function Dashboard({
   notify,
   onRefresh,
 }: DashboardProps) {
-  // Filter active projects (excluding delivered, closed, cancelled)
+  // ─── TEAM MEMBER DASHBOARD ───────────────────────────────────────────────
+  if (role === "Team Member") {
+    const myTasks = tasks.filter(
+      (t) =>
+        t.assignee_id === profileId ||
+        (userName && t.owner?.toLowerCase() === userName.toLowerCase()),
+    );
+
+    const myProjects = projects.filter(
+      (p) =>
+        p.leader_id === profileId ||
+        p.project_members?.some((m) => m.user_id === profileId),
+    );
+
+    const myInProgress = myTasks.filter((t) => t.state === "In Progress").length;
+    const myInReview = myTasks.filter(
+      (t) => t.state === "In Review" || t.state === "In Revision",
+    ).length;
+    const myCompleted = myTasks.filter(
+      (t) => t.state === "Completed" || t.state === "Closed",
+    ).length;
+    const myOpen = myTasks.filter((t) => t.state === "Open").length;
+
+    const urgentTasks = myTasks.filter(
+      (t) => t.state !== "Completed" && t.state !== "Closed",
+    );
+
+    return (
+      <div className="space-y-7">
+        {/* Welcome Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xs">
+          <div>
+            <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-[#e3292f]">
+              <Sparkles size={16} />
+              Welcome Back
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-black text-slate-900">
+              Hello, {userName}!
+            </h1>
+            <p className="mt-1 text-xs font-semibold text-slate-500">
+              Here is your active work summary and task list for today.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setView("Tasks")}
+              className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
+            >
+              <ListTodo size={16} />
+              View My Tasks ({myTasks.length})
+            </button>
+          </div>
+        </div>
+
+        {/* Simplified Stat Cards (4 Cards) */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              To Do Tasks
+            </p>
+            <p className="mt-2 text-3xl font-black text-slate-900">{myOpen}</p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+              ready to start
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              In Progress
+            </p>
+            <p className="mt-2 text-3xl font-black text-blue-600">
+              {myInProgress}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+              actively working
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              In Review / Revision
+            </p>
+            <p className="mt-2 text-3xl font-black text-amber-500">
+              {myInReview}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+              awaiting check
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+              Completed
+            </p>
+            <p className="mt-2 text-3xl font-black text-emerald-600">
+              {myCompleted}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-slate-400">
+              finished tasks
+            </p>
+          </div>
+        </div>
+
+        {/* 2-Column Section for Team Member: My Active Tasks & My Projects */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* My Active Tasks List */}
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-100 p-5">
+                <div>
+                  <h2 className="font-black text-slate-900 text-base">
+                    My Active Tasks
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500 font-semibold">
+                    Tasks assigned specifically to you
+                  </p>
+                </div>
+                <button
+                  onClick={() => setView("Tasks")}
+                  className="flex items-center gap-1 text-xs font-bold text-[#e3292f] hover:underline cursor-pointer"
+                >
+                  All Tasks <ArrowRight size={13} />
+                </button>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
+                {urgentTasks.map((t) => (
+                  <div
+                    key={t.id}
+                    className="flex items-center justify-between p-4 hover:bg-slate-50 transition"
+                  >
+                    <div className="min-w-0 flex-1 pr-3">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                        {t.project || "General"}
+                      </span>
+                      <p className="font-bold text-slate-900 text-xs truncate mt-0.5">
+                        {t.title}
+                      </p>
+                      {t.due && (
+                        <span className="text-[10px] font-semibold text-slate-400 flex items-center gap-1 mt-1">
+                          <Clock size={10} /> {t.due}
+                        </span>
+                      )}
+                    </div>
+
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
+                        t.state === "In Progress"
+                          ? "bg-blue-50 text-blue-700 border border-blue-200"
+                          : t.state === "In Review"
+                          ? "bg-amber-50 text-amber-700 border border-amber-200"
+                          : t.state === "In Revision"
+                          ? "bg-red-50 text-red-700 border border-red-200"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {t.state}
+                    </span>
+                  </div>
+                ))}
+
+                {urgentTasks.length === 0 && (
+                  <div className="p-10 text-center text-xs font-semibold text-slate-400">
+                    No active tasks assigned to you right now! 🎉
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* My Assigned Projects */}
+          <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between border-b border-slate-100 p-5">
+                <div>
+                  <h2 className="font-black text-slate-900 text-base">
+                    My Assigned Projects
+                  </h2>
+                  <p className="mt-0.5 text-xs text-slate-500 font-semibold">
+                    Projects where you are a team member
+                  </p>
+                </div>
+                <button
+                  onClick={() => setView("Projects")}
+                  className="flex items-center gap-1 text-xs font-bold text-[#e3292f] hover:underline cursor-pointer"
+                >
+                  All Projects <ArrowRight size={13} />
+                </button>
+              </div>
+
+              <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
+                {myProjects.map((p) => {
+                  const timeLeft = calculateTimeLeft(p.deadline);
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setView("Projects")}
+                      className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 transition cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1 pr-3">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] font-bold text-red-600">
+                            {p.code}
+                          </span>
+                          <p className="font-black text-slate-900 text-xs truncate">
+                            {p.name}
+                          </p>
+                        </div>
+                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                          Led by {p.leader}
+                        </p>
+                      </div>
+
+                      <div className="text-right shrink-0">
+                        <Pill color={projectStatusColor(p.status)}>
+                          {projectStatusLabel(p.status)}
+                        </Pill>
+                        <span className={`text-[10px] font-bold block mt-1 ${timeLeft.tone}`}>
+                          {timeLeft.label}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {myProjects.length === 0 && (
+                  <div className="p-10 text-center text-xs font-semibold text-slate-400">
+                    You are not assigned to any projects yet.
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ADMIN & PROJECT LEADER EXECUTIVE DASHBOARD ─────────────────────────
   const activeProjects = projects.filter(
     (p) =>
       !["delivered", "closed", "cancelled"].includes(
@@ -38,7 +287,6 @@ export function Dashboard({
       ),
   );
 
-  // Top Metric Counts
   const totalCount = projects.length;
   const activeCount = activeProjects.length;
   const openCount = projects.filter(
@@ -53,44 +301,35 @@ export function Dashboard({
   const revisionsCount = projects.filter(
     (p) => normalizeProjectStatus(p.status) === "revisions",
   ).length;
-  const deliveredCount = projects.filter(
-    (p) =>
-      ["delivered", "closed"].includes(normalizeProjectStatus(p.status)),
+  const deliveredCount = projects.filter((p) =>
+    ["delivered", "closed"].includes(normalizeProjectStatus(p.status)),
   ).length;
 
-  // 1. Needs Attention: ALL items overdue OR due in the next 2 days (48h)
-  // Excludes delivered, closed, cancelled
   const needsAttentionProjects = projects.filter((p) => {
     const status = normalizeProjectStatus(p.status);
     if (["delivered", "closed", "cancelled"].includes(status)) return false;
-
-    // Status is in revisions or in review
     if (status === "revisions" || status === "in_review") return true;
 
-    // Deadline is overdue OR due within the next 48 hours (2 days)
     if (p.deadline) {
       const diffHours =
         (new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
-      return diffHours <= 48; // Overdue (<0) or due within 48h
+      return diffHours <= 48;
     }
     return false;
   });
 
-  // Sort needs attention by urgency (most overdue first)
   const sortedNeedsAttention = [...needsAttentionProjects].sort((a, b) => {
     const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
     return timeA - timeB;
   });
 
-  // 2. Open Projects: All active projects aligned by time remaining
   const sortedOpenProjects = [...activeProjects].sort((a, b) => {
     const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
     return timeA - timeB;
   });
 
-  // 3. Upcoming Deadlines: ALL active projects with deadlines (excluding delivered, closed, cancelled)
   const sortedDeadlines = [...projects]
     .filter((p) => {
       if (!p.deadline) return false;
@@ -102,7 +341,6 @@ export function Dashboard({
         new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime(),
     );
 
-  // 4. Pending Revisions & Approvals Queue (3rd Section)
   const pendingRevisions = projects.filter((p) => {
     const normStatus = normalizeProjectStatus(p.status);
     const rawStatus = (p.status || "").toLowerCase();
@@ -143,20 +381,17 @@ export function Dashboard({
           </p>
         </div>
 
-        {role !== "Team Member" && (
-          <button
-            onClick={() => setView("Projects")}
-            className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto"
-          >
-            <Plus size={16} />
-            New Project
-          </button>
-        )}
+        <button
+          onClick={() => setView("Projects")}
+          className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto cursor-pointer"
+        >
+          <Plus size={16} />
+          New Project
+        </button>
       </div>
 
       {/* Top Metric Cards Row (6 Cards) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        {/* TOTAL */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             Total
@@ -167,7 +402,6 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* OPEN */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             Open
@@ -178,7 +412,6 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* IN PROGRESS */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             In Progress
@@ -191,7 +424,6 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* IN REVIEW */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             In Review
@@ -204,7 +436,6 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* REVISIONS */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             Revisions
@@ -217,7 +448,6 @@ export function Dashboard({
           </p>
         </div>
 
-        {/* DELIVERED */}
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
           <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
             Delivered
@@ -233,7 +463,6 @@ export function Dashboard({
 
       {/* Middle Section (3-Column Grid) */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Column 1: Needs Attention (ALL overdue or due in next 48h) */}
         <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 p-4">
@@ -257,7 +486,7 @@ export function Dashboard({
                   <button
                     key={p.id}
                     onClick={() => setView("Projects")}
-                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition"
+                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-center gap-2">
@@ -289,7 +518,6 @@ export function Dashboard({
           </div>
         </section>
 
-        {/* Column 2: Open Projects (Aligned by time remaining) */}
         <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 p-4">
@@ -303,7 +531,7 @@ export function Dashboard({
               </div>
               <button
                 onClick={() => setView("Projects")}
-                className="flex items-center gap-1 text-xs font-black text-[#e3292f] hover:underline"
+                className="flex items-center gap-1 text-xs font-black text-[#e3292f] hover:underline cursor-pointer"
               >
                 All <ArrowRight size={13} />
               </button>
@@ -328,7 +556,7 @@ export function Dashboard({
                   <button
                     key={p.id}
                     onClick={() => setView("Projects")}
-                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition"
+                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-center gap-2">
@@ -380,7 +608,6 @@ export function Dashboard({
           </div>
         </section>
 
-        {/* Column 3: Revisions & Approvals Queue (Visual & Helpful 3rd Section) */}
         <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 p-4">
@@ -394,7 +621,7 @@ export function Dashboard({
               </div>
               <button
                 onClick={() => setView("Revisions")}
-                className="flex items-center gap-1 text-xs font-black text-[#e3292f] hover:underline"
+                className="flex items-center gap-1 text-xs font-black text-[#e3292f] hover:underline cursor-pointer"
               >
                 Queue <ArrowRight size={13} />
               </button>
@@ -405,7 +632,7 @@ export function Dashboard({
                 <button
                   key={`rev-proj-${p.id}`}
                   onClick={() => setView("Revisions")}
-                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition"
+                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
                 >
                   <div className="min-w-0 flex-1 pr-3">
                     <div className="flex items-center gap-2">
@@ -429,7 +656,7 @@ export function Dashboard({
                 <button
                   key={`rev-task-${t.id}`}
                   onClick={() => setView("Revisions")}
-                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition"
+                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
                 >
                   <div className="min-w-0 flex-1 pr-3">
                     <div className="flex items-center gap-2">
@@ -467,7 +694,7 @@ export function Dashboard({
         </section>
       </div>
 
-      {/* Bottom Section: Upcoming Deadlines Table (ALL Active Projects with Deadlines) */}
+      {/* Bottom Section: Upcoming Deadlines Table */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="border-b border-slate-100 p-4 sm:p-5 flex items-center justify-between">
           <div>
@@ -475,7 +702,7 @@ export function Dashboard({
               Upcoming Deadlines
             </h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              All active project target dates (completed/delivered/closed orders excluded)
+              All active project target dates
             </p>
           </div>
           <span className="text-xs font-black text-slate-400">
