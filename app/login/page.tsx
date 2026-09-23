@@ -1,7 +1,9 @@
 "use client";
+
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -9,38 +11,60 @@ export default function Login() {
   const [rememberEmail, setRememberEmail] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
   useEffect(() => {
     const savedEmail = window.localStorage.getItem("red-shadow-login-email");
     if (savedEmail) {
       setEmail(savedEmail);
       setRememberEmail(true);
     }
-    supabase?.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/");
-    });
+    if (supabase) {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) {
+          document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${
+            60 * 60 * 24 * 7
+          }; SameSite=Lax`;
+          router.replace("/");
+        }
+      });
+    }
   }, [router]);
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!supabase) {
       setError("Supabase environment variables are missing.");
       return;
     }
-    if (rememberEmail) window.localStorage.setItem("red-shadow-login-email", email);
+    if (rememberEmail)
+      window.localStorage.setItem("red-shadow-login-email", email);
     else window.localStorage.removeItem("red-shadow-login-email");
+
     setBusy(true);
     setError("");
-    const { error } = await supabase.auth.signInWithPassword({
+
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
+
     setBusy(false);
-    if (error) {
-      setError(error.message);
+
+    if (authError) {
+      setError(authError.message);
       return;
     }
+
+    if (data.session) {
+      document.cookie = `sb-access-token=${data.session.access_token}; path=/; max-age=${
+        60 * 60 * 24 * 7
+      }; SameSite=Lax`;
+    }
+
     router.replace("/");
     router.refresh();
   }
+
   return (
     <main className="grid min-h-screen place-items-center bg-[#111419] p-5">
       <section className="w-full max-w-md rounded-3xl bg-white p-7 shadow-2xl">
@@ -49,12 +73,13 @@ export default function Login() {
             R
           </span>
           <div>
-            <h1 className="font-black">Red Shadow Projects</h1>
+            <h1 className="font-black text-slate-900">Red Shadow Projects</h1>
             <p className="text-sm text-slate-500">Private company workspace</p>
           </div>
         </div>
+
         <form onSubmit={submit} className="space-y-4">
-          <label className="block text-sm font-bold">
+          <label className="block text-sm font-bold text-slate-700">
             Work email
             <input
               required
@@ -63,10 +88,11 @@ export default function Login() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 outline-none focus:border-red-400"
+              className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
             />
           </label>
-          <label className="block text-sm font-bold">
+
+          <label className="block text-sm font-bold text-slate-700">
             Password
             <input
               required
@@ -75,27 +101,38 @@ export default function Login() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 outline-none focus:border-red-400"
+              className="mt-2 h-12 w-full rounded-xl border border-slate-200 px-4 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
             />
           </label>
+
           <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
-            <input type="checkbox" checked={rememberEmail} onChange={(e) => setRememberEmail(e.target.checked)} className="h-4 w-4 accent-[#e3292f]" />
+            <input
+              type="checkbox"
+              checked={rememberEmail}
+              onChange={(e) => setRememberEmail(e.target.checked)}
+              className="h-4 w-4 accent-[#e3292f]"
+            />
             Remember my email
           </label>
+
           {error && (
             <p className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
               {error}
             </p>
           )}
+
           <button
             disabled={busy}
             type="submit"
-            className="h-12 w-full rounded-xl bg-[#e3292f] font-black text-white disabled:opacity-60"
+            className="h-12 w-full rounded-xl bg-[#e3292f] font-black text-white disabled:opacity-60 hover:bg-red-700 transition"
           >
             {busy ? "Signing in…" : "Sign in"}
           </button>
         </form>
-        <p className="mt-4 text-center text-xs text-slate-400">Your browser can offer to save the password securely.</p>
+
+        <p className="mt-4 text-center text-xs text-slate-400">
+          Your browser can offer to save the password securely.
+        </p>
         <p className="mt-5 text-center text-xs text-slate-400">
           Accounts are created by your administrator.
         </p>
@@ -103,4 +140,3 @@ export default function Login() {
     </main>
   );
 }
-
