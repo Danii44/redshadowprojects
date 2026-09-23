@@ -26,6 +26,51 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 type Role = "Admin" | "Project Leader" | "Team Member";
+const PROJECT_STATUSES = [
+  ["open", "Open"],
+  ["in_progress", "In Progress"],
+  ["in_review", "In Review"],
+  ["revisions", "Revisions"],
+  ["delivered", "Delivered"],
+  ["closed", "Closed"],
+  ["cancelled", "Cancelled"],
+] as const;
+type ProjectStatus = (typeof PROJECT_STATUSES)[number][0];
+const LEGACY_PROJECT_STATUSES: Record<string, ProjectStatus> = {
+  active: "open",
+  waiting_client: "in_review",
+  revision: "revisions",
+  completed: "closed",
+  on_hold: "in_progress",
+};
+function normalizeProjectStatus(status?: string | null): ProjectStatus {
+  if (!status) return "open";
+  const normalized = LEGACY_PROJECT_STATUSES[status] ?? status;
+  return PROJECT_STATUSES.some(([value]) => value === normalized)
+    ? (normalized as ProjectStatus)
+    : "open";
+}
+function projectStatusLabel(status?: string | null) {
+  const normalized = normalizeProjectStatus(status);
+  return PROJECT_STATUSES.find(([value]) => value === normalized)?.[1] ?? "Open";
+}
+function projectStatusColor(status?: string | null) {
+  const normalized = normalizeProjectStatus(status);
+  if (normalized === "revisions") return "purple";
+  if (["delivered", "closed"].includes(normalized)) return "green";
+  if (normalized === "cancelled") return "red";
+  return "blue";
+}
+function projectStatusHighlight(status?: string | null) {
+  const normalized = normalizeProjectStatus(status);
+  if (normalized === "open") return "border-sky-200 bg-sky-50 text-sky-800";
+  if (normalized === "in_progress") return "border-blue-200 bg-blue-50 text-blue-800";
+  if (normalized === "in_review") return "border-amber-200 bg-amber-50 text-amber-800";
+  if (normalized === "revisions") return "border-violet-200 bg-violet-50 text-violet-800";
+  if (normalized === "delivered") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (normalized === "closed") return "border-slate-300 bg-slate-100 text-slate-800";
+  return "border-red-200 bg-red-50 text-red-800";
+}
 type View =
   | "Dashboard"
   | "Projects"
@@ -557,10 +602,10 @@ export default function Home() {
             <button
               onClick={() => setView("Notifications")}
               className="relative grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white"
-              aria-label="Open tasks requiring attention"
+              aria-label="Open notifications"
             >
               <Bell size={19} />
-              {tasks.some((task) => task.state === "Blocked" || task.state === "Review") && (
+              {notifications.some((item) => !item.read_at) && (
                 <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white" />
               )}
             </button>
@@ -716,7 +761,7 @@ function Dashboard({
   notify: (s: string) => void;
 }) {
   const activeProjects = projects.filter(
-    (project) => !["completed", "archived"].includes(project.status),
+    (project) => !["delivered", "closed", "cancelled"].includes(normalizeProjectStatus(project.status)),
   );
   const liveAttention = tasks
     .filter((task) => task.state === "In Review" || task.state === "In Revision")
@@ -763,7 +808,7 @@ function Dashboard({
           <Info label="Open tasks" value={String(openTasks.length)} />
           <Info label="In review" value={String(tasks.filter((task) => task.state === "In Review" || task.state === "In Revision").length)} />
         </section>
-        <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
+        <div>
           <section className="rounded-[22px] border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between border-b border-slate-100 p-5"><div><h2 className="font-black">My tasks</h2><p className="mt-1 text-sm text-slate-500">Only tasks assigned to you are shown.</p></div><Pill color={openTasks.length ? "amber" : "green"}>{openTasks.length} open</Pill></div>
             <div className="divide-y divide-slate-100">
@@ -771,7 +816,6 @@ function Dashboard({
               {!tasks.length && <p className="p-8 text-center text-sm font-semibold text-slate-500">No tasks assigned yet.</p>}
             </div>
           </section>
-          <section className="rounded-[22px] border border-slate-200 bg-white p-5 shadow-sm"><h2 className="font-black">My projects</h2><p className="mt-1 text-sm text-slate-500">Projects connected to your assigned work.</p><div className="mt-5 space-y-3">{activeProjects.slice(0, 5).map((project) => <button key={project.id} onClick={() => setView("Projects")} className="w-full rounded-xl border border-slate-200 p-4 text-left hover:border-red-200"><p className="font-bold">{project.name}</p><p className={`mt-1 text-sm font-semibold ${project.deadlineTone || "text-slate-500"}`}>{project.phase} · Due {project.due}</p></button>)}{!activeProjects.length && <p className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">Your projects appear when work is assigned.</p>}</div></section>
         </div>
       </>
     );
@@ -953,12 +997,8 @@ function ProjectCard({ p, onClick }: { p: any; onClick: () => void }) {
     >
       <div className="mb-4 flex items-start justify-between">
         <span className="text-xs font-black text-slate-400">{p.code}</span>
-        <Pill color={p.status === "revision" ? "purple" : p.status === "completed" ? "green" : "blue"}>
-          {p.status === "revision"
-            ? "Revision reopened"
-            : p.status === "completed"
-              ? "Completed"
-              : "Active"}
+        <Pill color={projectStatusColor(p.status)}>
+          {projectStatusLabel(p.status)}
         </Pill>
       </div>
       <h3 className="font-black">{p.name}</h3>
@@ -1000,6 +1040,7 @@ function ProjectsView({
   notify: (s: string) => void;
 }) {
   const [selected, setSelected] = useState(projects[0]);
+  const [statusFilter, setStatusFilter] = useState<ProjectStatus | "all">("all");
   const [creating, setCreating] = useState(false);
   const [projectForm, setProjectForm] = useState({
     name: "",
@@ -1011,14 +1052,64 @@ function ProjectsView({
     requirements: "",
   });
   const [savingProject, setSavingProject] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [projectDetails, setProjectDetails] = useState({
+    name: "",
+    client: "",
+    deadline: "",
+    priority: "normal",
+    description: "",
+    requirements: "",
+  });
+  const visibleProjects = statusFilter === "all"
+    ? projects
+    : projects.filter((project) => normalizeProjectStatus(project.status) === statusFilter);
 
   useEffect(() => {
-    if (!selected && projects.length) setSelected(projects[0]);
-  }, [projects, selected]);
+    if (!visibleProjects.length) {
+      setSelected(undefined);
+      return;
+    }
+    if (!selected || !visibleProjects.some((project) => project.id === selected.id)) {
+      setSelected(visibleProjects[0]);
+    }
+  }, [visibleProjects, selected]);
+  useEffect(() => {
+    if (!selected) return;
+    setProjectDetails({
+      name: selected.name ?? "",
+      client: selected.client ?? "",
+      deadline: selected.deadline ? String(selected.deadline).slice(0, 10) : "",
+      priority: String(selected.priority ?? "normal").toLowerCase(),
+      description: selected.description ?? "",
+      requirements: selected.requirements ?? "",
+    });
+  }, [selected]);
   const canManageSelected = role === "Admin" || selected?.leader_id === profileId;
+  const saveProjectDetails = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase || !selected || role !== "Admin") return;
+    setSavingDetails(true);
+    const changes = {
+      name: projectDetails.name.trim(),
+      client: projectDetails.client.trim() || null,
+      deadline: projectDetails.deadline || null,
+      priority: projectDetails.priority,
+      description: projectDetails.description.trim() || null,
+      requirements: projectDetails.requirements.trim() || null,
+      updated_at: new Date().toISOString(),
+      last_activity_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase.from("projects").update(changes).eq("id", selected.id).select().maybeSingle();
+    setSavingDetails(false);
+    if (error) return notify(error.message);
+    if (!data) return notify("Project changes were not saved. Check your permissions.");
+    notify("Project details updated");
+    window.location.reload();
+  };
   const changeStatus = async (status: string) => {
     if (!supabase || !selected || !canManageSelected) return notify("Only the project leader or an admin can change this status");
-    if (status === "revision" && selected.status !== "revision") {
+    if (status === "revisions" && normalizeProjectStatus(selected.status) !== "revisions") {
       const phases = selected.project_phases ?? [];
       const phase = phases.find((item: any) => item.state === "active") ?? phases.sort((a: any, b: any) => a.position - b.position)[0];
       if (!phase?.id) return notify("This project has no phase to attach the revision to");
@@ -1043,8 +1134,8 @@ function ProjectsView({
     if (error) return notify(error.message);
     if (!data) return notify("Project status was not saved. Check your project permissions.");
     setSelected((current: any) => current ? { ...current, status } : current);
-    if (status === "revision") {
-      notify("Revision reopened and added to review");
+    if (status === "revisions") {
+      notify("Project moved to revisions and a revision was created");
       window.location.reload();
       return;
     }
@@ -1090,7 +1181,7 @@ function ProjectsView({
         priority: projectForm.priority,
         description: projectForm.description || null,
         requirements: projectForm.requirements || null,
-        status: "active",
+        status: "open",
       })
       .select("id")
       .single();
@@ -1140,6 +1231,13 @@ function ProjectsView({
           </button>
         )}
       </div>
+      <div className="mb-5 flex flex-wrap gap-2" aria-label="Filter projects by status">
+        <button onClick={() => setStatusFilter("all")} className={`rounded-full border px-3 py-2 text-xs font-black ${statusFilter === "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-200 bg-white text-slate-600"}`}>All ({projects.length})</button>
+        {PROJECT_STATUSES.map(([value, label]) => {
+          const count = projects.filter((project) => normalizeProjectStatus(project.status) === value).length;
+          return <button key={value} onClick={() => setStatusFilter(value)} className={`rounded-full border px-3 py-2 text-xs font-black ${statusFilter === value ? projectStatusHighlight(value) : "border-slate-200 bg-white text-slate-600"}`}>{label} ({count})</button>;
+        })}
+      </div>
       {creating && (
         <form onSubmit={createProject} className="mb-6 rounded-2xl border border-red-100 bg-white p-5 shadow-sm sm:p-6">
           <div className="mb-5">
@@ -1163,27 +1261,17 @@ function ProjectsView({
       )}
       <div className="grid gap-6 xl:grid-cols-[.8fr_1.4fr]">
         <div className="space-y-3">
-          {projects.map((p) => (
+          {visibleProjects.map((p) => (
             <button
               key={p.name}
               onClick={() => setSelected(p)}
               className={`w-full rounded-2xl border bg-white p-4 text-left ${selected?.name === p.name ? "border-red-300 ring-4 ring-red-50" : "border-slate-200"}`}
             >
-              <div className="flex justify-between">
+              <div className="flex flex-wrap justify-between gap-2">
                 <span className="text-xs font-bold text-slate-400">
                   {p.code}
                 </span>
-                <Pill
-                  color={
-                    p.priority === "Critical"
-                      ? "red"
-                      : p.priority === "High"
-                        ? "amber"
-                        : "slate"
-                  }
-                >
-                  {p.priority}
-                </Pill>
+                <div className="flex gap-2"><Pill color={projectStatusColor(p.status)}>{projectStatusLabel(p.status)}</Pill><Pill color={p.priority === "Critical" ? "red" : p.priority === "High" ? "amber" : "slate"}>{p.priority}</Pill></div>
               </div>
               <h3 className="mt-2 font-black">{p.name}</h3>
               <p className="mt-1 text-sm text-slate-500">
@@ -1191,6 +1279,7 @@ function ProjectsView({
               </p>
             </button>
           ))}
+          {!visibleProjects.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm font-semibold text-slate-500">No projects match this status.</div>}
         </div>
         {selected && (
           <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
@@ -1205,12 +1294,8 @@ function ProjectsView({
               {canManageSelected && (
                 <div className="grid w-full gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 lg:w-auto lg:min-w-[430px]">
                   {role === "Admin" && <label className="text-xs font-black uppercase tracking-wide text-slate-400">Project leader<select aria-label="Project leader" value={selected.leader_id ?? ""} onChange={(e) => changeLeader(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"><option value="">Select leader</option>{people.filter((person) => person.role === "admin" || person.role === "project_leader").map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>}
-                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Project status<select aria-label="Project status" value={selected.status} onChange={(e) => changeStatus(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50">
-                    <option value="active">Active</option>
-                    <option value="waiting_client">Waiting for client</option>
-                    <option value="revision">Revision reopened</option>
-                    <option value="completed">Completed</option>
-                    <option value="on_hold">On hold</option>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Project status<select aria-label="Project status" value={normalizeProjectStatus(selected.status)} onChange={(e) => changeStatus(e.target.value)} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold normal-case tracking-normal text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50">
+                    {PROJECT_STATUSES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select></label>
                   {role === "Admin" && <button onClick={deleteProject} className="h-10 self-end rounded-xl border border-red-200 px-4 text-sm font-bold text-red-600 hover:bg-red-50">Delete project</button>}
                 </div>
@@ -1223,8 +1308,22 @@ function ProjectsView({
                 className={deadlineTone(selected.deadline)}
               />
               <Info label="Priority" value={selected.priority || "Normal"} />
-              <Info label="Status" value={String(selected.status || "active").replaceAll("_", " ")} />
+              <div className={`rounded-xl border p-4 ${projectStatusHighlight(selected.status)}`}><p className="text-xs font-bold opacity-60">Status</p><p className="mt-1 font-black">{projectStatusLabel(selected.status)}</p></div>
             </div>
+            {role === "Admin" && (
+              <form onSubmit={saveProjectDetails} className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="mb-4"><h3 className="font-black">Admin project controls</h3><p className="mt-1 text-xs text-slate-500">Update the project details, deadline, and priority.</p></div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Project name<input required value={projectDetails.name} onChange={(e) => setProjectDetails({ ...projectDetails, name: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-800" /></label>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Client<input value={projectDetails.client} onChange={(e) => setProjectDetails({ ...projectDetails, client: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-800" /></label>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Deadline<input type="date" value={projectDetails.deadline} onChange={(e) => setProjectDetails({ ...projectDetails, deadline: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-800" /></label>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400">Priority<select value={projectDetails.priority} onChange={(e) => setProjectDetails({ ...projectDetails, priority: e.target.value })} className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold normal-case tracking-normal text-slate-800"><option value="none">None</option><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option><option value="critical">Critical</option></select></label>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400 md:col-span-2">Description<textarea rows={3} value={projectDetails.description} onChange={(e) => setProjectDetails({ ...projectDetails, description: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-slate-800" /></label>
+                  <label className="text-xs font-black uppercase tracking-wide text-slate-400 md:col-span-2">Requirements<textarea rows={3} value={projectDetails.requirements} onChange={(e) => setProjectDetails({ ...projectDetails, requirements: e.target.value })} className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold normal-case tracking-normal text-slate-800" /></label>
+                </div>
+                <button disabled={savingDetails} className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60">{savingDetails ? "Saving..." : "Save project changes"}</button>
+              </form>
+            )}
             {(selected.description || selected.requirements) && (
               <div className="mt-4 grid gap-3 md:grid-cols-2">
                 {selected.description && <Info label="Description" value={selected.description} />}
@@ -1277,13 +1376,7 @@ function ProjectsView({
             <div className="mt-4">
               <Info
                 label="Project status"
-                value={
-                  selected.status === "revision"
-                    ? "Revision reopened"
-                    : selected.status === "completed"
-                      ? "Completed"
-                      : "Active"
-                }
+                value={projectStatusLabel(selected.status)}
               />
             </div>
             <div className="mt-5 rounded-2xl bg-slate-50 p-5">
@@ -1876,4 +1969,3 @@ function GenericView({
     </>
   );
 }
-

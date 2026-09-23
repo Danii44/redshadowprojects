@@ -104,9 +104,9 @@ CREATE TABLE public.projects (
     requirements text,
     internal_notes text,
 
-    -- active / in_review / on_hold /
-    -- revision / completed / cancelled
-    status text NOT NULL DEFAULT 'active',
+    -- open / in_progress / in_review / revisions /
+    -- delivered / closed / cancelled
+    status text NOT NULL DEFAULT 'open',
 
     -- none / low / normal / high / critical
     priority text NOT NULL DEFAULT 'normal',
