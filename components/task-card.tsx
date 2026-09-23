@@ -26,14 +26,14 @@ export function TaskCard({
     <div
       draggable={editable}
       onDragStart={onDragStart}
-      className={`w-full rounded-xl border border-slate-200 bg-white p-3 text-left shadow-sm ${
-        editable ? "cursor-grab active:cursor-grabbing" : ""
+      className={`w-full rounded-xl border border-slate-200 bg-white p-2.5 text-left shadow-2xs transition ${
+        editable ? "cursor-grab active:cursor-grabbing hover:shadow-sm" : ""
       }`}
     >
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-bold leading-5 text-slate-900">{t.title}</p>
+      <div className="flex items-start justify-between gap-1.5">
+        <p className="text-xs font-bold leading-snug text-slate-900 break-words">{t.title}</p>
         <span
-          className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black uppercase ${
+          className={`shrink-0 rounded px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tight ${
             t.priority === "critical"
               ? "bg-red-50 text-red-700"
               : t.priority === "high"
@@ -44,19 +44,19 @@ export function TaskCard({
           {t.priority || "normal"}
         </span>
       </div>
-      <p className="mt-2 text-xs text-slate-400">{t.project}</p>
+      <p className="mt-1.5 text-[11px] font-semibold text-slate-500 truncate">{t.project}</p>
       <p
-        className={`mt-1 text-xs font-semibold ${
+        className={`mt-0.5 text-[10px] font-semibold truncate ${
           t.dueTone || "text-slate-500"
         }`}
       >
         {t.owner} · Due {t.due || "No deadline"}
       </p>
-      <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-bold text-slate-500">
+      <div className="mt-2.5 flex items-center justify-between">
+        <span className="text-[10px] font-bold text-slate-400">
           ☑ {t.checklist || "0/0"}
         </span>
-        <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-[9px] font-black text-white">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[8.5px] font-black text-white">
           {t.initials || "TM"}
         </span>
       </div>

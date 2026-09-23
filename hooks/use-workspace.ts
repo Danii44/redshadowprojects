@@ -88,97 +88,92 @@ export function useWorkspace() {
     setPeople(peopleRows ?? []);
     setNotifications(notificationRows ?? []);
 
-    if (visibleProjectRows.length) {
-      const projectById = new Map<string, string>(
-        visibleProjectRows.map((project: any) => [project.id, project.name]),
-      );
+    const projectById = new Map<string, string>(
+      (visibleProjectRows ?? []).map((project: any) => [project.id, project.name]),
+    );
 
-      setProjects(
-        visibleProjectRows.map((project: any) => {
-          const phase =
-            project.project_phases?.find(
-              (item: any) => item.state === "active",
-            ) ??
-            project.project_phases?.sort(
-              (a: any, b: any) => a.position - b.position,
-            )[0];
+    setProjects(
+      (visibleProjectRows ?? []).map((project: any) => {
+        const phase =
+          project.project_phases?.find(
+            (item: any) => item.state === "active",
+          ) ??
+          project.project_phases?.sort(
+            (a: any, b: any) => a.position - b.position,
+          )[0];
 
-          return {
-            ...project,
-            phase: phase?.name ?? "Requirements",
-            revision: project.revisions?.length
-              ? `R${Math.max(
-                  ...project.revisions.map((item: any) => item.number),
-                )}`
-              : "No revision",
-            leader: peopleMap.get(project.leader_id) ?? "Unassigned",
-            team: (project.project_members ?? []).map((member: any) =>
-              String(peopleMap.get(member.user_id) ?? "TM")
+        return {
+          ...project,
+          phase: phase?.name ?? "Requirements",
+          revision: project.revisions?.length
+            ? `R${Math.max(
+                ...project.revisions.map((item: any) => item.number),
+              )}`
+            : "No revision",
+          leader: peopleMap.get(project.leader_id) ?? "Unassigned",
+          team: (project.project_members ?? []).map((member: any) =>
+            String(peopleMap.get(member.user_id) ?? "TM")
+              .split(" ")
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+              .toUpperCase(),
+          ),
+          due: project.deadline
+            ? new Date(project.deadline).toLocaleDateString()
+            : "No deadline",
+          deadlineTone: deadlineTone(project.deadline),
+          priority:
+            project.priority?.charAt(0).toUpperCase() +
+              project.priority?.slice(1) || "Normal",
+          color:
+            project.priority === "critical"
+              ? "#ef4444"
+              : project.priority === "high"
+              ? "#f59e0b"
+              : "#3b82f6",
+          note:
+            project.requirements ??
+            project.description ??
+            "No requirements added",
+        };
+      }),
+    );
+
+    if (visibleTaskRows && visibleTaskRows.length) {
+      setTasks(
+        visibleTaskRows
+          .filter((task: any) => !task.project_id || visibleProjectIds.has(task.project_id))
+          .map((task: any) => {
+            const owner = peopleMap.get(task.assignee_id) ?? "Unassigned";
+            return {
+              ...task,
+              title: task.title,
+              project: projectById.get(task.project_id) ?? "General Task",
+              owner,
+              initials: String(owner)
                 .split(" ")
                 .map((part) => part[0])
                 .join("")
                 .slice(0, 2)
                 .toUpperCase(),
-            ),
-            due: project.deadline
-              ? new Date(project.deadline).toLocaleDateString()
-              : "No deadline",
-            deadlineTone: deadlineTone(project.deadline),
-            priority:
-              project.priority?.charAt(0).toUpperCase() +
-                project.priority?.slice(1) || "Normal",
-            color:
-              project.priority === "critical"
-                ? "#ef4444"
-                : project.priority === "high"
-                ? "#f59e0b"
-                : "#3b82f6",
-            note:
-              project.requirements ??
-              project.description ??
-              "No requirements added",
-          };
-        }),
+              state: task.status
+                .split("_")
+                .map(
+                  (part: string) =>
+                    part.charAt(0).toUpperCase() + part.slice(1),
+                )
+                .join(" "),
+              due: task.due_at
+                ? new Date(task.due_at).toLocaleDateString()
+                : "No deadline",
+              dueTone: deadlineTone(task.due_at),
+              priority: task.priority ?? "normal",
+              checklist: "0/0",
+            };
+          }),
       );
-
-      if (visibleTaskRows.length) {
-        setTasks(
-          visibleTaskRows
-            .filter((task: any) => visibleProjectIds.has(task.project_id))
-            .map((task: any) => {
-              const owner = peopleMap.get(task.assignee_id) ?? "Unassigned";
-              return {
-                ...task,
-                title: task.title,
-                project: projectById.get(task.project_id) ?? "Project",
-                owner,
-                initials: String(owner)
-                  .split(" ")
-                  .map((part) => part[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase(),
-                state: task.status
-                  .split("_")
-                  .map(
-                    (part: string) =>
-                      part.charAt(0).toUpperCase() + part.slice(1),
-                  )
-                  .join(" "),
-                due: task.due_at
-                  ? new Date(task.due_at).toLocaleDateString()
-                  : "No deadline",
-                dueTone: deadlineTone(task.due_at),
-                priority: task.priority ?? "normal",
-                checklist: "0/0",
-              };
-            }),
-        );
-      } else {
-        setTasks([]);
-      }
     } else {
-      setProjects([]);
       setTasks([]);
     }
 

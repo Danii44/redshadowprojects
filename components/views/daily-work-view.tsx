@@ -158,14 +158,14 @@ export function DailyWorkView({
   // 1. Team member self-adds what they are working on today
   const handleAddSelfTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !selfTaskForm.title.trim() || !selfTaskForm.projectId) return;
+    if (!supabase || !selfTaskForm.title.trim()) return;
     setSubmitting(true);
 
     const { data: newTask, error } = await supabase
       .from("tasks")
       .insert({
         title: selfTaskForm.title.trim(),
-        project_id: selfTaskForm.projectId,
+        project_id: selfTaskForm.projectId || null,
         assignee_id: profileId,
         created_by: profileId,
         status: "in_progress",
@@ -180,15 +180,17 @@ export function DailyWorkView({
     setSubmitting(false);
     if (error) return notify(`Could not add task: ${error.message}`);
 
-    // Ensure user is added as project member
-    await supabase.from("project_members").upsert(
-      {
-        project_id: selfTaskForm.projectId,
-        user_id: profileId,
-        project_role: "Team Member",
-      },
-      { onConflict: "project_id,user_id" },
-    );
+    // Only link to project if one was selected
+    if (selfTaskForm.projectId) {
+      await supabase.from("project_members").upsert(
+        {
+          project_id: selfTaskForm.projectId,
+          user_id: profileId,
+          project_role: "Team Member",
+        },
+        { onConflict: "project_id,user_id" },
+      );
+    }
 
     setAddingSelfTask(false);
     setSelfTaskForm({
@@ -205,15 +207,14 @@ export function DailyWorkView({
   // 2. Admin / Project Leader assigns a daily task to a member
   const handleAssignMemberTask = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase || !assignForm.title.trim() || !assignForm.projectId || !assignForm.assigneeId)
-      return;
+    if (!supabase || !assignForm.title.trim() || !assignForm.assigneeId) return;
     setSubmitting(true);
 
     const { data: newTask, error } = await supabase
       .from("tasks")
       .insert({
         title: assignForm.title.trim(),
-        project_id: assignForm.projectId,
+        project_id: assignForm.projectId || null,
         assignee_id: assignForm.assigneeId,
         created_by: profileId,
         status: "in_progress",
@@ -228,14 +229,17 @@ export function DailyWorkView({
     setSubmitting(false);
     if (error) return notify(`Could not assign task: ${error.message}`);
 
-    await supabase.from("project_members").upsert(
-      {
-        project_id: assignForm.projectId,
-        user_id: assignForm.assigneeId,
-        project_role: "Team Member",
-      },
-      { onConflict: "project_id,user_id" },
-    );
+    // Only link to project if one was selected
+    if (assignForm.projectId) {
+      await supabase.from("project_members").upsert(
+        {
+          project_id: assignForm.projectId,
+          user_id: assignForm.assigneeId,
+          project_role: "Team Member",
+        },
+        { onConflict: "project_id,user_id" },
+      );
+    }
 
     setAssigningMemberTask(false);
     setAssignForm({
@@ -569,16 +573,16 @@ export function DailyWorkView({
               </label>
 
               <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                Project *
+                Project{" "}
+                <span className="normal-case font-semibold text-slate-400">(optional)</span>
                 <select
-                  required
                   value={selfTaskForm.projectId}
                   onChange={(e) =>
                     setSelfTaskForm({ ...selfTaskForm, projectId: e.target.value })
                   }
                   className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900 cursor-pointer"
                 >
-                  <option value="">Select project...</option>
+                  <option value="">No project / standalone task</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.code})
@@ -697,16 +701,16 @@ export function DailyWorkView({
               </label>
 
               <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                Project *
+                Project{" "}
+                <span className="normal-case font-semibold text-slate-400">(optional)</span>
                 <select
-                  required
                   value={assignForm.projectId}
                   onChange={(e) =>
                     setAssignForm({ ...assignForm, projectId: e.target.value })
                   }
                   className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold outline-none focus:border-red-400 text-slate-900 cursor-pointer"
                 >
-                  <option value="">Select project...</option>
+                  <option value="">No project / standalone task</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name} ({p.code})

@@ -1,4 +1,3 @@
-"useClient";
 "use client";
 
 import { useState } from "react";
