@@ -56,25 +56,72 @@ export function projectStatusHighlight(status?: string | null): string {
   }
 }
 
-/** Calculate human readable time left or overdue string */
+/** Calculate human readable time left or overdue string with urgency colors */
 export function calculateTimeLeft(deadline?: string | null): {
   label: string;
   tone: string;
+  bgClass: string;
+  borderClass: string;
+  badgeClass: string;
+  urgencyLevel: "overdue" | "today" | "soon" | "normal" | "none";
 } {
-  if (!deadline) return { label: "No deadline", tone: "text-slate-400" };
+  if (!deadline) {
+    return {
+      label: "No deadline",
+      tone: "text-slate-400 font-medium",
+      bgClass: "bg-transparent",
+      borderClass: "border-l-4 border-l-transparent",
+      badgeClass: "bg-slate-100 text-slate-600 border border-slate-200 font-medium",
+      urgencyLevel: "none",
+    };
+  }
+
   const diffDays = Math.ceil(
     (new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
   );
+
   if (diffDays < 0) {
-    return { label: `${Math.abs(diffDays)}d overdue`, tone: "text-red-600 font-bold" };
+    const days = Math.abs(diffDays);
+    return {
+      label: `${days}d overdue`,
+      tone: "text-amber-900 font-bold",
+      bgClass: "bg-amber-50/90 hover:bg-amber-100/80",
+      borderClass: "border-l-4 border-l-amber-500",
+      badgeClass: "bg-amber-100/90 text-amber-900 border border-amber-300 font-bold",
+      urgencyLevel: "overdue",
+    };
   }
+
   if (diffDays === 0) {
-    return { label: "Due today", tone: "text-amber-600 font-bold" };
+    return {
+      label: "Due today",
+      tone: "text-red-900 font-bold",
+      bgClass: "bg-red-50/90 hover:bg-red-100/80",
+      borderClass: "border-l-4 border-l-red-500",
+      badgeClass: "bg-red-100/90 text-red-900 border border-red-300 font-bold",
+      urgencyLevel: "today",
+    };
   }
+
   if (diffDays <= 3) {
-    return { label: `${diffDays}d left`, tone: "text-amber-600 font-bold" };
+    return {
+      label: `${diffDays}d left`,
+      tone: "text-orange-900 font-bold",
+      bgClass: "bg-orange-50/50 hover:bg-orange-100/50",
+      borderClass: "border-l-4 border-l-orange-400",
+      badgeClass: "bg-orange-100/80 text-orange-900 border border-orange-200 font-bold",
+      urgencyLevel: "soon",
+    };
   }
-  return { label: `${diffDays}d left`, tone: "text-slate-500 font-medium" };
+
+  return {
+    label: `${diffDays}d left`,
+    tone: "text-slate-600 font-semibold",
+    bgClass: "bg-white hover:bg-slate-50/80",
+    borderClass: "border-l-4 border-l-transparent",
+    badgeClass: "bg-slate-100 text-slate-700 border border-slate-200 font-semibold",
+    urgencyLevel: "normal",
+  };
 }
 
 /** Get a text color class based on how close a deadline is */

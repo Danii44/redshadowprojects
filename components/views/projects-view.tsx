@@ -53,13 +53,14 @@ export function ProjectsView({
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<
+    | "status_workflow"
     | "deadline_asc"
     | "deadline_desc"
     | "name_asc"
     | "name_desc"
     | "priority"
     | "code"
-  >("deadline_asc");
+  >("status_workflow");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Modal / Drawer state
@@ -91,6 +92,7 @@ export function ProjectsView({
     type: "",
     deadline: "",
     priority: "normal",
+    status: "open",
     description: "",
     requirements: "",
     internal_notes: "",
@@ -105,6 +107,7 @@ export function ProjectsView({
       type: p.type || "Product Design",
       deadline: p.deadline ? p.deadline.slice(0, 10) : "",
       priority: p.priority ? p.priority.toLowerCase() : "normal",
+      status: normalizeProjectStatus(p.status),
       description: p.description || "",
       requirements: p.requirements || "",
       internal_notes: p.internal_notes || "",
@@ -163,6 +166,26 @@ export function ProjectsView({
   });
 
   const sortedProjects = [...filteredProjects].sort((a, b) => {
+    if (sortBy === "status_workflow") {
+      const statusOrder: Record<string, number> = {
+        open: 1,
+        in_progress: 2,
+        in_review: 3,
+        revisions: 4,
+        on_hold: 5,
+        delivered: 6,
+        closed: 7,
+        cancelled: 8,
+      };
+      const rankA = statusOrder[normalizeProjectStatus(a.status)] ?? 99;
+      const rankB = statusOrder[normalizeProjectStatus(b.status)] ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+
+      // Secondary tie-breaker by deadline (soonest first)
+      const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return timeA - timeB;
+    }
     if (sortBy === "deadline_asc") {
       const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
       const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
@@ -324,6 +347,7 @@ export function ProjectsView({
         type: editForm.type || null,
         deadline,
         priority: editForm.priority,
+        status: editForm.status,
         description: editForm.description || null,
         requirements: editForm.requirements || null,
         internal_notes: editForm.internal_notes || null,
@@ -333,6 +357,21 @@ export function ProjectsView({
 
     setSavingDetails(false);
     if (error) return notify(error.message);
+
+    setActiveProject({
+      ...activeProject,
+      name: editForm.name,
+      client: editForm.client || null,
+      type: editForm.type || null,
+      deadline,
+      due: deadline ? new Date(deadline).toLocaleDateString() : "No deadline",
+      priority: editForm.priority,
+      status: editForm.status,
+      description: editForm.description || null,
+      requirements: editForm.requirements || null,
+      internal_notes: editForm.internal_notes || null,
+    });
+
     notify("Project details updated");
     setDrawerTab("overview");
     refresh();
@@ -412,6 +451,12 @@ export function ProjectsView({
       .eq("id", projectId);
 
     if (error) return notify(error.message);
+
+    if (activeProject && activeProject.id === projectId) {
+      setActiveProject({ ...activeProject, status });
+      setEditForm((prev) => ({ ...prev, status }));
+    }
+
     notify(`Status changed to ${projectStatusLabel(status)}`);
     refresh();
   };
@@ -473,6 +518,7 @@ export function ProjectsView({
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
+              <option value="status_workflow">Status Workflow (Open → Closed)</option>
               <option value="deadline_asc">Due Date (Soonest First)</option>
               <option value="deadline_desc">Due Date (Furthest First)</option>
               <option value="name_asc">Name (A → Z)</option>
@@ -1284,6 +1330,23 @@ export function ProjectsView({
                   <form onSubmit={updateProjectDetails} className="space-y-4">
                     <div className="grid gap-3 sm:grid-cols-2">
                       <label className="text-xs font-bold text-slate-500">
+                        Project Status
+                        <select
+                          value={editForm.status}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, status: e.target.value })
+                          }
+                          className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+                        >
+                          {PROJECT_STATUSES.map(([val, label]) => (
+                            <option key={val} value={val}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+
+                      <label className="text-xs font-bold text-slate-500">
                         Project Name
                         <input
                           required
@@ -1324,7 +1387,20 @@ export function ProjectsView({
                       </label>
 
                       <label className="text-xs font-bold text-slate-500">
-                        Deadline
+                        <span className="flex items-center justify-between">
+                          <span>Deadline</span>
+                          {editForm.deadline && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setEditForm({ ...editForm, deadline: "" })
+                              }
+                              className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                            >
+                              Clear Deadline
+                            </button>
+                          )}
+                        </span>
                         <input
                           type="date"
                           value={editForm.deadline}

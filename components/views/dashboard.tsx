@@ -3,6 +3,7 @@ import {
   ArrowRight,
   CheckCircle2,
   Clock,
+  Eye,
   FileClock,
   Layers,
   ListTodo,
@@ -48,11 +49,31 @@ export function Dashboard({
         (userName && t.owner?.toLowerCase() === userName.toLowerCase()),
     );
 
-    const myProjects = projects.filter(
+    const rawMyProjects = projects.filter(
       (p) =>
         p.leader_id === profileId ||
         p.project_members?.some((m) => m.user_id === profileId),
     );
+
+    const statusWorkflowOrder: Record<string, number> = {
+      open: 1,
+      in_progress: 2,
+      in_review: 3,
+      revisions: 4,
+      on_hold: 5,
+      delivered: 6,
+      closed: 7,
+      cancelled: 8,
+    };
+
+    const myProjects = [...rawMyProjects].sort((a, b) => {
+      const rankA = statusWorkflowOrder[normalizeProjectStatus(a.status)] ?? 99;
+      const rankB = statusWorkflowOrder[normalizeProjectStatus(b.status)] ?? 99;
+      if (rankA !== rankB) return rankA - rankB;
+      const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
+      const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+      return timeA - timeB;
+    });
 
     const myInProgress = myTasks.filter((t) => t.state === "In Progress").length;
     const myInReview = myTasks.filter(
@@ -187,15 +208,14 @@ export function Dashboard({
                     </div>
 
                     <span
-                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${
-                        t.state === "In Progress"
-                          ? "bg-blue-50 text-blue-700 border border-blue-200"
-                          : t.state === "In Review"
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${t.state === "In Progress"
+                        ? "bg-blue-50 text-blue-700 border border-blue-200"
+                        : t.state === "In Review"
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : t.state === "In Revision"
-                          ? "bg-red-50 text-red-700 border border-red-200"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
+                            ? "bg-red-50 text-red-700 border border-red-200"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
                     >
                       {t.state}
                     </span>
@@ -308,23 +328,51 @@ export function Dashboard({
   const needsAttentionProjects = projects.filter((p) => {
     const status = normalizeProjectStatus(p.status);
     if (["delivered", "closed", "cancelled"].includes(status)) return false;
-    if (status === "revisions" || status === "in_review") return true;
 
     if (p.deadline) {
       const diffHours =
         (new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
       return diffHours <= 48;
     }
-    return false;
+    return status === "in_progress" || status === "open";
   });
 
   const sortedNeedsAttention = [...needsAttentionProjects].sort((a, b) => {
     const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+
+    const diffDaysA = a.deadline
+      ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : 999;
+    const diffDaysB = b.deadline
+      ? Math.ceil((new Date(b.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : 999;
+
+    // Rank 1: Due Today (0 days diff - Urgent deliverable)
+    // Rank 2: Approaching deadline (1-2 days diff)
+    // Rank 3: Overdue / other
+    const rankA = diffDaysA === 0 ? 1 : diffDaysA > 0 ? 2 : 3;
+    const rankB = diffDaysB === 0 ? 1 : diffDaysB > 0 ? 2 : 3;
+
+    if (rankA !== rankB) return rankA - rankB;
     return timeA - timeB;
   });
 
   const sortedOpenProjects = [...activeProjects].sort((a, b) => {
+    const statusWorkflowOrder: Record<string, number> = {
+      open: 1,
+      in_progress: 2,
+      in_review: 3,
+      revisions: 4,
+      on_hold: 5,
+      delivered: 6,
+      closed: 7,
+      cancelled: 8,
+    };
+    const rankA = statusWorkflowOrder[normalizeProjectStatus(a.status)] ?? 99;
+    const rankB = statusWorkflowOrder[normalizeProjectStatus(b.status)] ?? 99;
+    if (rankA !== rankB) return rankA - rankB;
+
     const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
     return timeA - timeB;
@@ -376,7 +424,7 @@ export function Dashboard({
           <h1 className="text-3xl font-black tracking-tight text-slate-900">
             Studio Dashboard
           </h1>
-          <p className="mt-1 text-xs font-bold text-slate-400">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             Red Shadow Designs · {userName} ({role})
           </p>
         </div>
@@ -392,89 +440,101 @@ export function Dashboard({
 
       {/* Top Metric Cards Row (6 Cards) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs hover:shadow-xs transition">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             Total
           </p>
           <p className="mt-2 text-3xl font-black text-slate-900">{totalCount}</p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             {activeCount} active
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+          openCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+        }`}>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             Open
           </p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{openCount}</p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className={`mt-2 text-3xl font-black ${openCount === 0 ? "text-slate-400" : "text-slate-900"}`}>
+            {openCount}
+          </p>
+          <p className="mt-1 text-xs font-bold text-slate-600">
             not started yet
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+          inProgressCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+        }`}>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             In Progress
           </p>
-          <p className="mt-2 text-3xl font-black text-blue-600">
+          <p className={`mt-2 text-3xl font-black ${inProgressCount === 0 ? "text-slate-400" : "text-blue-600"}`}>
             {inProgressCount}
           </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             work happening
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+          inReviewCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+        }`}>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             In Review
           </p>
-          <p className="mt-2 text-3xl font-black text-amber-500">
+          <p className={`mt-2 text-3xl font-black ${inReviewCount === 0 ? "text-slate-400" : "text-amber-500"}`}>
             {inReviewCount}
           </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             awaiting feedback
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+          revisionsCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+        }`}>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             Revisions
           </p>
-          <p className="mt-2 text-3xl font-black text-violet-600">
+          <p className={`mt-2 text-3xl font-black ${revisionsCount === 0 ? "text-slate-400" : "text-violet-600"}`}>
             {revisionsCount}
           </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             client changes
           </p>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
-          <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+          deliveredCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+        }`}>
+          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
             Delivered
           </p>
-          <p className="mt-2 text-3xl font-black text-emerald-600">
+          <p className={`mt-2 text-3xl font-black ${deliveredCount === 0 ? "text-slate-400" : "text-emerald-600"}`}>
             {deliveredCount}
           </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-bold text-slate-600">
             completed / sent
           </p>
         </div>
       </div>
 
-      {/* Middle Section (3-Column Grid) */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
+      {/* Middle Section (2-Column Grid: Needs Attention & Open Projects) */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between overflow-hidden">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 p-4">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-5 bg-white">
               <div>
                 <h2 className="font-black text-slate-900 text-base">
                   Needs Attention
                 </h2>
-                <p className="mt-0.5 text-[11px] text-slate-500 font-semibold">
+                <p className="mt-0.5 text-xs text-slate-600 font-semibold">
                   Overdue & due in next 2 days
                 </p>
               </div>
-              <span className="rounded-full bg-red-50 px-2.5 py-1 text-xs font-black text-red-600">
+              <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-black text-red-600">
                 {sortedNeedsAttention.length} urgent
               </span>
             </div>
@@ -486,20 +546,20 @@ export function Dashboard({
                   <button
                     key={p.id}
                     onClick={() => setView("Projects")}
-                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+                    className={`flex w-full items-center justify-between p-4 text-left transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-slate-400">
+                        <span className="font-mono text-xs font-bold text-slate-500">
                           {p.code}
                         </span>
                         <p className="font-black text-slate-900 text-xs truncate">
                           {p.name}
                         </p>
                       </div>
-                      <p className={`mt-1 text-[11px] ${timeLeft.tone}`}>
+                      <span className={`inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[11px] ${timeLeft.badgeClass}`}>
                         {timeLeft.label}
-                      </p>
+                      </span>
                     </div>
 
                     <Pill color={projectStatusColor(p.status)}>
@@ -510,7 +570,7 @@ export function Dashboard({
               })}
 
               {!sortedNeedsAttention.length && (
-                <div className="p-8 text-center text-xs font-semibold text-slate-400">
+                <div className="p-8 text-center text-xs font-semibold text-slate-400 bg-white">
                   No urgent items or overdue deadlines right now!
                 </div>
               )}
@@ -518,14 +578,14 @@ export function Dashboard({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between overflow-hidden">
           <div>
-            <div className="flex items-center justify-between border-b border-slate-100 p-4">
+            <div className="flex items-center justify-between border-b border-slate-100 p-4 sm:p-5 bg-white">
               <div>
                 <h2 className="font-black text-slate-900 text-base">
                   Open Projects
                 </h2>
-                <p className="mt-0.5 text-[11px] text-slate-500 font-semibold">
+                <p className="mt-0.5 text-xs text-slate-600 font-semibold">
                   Active deliverables aligned by timeline
                 </p>
               </div>
@@ -545,22 +605,22 @@ export function Dashboard({
                   (p.phase === "Requirements"
                     ? 15
                     : p.phase === "Concept"
-                    ? 35
-                    : p.phase === "Detailed Design"
-                    ? 60
-                    : p.phase === "Client Review"
-                    ? 80
-                    : 95);
+                      ? 35
+                      : p.phase === "Detailed Design"
+                        ? 60
+                        : p.phase === "Client Review"
+                          ? 80
+                          : 95);
 
                 return (
                   <button
                     key={p.id}
                     onClick={() => setView("Projects")}
-                    className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
+                    className={`flex w-full items-center justify-between p-4 text-left transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
                     <div className="min-w-0 flex-1 pr-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[11px] font-bold text-slate-400">
+                        <span className="font-mono text-xs font-bold text-slate-500">
                           {p.code}
                         </span>
                         <p className="font-black text-slate-900 text-xs truncate">
@@ -569,13 +629,13 @@ export function Dashboard({
                       </div>
 
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="h-1.5 w-20 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden">
                           <div
                             className="h-full bg-slate-900 rounded-full"
                             style={{ width: `${progressPct}%` }}
                           />
                         </div>
-                        <span className="text-[10px] font-bold text-slate-400">
+                        <span className="text-[10px] font-bold text-slate-500">
                           {progressPct}%
                         </span>
 
@@ -592,7 +652,7 @@ export function Dashboard({
                       </div>
                     </div>
 
-                    <span className={`text-[11px] ${timeLeft.tone}`}>
+                    <span className={`rounded-full px-2.5 py-0.5 text-[11px] ${timeLeft.badgeClass}`}>
                       {timeLeft.label}
                     </span>
                   </button>
@@ -600,93 +660,8 @@ export function Dashboard({
               })}
 
               {!sortedOpenProjects.length && (
-                <div className="p-8 text-center text-xs font-semibold text-slate-400">
+                <div className="p-8 text-center text-xs font-semibold text-slate-400 bg-white">
                   No open active projects found.
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white shadow-xs flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between border-b border-slate-100 p-4">
-              <div>
-                <h2 className="font-black text-slate-900 text-base">
-                  Revisions & Approvals
-                </h2>
-                <p className="mt-0.5 text-[11px] text-slate-500 font-semibold">
-                  Pending review & approval queue
-                </p>
-              </div>
-              <button
-                onClick={() => setView("Revisions")}
-                className="flex items-center gap-1 text-xs font-black text-[#e3292f] hover:underline cursor-pointer"
-              >
-                Queue <ArrowRight size={13} />
-              </button>
-            </div>
-
-            <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
-              {pendingRevisions.map((p) => (
-                <button
-                  key={`rev-proj-${p.id}`}
-                  onClick={() => setView("Revisions")}
-                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <div className="min-w-0 flex-1 pr-3">
-                    <div className="flex items-center gap-2">
-                      <FileClock size={14} className="text-violet-500 shrink-0" />
-                      <p className="font-black text-slate-900 text-xs truncate">
-                        {p.name}
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-[10px] text-slate-500 font-semibold">
-                      {p.code} · {p.revision || "R1"}
-                    </p>
-                  </div>
-
-                  <Pill color={projectStatusColor(p.status)}>
-                    {projectStatusLabel(p.status)}
-                  </Pill>
-                </button>
-              ))}
-
-              {pendingTaskReviews.map((t) => (
-                <button
-                  key={`rev-task-${t.id}`}
-                  onClick={() => setView("Revisions")}
-                  className="flex w-full items-center justify-between p-3.5 text-left hover:bg-slate-50 transition cursor-pointer"
-                >
-                  <div className="min-w-0 flex-1 pr-3">
-                    <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-amber-500 shrink-0" />
-                      <p className="font-black text-slate-900 text-xs truncate">
-                        {t.title}
-                      </p>
-                    </div>
-                    <p className="mt-0.5 text-[10px] text-slate-500 font-semibold">
-                      {t.project} · Task Review
-                    </p>
-                  </div>
-
-                  <Pill
-                    color={
-                      t.state === "In Revision"
-                        ? "red"
-                        : t.state === "In Review"
-                        ? "amber"
-                        : "blue"
-                    }
-                  >
-                    {t.state}
-                  </Pill>
-                </button>
-              ))}
-
-              {!pendingRevisions.length && !pendingTaskReviews.length && (
-                <div className="p-8 text-center text-xs font-semibold text-slate-400">
-                  No pending project revisions or task reviews in queue!
                 </div>
               )}
             </div>
@@ -701,11 +676,11 @@ export function Dashboard({
             <h2 className="font-black text-slate-900 text-base">
               Upcoming Deadlines
             </h2>
-            <p className="mt-0.5 text-xs text-slate-500">
-              All active project target dates
+            <p className="mt-0.5 text-xs text-slate-600 font-semibold">
+              All active project target dates and assignments
             </p>
           </div>
-          <span className="text-xs font-black text-slate-400">
+          <span className="text-xs font-black text-slate-500">
             {sortedDeadlines.length} active deadlines
           </span>
         </div>
@@ -713,13 +688,14 @@ export function Dashboard({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                <th className="py-3 px-4">ID</th>
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-black uppercase tracking-wider text-slate-500">
+                <th className="py-3 px-4">CODE</th>
                 <th className="py-3 px-4">PROJECT</th>
                 <th className="py-3 px-4">ASSIGNED</th>
                 <th className="py-3 px-4">STATUS</th>
                 <th className="py-3 px-4">DEADLINE</th>
-                <th className="py-3 px-4 text-right pr-6">REMAINING</th>
+                <th className="py-3 px-4 text-right">REMAINING</th>
+                <th className="py-3 px-4 text-right pr-6">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
@@ -733,9 +709,9 @@ export function Dashboard({
                   <tr
                     key={p.id}
                     onClick={() => setView("Projects")}
-                    className="hover:bg-slate-50 transition cursor-pointer"
+                    className={`transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-400">
+                    <td className="py-3.5 px-4 font-mono font-bold text-red-600">
                       {p.code}
                     </td>
 
@@ -744,15 +720,28 @@ export function Dashboard({
                     </td>
 
                     <td className="py-3.5 px-4">
-                      <div className="flex -space-x-2">
-                        {p.team?.slice(0, 3).map((initials, idx) => (
-                          <span
-                            key={idx}
-                            className="grid h-6 w-6 place-items-center rounded-full bg-slate-800 text-[8px] font-black text-white ring-1 ring-white"
-                          >
-                            {initials}
+                      <div className="flex items-center gap-1.5">
+                        {p.team && p.team.length > 0 ? (
+                          <div className="flex -space-x-1.5">
+                            {p.team.slice(0, 3).map((initials, idx) => (
+                              <span
+                                key={idx}
+                                className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[8.5px] font-black text-white ring-2 ring-white"
+                              >
+                                {initials}
+                              </span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-200 text-[8.5px] font-black text-slate-800 ring-2 ring-white">
+                              {getInitials(p.leader || "Unassigned")}
+                            </span>
+                            <span className="text-slate-700 text-xs font-semibold">
+                              {p.leader || "Unassigned"}
+                            </span>
                           </span>
-                        ))}
+                        )}
                       </div>
                     </td>
 
@@ -762,12 +751,27 @@ export function Dashboard({
                       </Pill>
                     </td>
 
-                    <td className="py-3.5 px-4 font-semibold text-slate-700">
+                    <td className="py-3.5 px-4 font-bold text-slate-800">
                       {deadlineDateStr}
                     </td>
 
-                    <td className={`py-3.5 px-4 text-right pr-6 ${timeLeft.tone}`}>
-                      {timeLeft.label}
+                    <td className="py-3.5 px-4 text-right">
+                      <span className={`inline-block rounded-full px-2.5 py-1 text-xs ${timeLeft.badgeClass}`}>
+                        {timeLeft.label}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right pr-6">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setView("Projects");
+                        }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-900 hover:text-white transition cursor-pointer shadow-2xs"
+                      >
+                        <Eye size={13} />
+                        View
+                      </button>
                     </td>
                   </tr>
                 );
@@ -776,7 +780,7 @@ export function Dashboard({
               {!sortedDeadlines.length && (
                 <tr>
                   <td
-                    colSpan={6}
+                    colSpan={7}
                     className="py-8 text-center text-xs font-semibold text-slate-400"
                   >
                     No active project deadlines found.

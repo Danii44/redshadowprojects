@@ -10,7 +10,7 @@ export function Pill({ children, color = "slate" }: PillProps) {
   const toneClass = tone[color] ?? tone.slate;
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset ${toneClass}`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset whitespace-nowrap ${toneClass}`}
     >
       {children}
     </span>

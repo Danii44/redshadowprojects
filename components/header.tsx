@@ -29,16 +29,16 @@ export function Header({
       >
         <Menu />
       </button>
-      <div className="relative hidden max-w-md flex-1 md:block">
+      <div className="relative hidden max-w-xl flex-1 md:block">
         <Search
-          className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
           size={18}
         />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search projects, tasks or people..."
-          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm outline-none focus:border-red-300 focus:ring-4 focus:ring-red-50"
+          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-4 text-sm font-semibold outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-50 text-slate-900"
         />
       </div>
       <div className="ml-auto flex items-center gap-3">
