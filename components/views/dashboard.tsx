@@ -329,30 +329,34 @@ export function Dashboard({
     const status = normalizeProjectStatus(p.status);
     if (["delivered", "closed", "cancelled"].includes(status)) return false;
 
-    if (p.deadline) {
-      const diffHours =
-        (new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
-      return diffHours <= 48;
-    }
-    return status === "in_progress" || status === "open";
+    // Require an actual deadline date (must be overdue or due in next 48 hours)
+    if (!p.deadline) return false;
+
+    const diffHours =
+      (new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
+    return diffHours <= 48;
   });
 
   const sortedNeedsAttention = [...needsAttentionProjects].sort((a, b) => {
-    const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
-    const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
+    const timeA = new Date(a.deadline!).getTime();
+    const timeB = new Date(b.deadline!).getTime();
 
-    const diffDaysA = a.deadline
-      ? Math.ceil((new Date(a.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : 999;
-    const diffDaysB = b.deadline
-      ? Math.ceil((new Date(b.deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-      : 999;
+    const now = Date.now();
+    const diffDaysA = Math.ceil((timeA - now) / (1000 * 60 * 60 * 24));
+    const diffDaysB = Math.ceil((timeB - now) / (1000 * 60 * 60 * 24));
 
-    // Rank 1: Due Today (0 days diff - Urgent deliverable)
-    // Rank 2: Approaching deadline (1-2 days diff)
-    // Rank 3: Overdue / other
-    const rankA = diffDaysA === 0 ? 1 : diffDaysA > 0 ? 2 : 3;
-    const rankB = diffDaysB === 0 ? 1 : diffDaysB > 0 ? 2 : 3;
+    // Priority Order in Needs Attention:
+    // 1. Due Today (0 days left) -> Must deliver today (Red alert)
+    // 2. Overdue (< 0 days left) -> Overdue (Amber alert)
+    // 3. Due in 1-2 days (> 0 days left) -> Imminent target
+    const getUrgencyRank = (days: number) => {
+      if (days === 0) return 1;
+      if (days < 0) return 2;
+      return 3;
+    };
+
+    const rankA = getUrgencyRank(diffDaysA);
+    const rankB = getUrgencyRank(diffDaysB);
 
     if (rankA !== rankB) return rankA - rankB;
     return timeA - timeB;
