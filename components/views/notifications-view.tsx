@@ -5,7 +5,6 @@ import {
   CheckCheck,
   CircleAlert,
   Info,
-  Monitor,
   TriangleAlert,
   User,
   X,
@@ -13,6 +12,8 @@ import {
 import type { Notification } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import {
+  canUseNotifications,
+  getNotificationPermission,
   requestBrowserNotificationPermission,
   sendBrowserNotification,
 } from "@/lib/notifications";
@@ -29,29 +30,68 @@ export function NotificationsView({
   notify,
 }: NotificationsViewProps) {
   const unread = notifications.filter((n) => !n.read_at);
-  const [permBanner, setPermBanner] = useState<"pending" | "hidden">("hidden");
+  const [permBanner, setPermBanner] = useState<
+    "pending" | "denied" | "hidden" | "unsupported"
+  >("hidden");
+  const [requesting, setRequesting] = useState(false);
 
-  // Show permission banner if not yet granted
+  // Show banner based on current permission (only after mount)
   useEffect(() => {
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission === "default") {
-      setPermBanner("pending");
+    if (!canUseNotifications()) {
+      if (typeof window !== "undefined" && !window.isSecureContext) {
+        setPermBanner("unsupported");
+      } else if (typeof window !== "undefined" && !("Notification" in window)) {
+        setPermBanner("unsupported");
+      }
+      return;
     }
+
+    const perm = getNotificationPermission();
+    if (perm === "default") setPermBanner("pending");
+    else if (perm === "denied") setPermBanner("denied");
+    else setPermBanner("hidden"); // already granted
   }, []);
 
   const handleAllowDesktopNotifs = async () => {
-    const status = await requestBrowserNotificationPermission();
-    if (status === "granted") {
-      sendBrowserNotification("🔔 Red Shadow Alerts Active", {
-        body: "You will now receive desktop notifications for tasks and projects.",
-      });
-      notify("Desktop notifications enabled!");
-    } else if (status === "denied") {
-      notify(
-        "Notifications blocked. Enable them in browser settings (click the 🔒 lock icon in the address bar).",
-      );
+    if (requesting) return;
+    setRequesting(true);
+
+    try {
+      const status = await requestBrowserNotificationPermission();
+
+      if (status === "granted") {
+        // Small delay so the browser finishes closing the permission dialog
+        await new Promise((r) => setTimeout(r, 150));
+        sendBrowserNotification("Red Shadow Alerts Active", {
+          body: "You will now receive desktop notifications for tasks and projects.",
+          tag: "rs-permission-granted",
+        });
+        notify("Desktop notifications enabled!");
+        setPermBanner("hidden");
+      } else if (status === "denied") {
+        notify(
+          "Notifications were blocked. Click the lock icon in the address bar → Site settings → Notifications → Allow, then refresh.",
+        );
+        setPermBanner("denied");
+      } else if (status === "insecure") {
+        notify(
+          "Desktop notifications need HTTPS (or localhost). Open the app over a secure URL.",
+        );
+        setPermBanner("unsupported");
+      } else if (status === "unsupported") {
+        notify("This browser does not support desktop notifications.");
+        setPermBanner("unsupported");
+      } else {
+        // User closed the dialog without choosing (still "default")
+        notify("Permission not set yet. Click Allow again and choose Allow in the browser popup.");
+        setPermBanner("pending");
+      }
+    } catch (err) {
+      console.error(err);
+      notify("Could not request notification permission. Try again.");
+    } finally {
+      setRequesting(false);
     }
-    setPermBanner("hidden");
   };
 
   const markRead = async (id: string) => {
@@ -115,8 +155,6 @@ export function NotificationsView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-
-
           {unread.length > 0 && (
             <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-black text-red-700">
               {unread.length} unread
@@ -134,9 +172,9 @@ export function NotificationsView({
         </div>
       </div>
 
-      {/* Desktop notification permission banner */}
+      {/* Desktop notification permission — not yet decided */}
       {permBanner === "pending" && (
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <BellRing size={20} className="text-blue-600 shrink-0" />
             <div>
@@ -144,24 +182,76 @@ export function NotificationsView({
                 Enable desktop notifications
               </p>
               <p className="text-xs font-semibold text-blue-600">
-                Get Windows alerts for tasks, deadlines, and project updates — even when you&apos;re in another tab.
+                Get Windows alerts for tasks, deadlines, and project updates —
+                even when you're in another tab.
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
+              type="button"
+              disabled={requesting}
               onClick={handleAllowDesktopNotifs}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
-              Allow
+              {requesting ? "Waiting for browser…" : "Allow"}
             </button>
             <button
+              type="button"
               onClick={() => setPermBanner("hidden")}
               className="rounded-lg p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition cursor-pointer"
+              aria-label="Dismiss"
             >
               <X size={14} />
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Previously blocked — tell user how to re-enable */}
+      {permBanner === "denied" && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <TriangleAlert size={20} className="text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-black text-amber-900">
+                Desktop notifications are blocked
+              </p>
+              <p className="text-xs font-semibold text-amber-700">
+                In Chrome/Edge: click the lock icon left of the URL → Site
+                settings → Notifications → Allow. Then refresh this page.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPermBanner("hidden")}
+            className="rounded-lg p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-100 transition cursor-pointer self-end sm:self-auto"
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Unsupported / non-HTTPS */}
+      {permBanner === "unsupported" && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <Info size={20} className="text-slate-500 shrink-0" />
+            <p className="text-xs font-semibold text-slate-600">
+              Desktop notifications need a modern browser over HTTPS (or
+              localhost).
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPermBanner("hidden")}
+            className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+            aria-label="Dismiss"
+          >
+            <X size={14} />
+          </button>
         </div>
       )}
 
@@ -170,8 +260,13 @@ export function NotificationsView({
         {notifications.map((item) => (
           <div
             key={item.id}
-            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-white p-5 transition ${severityBorder(item.severity)
-              } ${item.read_at ? "border-slate-200 opacity-60" : "border-slate-200 shadow-xs"}`}
+            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-white p-5 transition ${
+              severityBorder(item.severity)
+            } ${
+              item.read_at
+                ? "border-slate-200 opacity-60"
+                : "border-slate-200 shadow-xs"
+            }`}
           >
             <div className="mt-0.5">{severityIcon(item.severity)}</div>
 
@@ -198,7 +293,6 @@ export function NotificationsView({
                 </p>
               )}
 
-              {/* Show who performed the action */}
               {item.actor?.name && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <User size={11} className="text-slate-400" />
@@ -225,13 +319,12 @@ export function NotificationsView({
             <Bell size={32} className="mx-auto text-slate-300 mb-3" />
             <h3 className="font-black text-slate-800 text-base">All caught up!</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">
-              No notifications yet. You&apos;ll be notified about project updates, task assignments, and deadlines.
+              No notifications yet. You'll be notified about project updates,
+              task assignments, and deadlines.
             </p>
           </div>
         )}
       </div>
-
     </div>
   );
 }
-
