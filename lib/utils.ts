@@ -57,7 +57,10 @@ export function projectStatusHighlight(status?: string | null): string {
 }
 
 /** Calculate human readable time left or overdue string with urgency colors */
-export function calculateTimeLeft(deadline?: string | null): {
+export function calculateTimeLeft(
+  deadline?: string | null,
+  projectType?: string | null,
+): {
   label: string;
   tone: string;
   bgClass: string;
@@ -65,6 +68,17 @@ export function calculateTimeLeft(deadline?: string | null): {
   badgeClass: string;
   urgencyLevel: "overdue" | "today" | "soon" | "normal" | "none";
 } {
+  if (projectType === "hourly_ongoing") {
+    return {
+      label: "Hourly / Retainer",
+      tone: "text-blue-700 font-bold",
+      bgClass: "bg-blue-50/30 hover:bg-blue-50/60",
+      borderClass: "border-l-4 border-l-blue-400",
+      badgeClass: "bg-blue-50 text-blue-800 border border-blue-200 font-bold",
+      urgencyLevel: "none",
+    };
+  }
+
   if (!deadline) {
     return {
       label: "No deadline",
@@ -125,12 +139,16 @@ export function calculateTimeLeft(deadline?: string | null): {
 }
 
 /** Get a text color class based on how close a deadline is */
-export function deadlineTone(value?: string | null): string {
+export function deadlineTone(
+  value?: string | null,
+  projectType?: string | null,
+): string {
+  if (projectType === "hourly_ongoing") return "text-blue-600 font-semibold";
   if (!value) return "text-slate-500";
   const hours = (new Date(value).getTime() - Date.now()) / 3600000;
-  if (hours < 0) return "text-red-600";
-  if (hours <= 24) return "text-red-600";
-  if (hours <= 48) return "text-amber-600";
+  if (hours < 0) return "text-red-600 font-semibold";
+  if (hours <= 24) return "text-red-600 font-semibold";
+  if (hours <= 48) return "text-amber-600 font-semibold";
   return "text-slate-500";
 }
 

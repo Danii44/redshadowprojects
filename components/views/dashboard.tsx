@@ -41,6 +41,10 @@ export function Dashboard({
   notify,
   onRefresh,
 }: DashboardProps) {
+  const [deadlineFilter, setDeadlineFilter] = React.useState<
+    "all" | "fixed_deadline" | "hourly_ongoing"
+  >("all");
+
   // ─── TEAM MEMBER DASHBOARD ───────────────────────────────────────────────
   if (role === "Team Member") {
     const myTasks = tasks.filter(
@@ -329,6 +333,11 @@ export function Dashboard({
     const status = normalizeProjectStatus(p.status);
     if (["delivered", "closed", "cancelled"].includes(status)) return false;
 
+    // Exclude hourly/ongoing projects from overdue alerts unless critical priority
+    if (p.project_type === "hourly_ongoing" && p.priority?.toLowerCase() !== "critical") {
+      return false;
+    }
+
     // Require an actual deadline date (must be overdue or due in next 48 hours)
     if (!p.deadline) return false;
 
@@ -345,10 +354,6 @@ export function Dashboard({
     const diffDaysA = Math.ceil((timeA - now) / (1000 * 60 * 60 * 24));
     const diffDaysB = Math.ceil((timeB - now) / (1000 * 60 * 60 * 24));
 
-    // Priority Order in Needs Attention:
-    // 1. Due Today (0 days left) -> Must deliver today (Red alert)
-    // 2. Overdue (< 0 days left) -> Overdue (Amber alert)
-    // 3. Due in 1-2 days (> 0 days left) -> Imminent target
     const getUrgencyRank = (days: number) => {
       if (days === 0) return 1;
       if (days < 0) return 2;
@@ -377,21 +382,51 @@ export function Dashboard({
     const rankB = statusWorkflowOrder[normalizeProjectStatus(b.status)] ?? 99;
     if (rankA !== rankB) return rankA - rankB;
 
+    const isHourlyA = a.project_type === "hourly_ongoing" || !a.deadline;
+    const isHourlyB = b.project_type === "hourly_ongoing" || !b.deadline;
+    if (!isHourlyA && isHourlyB) return -1;
+    if (isHourlyA && !isHourlyB) return 1;
+
     const timeA = a.deadline ? new Date(a.deadline).getTime() : Infinity;
     const timeB = b.deadline ? new Date(b.deadline).getTime() : Infinity;
     return timeA - timeB;
   });
 
-  const sortedDeadlines = [...projects]
-    .filter((p) => {
-      if (!p.deadline) return false;
-      const status = normalizeProjectStatus(p.status);
-      return !["delivered", "closed", "cancelled"].includes(status);
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime(),
-    );
+  const filteredDeadlines = projects.filter((p) => {
+    const status = normalizeProjectStatus(p.status);
+    if (["delivered", "closed", "cancelled"].includes(status)) return false;
+
+    if (deadlineFilter === "fixed_deadline") {
+      return p.project_type !== "hourly_ongoing" && Boolean(p.deadline);
+    }
+    if (deadlineFilter === "hourly_ongoing") {
+      return p.project_type === "hourly_ongoing" || !p.deadline;
+    }
+    return true; // "all"
+  });
+
+  const sortedDeadlines = [...filteredDeadlines].sort((a, b) => {
+    const isHourlyA = a.project_type === "hourly_ongoing" || !a.deadline;
+    const isHourlyB = b.project_type === "hourly_ongoing" || !b.deadline;
+
+    if (!isHourlyA && !isHourlyB) {
+      return new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime();
+    }
+    if (!isHourlyA && isHourlyB) return -1;
+    if (isHourlyA && !isHourlyB) return 1;
+
+    const timeA = a.last_activity_at
+      ? new Date(a.last_activity_at).getTime()
+      : a.created_at
+        ? new Date(a.created_at).getTime()
+        : 0;
+    const timeB = b.last_activity_at
+      ? new Date(b.last_activity_at).getTime()
+      : b.created_at
+        ? new Date(b.created_at).getTime()
+        : 0;
+    return timeB - timeA;
+  });
 
   const pendingRevisions = projects.filter((p) => {
     const normStatus = normalizeProjectStatus(p.status);
@@ -545,7 +580,7 @@ export function Dashboard({
 
             <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
               {sortedNeedsAttention.map((p) => {
-                const timeLeft = calculateTimeLeft(p.deadline);
+                const timeLeft = calculateTimeLeft(p.deadline, p.project_type);
                 return (
                   <button
                     key={p.id}
@@ -603,7 +638,15 @@ export function Dashboard({
 
             <div className="divide-y divide-slate-100 max-h-[380px] overflow-y-auto">
               {sortedOpenProjects.map((p) => {
-                const timeLeft = calculateTimeLeft(p.deadline);
+                const isHourly = p.project_type === "hourly_ongoing";
+                const timeLeft = calculateTimeLeft(p.deadline, p.project_type);
+                const activeTaskCount = tasks.filter(
+                  (t) =>
+                    t.project_id === p.id &&
+                    !["completed", "closed"].includes(
+                      (t.state || t.status || "").toLowerCase(),
+                    ),
+                ).length;
                 const progressPct =
                   p.completion_percentage ??
                   (p.phase === "Requirements"
@@ -633,15 +676,23 @@ export function Dashboard({
                       </div>
 
                       <div className="mt-1.5 flex items-center gap-2">
-                        <div className="h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden">
-                          <div
-                            className="h-full bg-slate-900 rounded-full"
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] font-bold text-slate-500">
-                          {progressPct}%
-                        </span>
+                        {isHourly ? (
+                          <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-bold text-blue-700">
+                            Hourly Track · {activeTaskCount} active tasks
+                          </span>
+                        ) : (
+                          <>
+                            <div className="h-1.5 w-20 rounded-full bg-slate-200 overflow-hidden">
+                              <div
+                                className="h-full bg-slate-900 rounded-full"
+                                style={{ width: `${progressPct}%` }}
+                              />
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500">
+                              {progressPct}%
+                            </span>
+                          </>
+                        )}
 
                         <div className="flex -space-x-1 ml-1">
                           {p.team?.slice(0, 2).map((initials, idx) => (
@@ -673,20 +724,50 @@ export function Dashboard({
         </section>
       </div>
 
-      {/* Bottom Section: Upcoming Deadlines Table */}
+      {/* Bottom Section: Upcoming Deadlines & Ongoing Projects Table */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
-        <div className="border-b border-slate-100 p-4 sm:p-5 flex items-center justify-between">
+        <div className="border-b border-slate-100 p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h2 className="font-black text-slate-900 text-base">
-              Upcoming Deadlines
+              Upcoming Deadlines & Ongoing Projects
             </h2>
             <p className="mt-0.5 text-xs text-slate-600 font-semibold">
-              All active project target dates and assignments
+              All active project target dates, retainers, and assignments
             </p>
           </div>
-          <span className="text-xs font-black text-slate-500">
-            {sortedDeadlines.length} active deadlines
-          </span>
+
+          <div className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 p-1">
+            <button
+              onClick={() => setDeadlineFilter("all")}
+              className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                deadlineFilter === "all"
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All Projects
+            </button>
+            <button
+              onClick={() => setDeadlineFilter("fixed_deadline")}
+              className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                deadlineFilter === "fixed_deadline"
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Fixed Deadline
+            </button>
+            <button
+              onClick={() => setDeadlineFilter("hourly_ongoing")}
+              className={`rounded-lg px-3 py-1 text-xs font-bold transition cursor-pointer ${
+                deadlineFilter === "hourly_ongoing"
+                  ? "bg-slate-900 text-white shadow-2xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Hourly / Ongoing
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -697,17 +778,20 @@ export function Dashboard({
                 <th className="py-3 px-4">PROJECT</th>
                 <th className="py-3 px-4">ASSIGNED</th>
                 <th className="py-3 px-4">STATUS</th>
-                <th className="py-3 px-4">DEADLINE</th>
-                <th className="py-3 px-4 text-right">REMAINING</th>
+                <th className="py-3 px-4">TARGET DATE</th>
+                <th className="py-3 px-4 text-right">TRACK / REMAINING</th>
                 <th className="py-3 px-4 text-right pr-6">ACTIONS</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
               {sortedDeadlines.map((p) => {
-                const timeLeft = calculateTimeLeft(p.deadline);
-                const deadlineDateStr = p.deadline
-                  ? new Date(p.deadline).toLocaleDateString()
-                  : "—";
+                const isHourly = p.project_type === "hourly_ongoing";
+                const timeLeft = calculateTimeLeft(p.deadline, p.project_type);
+                const deadlineDateStr = isHourly
+                  ? "Ongoing Track"
+                  : p.deadline
+                    ? new Date(p.deadline).toLocaleDateString()
+                    : "No deadline";
 
                 return (
                   <tr
@@ -720,7 +804,14 @@ export function Dashboard({
                     </td>
 
                     <td className="py-3.5 px-4 font-black text-slate-900">
-                      {p.name}
+                      <div className="flex items-center gap-2">
+                        <span>{p.name}</span>
+                        {isHourly && (
+                          <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-700">
+                            Hourly
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -787,7 +878,7 @@ export function Dashboard({
                     colSpan={7}
                     className="py-8 text-center text-xs font-semibold text-slate-400"
                   >
-                    No active project deadlines found.
+                    No active projects found matching filter.
                   </td>
                 </tr>
               )}

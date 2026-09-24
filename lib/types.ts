@@ -77,6 +77,7 @@ export interface ProjectRow {
   name: string;
   client?: string | null;
   type?: string | null;
+  project_type?: "fixed_deadline" | "hourly_ongoing" | string;
   description?: string | null;
   requirements?: string | null;
   internal_notes?: string | null;

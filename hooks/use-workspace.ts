@@ -119,10 +119,12 @@ export function useWorkspace() {
               .slice(0, 2)
               .toUpperCase(),
           ),
-          due: project.deadline
-            ? new Date(project.deadline).toLocaleDateString()
-            : "No deadline",
-          deadlineTone: deadlineTone(project.deadline),
+          due: project.project_type === "hourly_ongoing"
+            ? "Hourly Track"
+            : project.deadline
+              ? new Date(project.deadline).toLocaleDateString()
+              : "No deadline",
+          deadlineTone: deadlineTone(project.deadline, project.project_type),
           priority:
             project.priority?.charAt(0).toUpperCase() +
               project.priority?.slice(1) || "Normal",
