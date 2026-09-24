@@ -2,10 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Notification, Project, Role, Task, User } from "@/lib/types";
 import { deadlineTone, getAppRole } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import {
-  requestBrowserNotificationPermission,
-  sendBrowserNotification,
-} from "@/lib/notifications";
+import { sendBrowserNotification } from "@/lib/notifications";
 
 function mapProjects(
   projectRows: any[],
@@ -267,7 +264,7 @@ export function useWorkspace() {
 
   useEffect(() => {
     fetchData();
-    requestBrowserNotificationPermission();
+    // Do NOT request notification permission here — browsers require a user click.
     return () => {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
