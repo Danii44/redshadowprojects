@@ -96,7 +96,7 @@ export function ProjectsView({
     name: "",
     code: "",
     client: "",
-    type: "DFM / Sheet Metal",
+    type: "DFM",
     projectType: "fixed_deadline" as "fixed_deadline" | "hourly_ongoing",
     leaderId: "",
     startDate: new Date().toISOString().slice(0, 10),
@@ -131,7 +131,7 @@ export function ProjectsView({
     setEditForm({
       name: p.name || "",
       client: p.client || "",
-      type: p.type || "Product Design",
+      type: p.type || "DFM",
       project_type: (p.project_type as any) || "fixed_deadline",
       deadline: p.deadline ? p.deadline.slice(0, 10) : "",
       priority: p.priority ? p.priority.toLowerCase() : "normal",
@@ -273,7 +273,7 @@ export function ProjectsView({
       name: "",
       code: "",
       client: "",
-      type: dynamicCategories[0] || "DFM / Sheet Metal",
+      type: dynamicCategories[0] || "DFM",
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -303,14 +303,15 @@ export function ProjectsView({
     const leaderId = projectForm.leaderId || profileId;
 
     const finalType = isCustomCategory
-      ? customCategoryInput.trim() || "DFM / Sheet Metal"
-      : projectForm.type || "DFM / Sheet Metal";
+      ? customCategoryInput.trim() || "DFM"
+      : projectForm.type || "DFM";
 
     const payload: Record<string, any> = {
       name: projectForm.name,
       code,
       client: projectForm.client || null,
       type: finalType,
+      project_type: projectForm.projectType,
       description: projectForm.description || null,
       requirements: projectForm.requirements || null,
       leader_id: leaderId,
@@ -380,7 +381,7 @@ export function ProjectsView({
       name: "",
       code: "",
       client: "",
-      type: "DFM / Sheet Metal",
+      type: "DFM",
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),

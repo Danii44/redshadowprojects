@@ -1,7 +1,11 @@
 import React from "react";
-import { Bell, CheckCheck, CircleAlert, Info, TriangleAlert } from "lucide-react";
+import { Bell, BellRing, CheckCheck, CircleAlert, Info, TriangleAlert } from "lucide-react";
 import type { Notification } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
+import {
+  requestBrowserNotificationPermission,
+  sendBrowserNotification,
+} from "@/lib/notifications";
 
 interface NotificationsViewProps {
   notifications: Notification[];
@@ -76,7 +80,27 @@ export function NotificationsView({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={async () => {
+              const status = await requestBrowserNotificationPermission();
+              if (status === "granted") {
+                sendBrowserNotification("🔔 Notification Test", {
+                  body: "Browser desktop notifications are active! You will receive alerts on all browser tabs.",
+                });
+                notify("Desktop notifications active!");
+              } else if (status === "denied") {
+                notify("Notifications are blocked in browser settings. Please enable them in browser permissions.");
+              } else {
+                notify("Notification permission requested.");
+              }
+            }}
+            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs cursor-pointer"
+          >
+            <BellRing size={15} />
+            Test Desktop Alerts
+          </button>
+
           {unread.length > 0 && (
             <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-black text-red-700">
               {unread.length} unread

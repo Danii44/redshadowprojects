@@ -2,6 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import type { Notification, Project, Role, Task, User } from "@/lib/types";
 import { deadlineTone, getAppRole } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import {
+  requestBrowserNotificationPermission,
+  sendBrowserNotification,
+} from "@/lib/notifications";
 
 export function useWorkspace() {
   const [role, setRole] = useState<Role>("Admin");
@@ -184,7 +188,39 @@ export function useWorkspace() {
 
   useEffect(() => {
     fetchData();
+    requestBrowserNotificationPermission();
   }, [fetchData]);
+
+  // Realtime notification listener — only active once profileId is resolved
+  useEffect(() => {
+    if (!supabase || !profileId) return;
+
+    const channel = supabase
+      .channel(`notifications-user-${profileId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${profileId}`,
+        },
+        (payload) => {
+          const newNotif = payload.new as Notification;
+          setNotifications((prev) => [newNotif, ...prev]);
+
+          // Trigger native browser desktop notification (works on same tab, other tabs & background)
+          sendBrowserNotification(newNotif.title || "Red Shadow Alert", {
+            body: newNotif.body || "You have a new workspace notification.",
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      if (supabase) supabase.removeChannel(channel);
+    };
+  }, [profileId]);
 
   return {
     ready,
