@@ -36,6 +36,7 @@ export default function Home() {
     setTasks,
     setNotifications,
     refreshData,
+    scheduleRefresh,
   } = useWorkspace();
 
   const { toast, notify } = useToast();
@@ -72,45 +73,63 @@ export default function Home() {
 
   const updateTaskStatus = async (id: string | number, nextState: string) => {
     const current = tasks.find((task) => task.id === id);
+    const databaseState = nextState.toLowerCase().replaceAll(" ", "_");
 
+    // Optimistic UI update — show change immediately
     setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, state: nextState } : t)),
+      prev.map((t) =>
+        t.id === id
+          ? { ...t, state: nextState, status: databaseState }
+          : t,
+      ),
     );
 
     if (supabase && typeof id === "string") {
-      const databaseState = nextState.toLowerCase().replaceAll(" ", "_");
-      const result =
-        role === "Team Member"
-          ? await supabase.rpc("update_assigned_task_status", {
-              task_id: id,
-              new_status: databaseState,
-            })
-          : await supabase
-              .from("tasks")
-              .update({
-                status: databaseState,
-                submitted_at:
-                  databaseState === "in_review"
-                    ? new Date().toISOString()
-                    : null,
-                reviewed_at:
-                  databaseState === "completed"
-                    ? new Date().toISOString()
-                    : null,
-              })
-              .eq("id", id);
+      const payload: Record<string, unknown> = {
+        status: databaseState,
+        updated_at: new Date().toISOString(),
+      };
 
-      if (result.error) {
+      if (databaseState === "in_review") {
+        payload.submitted_at = new Date().toISOString();
+      }
+      if (databaseState === "completed" || databaseState === "closed") {
+        payload.reviewed_at = new Date().toISOString();
+      }
+
+      // Team members can only update their own assigned tasks (enforced by RLS)
+      let query = supabase.from("tasks").update(payload).eq("id", id);
+      if (role === "Team Member") {
+        query = query.eq("assignee_id", profileId);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        // Rollback optimistic update
         setTasks((prev) =>
-          prev.map((t) => (t.id === id ? { ...t, state: current?.state || nextState } : t)),
+          prev.map((t) =>
+            t.id === id
+              ? {
+                  ...t,
+                  state: current?.state || nextState,
+                  status: current?.status || databaseState,
+                }
+              : t,
+          ),
         );
-        notify("Could not save task update");
+        notify(`Could not save task update: ${error.message}`);
         return;
       }
     }
 
     notify(`Task moved to ${nextState}`);
+    // Realtime will also pick this up; light schedule keeps other views in sync
+    scheduleRefresh();
   };
+
+  // Prefer debounced refresh for mutations; full refresh still available
+  const onRefresh = scheduleRefresh ?? refreshData;
 
   if (!ready) {
     return (
@@ -169,7 +188,7 @@ export default function Home() {
               userName={userName}
               setView={setView}
               notify={notify}
-              onRefresh={refreshData}
+              onRefresh={onRefresh}
               onSelectProject={(id: string) => {
                 setSelectedProjectId(id);
                 setView("Projects");
@@ -184,7 +203,7 @@ export default function Home() {
               people={people}
               profileId={profileId}
               notify={notify}
-              onRefresh={refreshData}
+              onRefresh={onRefresh}
               initialProjectId={selectedProjectId}
               onClearInitialProject={() => setSelectedProjectId(null)}
             />
@@ -199,7 +218,7 @@ export default function Home() {
               userName={userName}
               role={role}
               notify={notify}
-              onRefresh={refreshData}
+              onRefresh={onRefresh}
             />
           )}
 
@@ -212,7 +231,7 @@ export default function Home() {
               role={role}
               updateTask={updateTaskStatus}
               notify={notify}
-              onRefresh={refreshData}
+              onRefresh={onRefresh}
             />
           )}
 
@@ -223,7 +242,7 @@ export default function Home() {
               profileId={profileId}
               role={role}
               notify={notify}
-              onRefresh={refreshData}
+              onRefresh={onRefresh}
             />
           )}
 
@@ -235,16 +254,17 @@ export default function Home() {
             />
           )}
 
-          {(view === "Settings" || view === "Team") && (role === "Admin" || role === "Project Leader") && (
-            <SettingsView
-              people={people}
-              projects={projects}
-              tasks={tasks}
-              role={role}
-              notify={notify}
-              onRefresh={refreshData}
-            />
-          )}
+          {(view === "Settings" || view === "Team") &&
+            (role === "Admin" || role === "Project Leader") && (
+              <SettingsView
+                people={people}
+                projects={projects}
+                tasks={tasks}
+                role={role}
+                notify={notify}
+                onRefresh={onRefresh}
+              />
+            )}
         </div>
       </main>
 
