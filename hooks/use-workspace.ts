@@ -115,6 +115,18 @@ function mapTasks(
     });
 }
 
+/** Keep only the first occurrence of each notification id (newest first). */
+function dedupeNotifications(rows: Notification[]): Notification[] {
+  const seen = new Set<string>();
+  const result: Notification[] = [];
+  for (const row of rows) {
+    if (!row?.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    result.push(row);
+  }
+  return result;
+}
+
 export function useWorkspace() {
   const [role, setRole] = useState<Role>("Admin");
   const [userName, setUserName] = useState("Team member");
@@ -132,6 +144,8 @@ export function useWorkspace() {
   const profileIdRef = useRef("");
   const roleRef = useRef<Role>("Admin");
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Ids already shown as browser desktop notifications this session */
+  const pushedNotifIdsRef = useRef<Set<string>>(new Set());
 
   const applyData = useCallback(
     (
@@ -171,7 +185,13 @@ export function useWorkspace() {
           currentRole,
         ),
       );
-      if (notificationRows) setNotifications(notificationRows);
+      if (notificationRows) {
+        setNotifications(dedupeNotifications(notificationRows));
+        // Mark already-loaded ids so reconnect does not re-push browser alerts
+        for (const n of notificationRows) {
+          if (n?.id) pushedNotifIdsRef.current.add(n.id);
+        }
+      }
     },
     [],
   );
@@ -224,7 +244,8 @@ export function useWorkspace() {
         .from("notifications")
         .select("*")
         .eq("user_id", profile.id)
-        .order("created_at", { ascending: false }),
+        .order("created_at", { ascending: false })
+        .limit(100),
     ]);
 
     applyData(
@@ -252,7 +273,7 @@ export function useWorkspace() {
     };
   }, [fetchData]);
 
-  // Realtime: projects + tasks + notifications → UI updates without waiting for manual refresh
+  // Realtime: projects + tasks + notifications
   useEffect(() => {
     if (!supabase || !profileId) return;
 
@@ -293,10 +314,38 @@ export function useWorkspace() {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
-          setNotifications((prev) => [newNotif, ...prev]);
-          sendBrowserNotification(newNotif.title || "Red Shadow Alert", {
-            body: newNotif.body || "You have a new workspace notification.",
+          if (!newNotif?.id) return;
+
+          // Never add the same notification twice to the list
+          setNotifications((prev) => {
+            if (prev.some((n) => n.id === newNotif.id)) return prev;
+            return dedupeNotifications([newNotif, ...prev]);
           });
+
+          // Browser desktop alert only once per notification id
+          if (!pushedNotifIdsRef.current.has(newNotif.id)) {
+            pushedNotifIdsRef.current.add(newNotif.id);
+            sendBrowserNotification(newNotif.title || "Red Shadow Alert", {
+              body: newNotif.body || "You have a new workspace notification.",
+              tag: `rs-notif-${newNotif.id}`,
+            });
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${profileId}`,
+        },
+        (payload) => {
+          const updated = payload.new as Notification;
+          if (!updated?.id) return;
+          setNotifications((prev) =>
+            prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)),
+          );
         },
       )
       .subscribe();
@@ -319,9 +368,7 @@ export function useWorkspace() {
     connectionError,
     setTasks,
     setNotifications,
-    /** Immediate refresh (use after local mutations if needed) */
     refreshData: fetchData,
-    /** Debounced refresh — preferred after create/update/delete */
     scheduleRefresh,
   };
 }
