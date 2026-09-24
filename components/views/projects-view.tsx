@@ -40,11 +40,15 @@ interface ProjectsViewProps {
 }
 
 const DEFAULT_CATEGORIES = [
-  "DFM / Sheet Metal",
-  "Product Design",
-  "3D Print Design",
-  "Concept Design",
+  "DFM",
+  "Feasibility Report",
+  "Design Review",
+  "Conceptual Design",
+  "3D Printing",
+  "Analysis",
   "Animation",
+  "Render",
+  "Technical Design",
 ];
 
 export function ProjectsView({
@@ -96,7 +100,7 @@ export function ProjectsView({
     name: "",
     code: "",
     client: "",
-    type: "DFM",
+    type: "DFM / Sheet Metal",
     projectType: "fixed_deadline" as "fixed_deadline" | "hourly_ongoing",
     leaderId: "",
     startDate: new Date().toISOString().slice(0, 10),
@@ -131,7 +135,7 @@ export function ProjectsView({
     setEditForm({
       name: p.name || "",
       client: p.client || "",
-      type: p.type || "DFM",
+      type: p.type || "Product Design",
       project_type: (p.project_type as any) || "fixed_deadline",
       deadline: p.deadline ? p.deadline.slice(0, 10) : "",
       priority: p.priority ? p.priority.toLowerCase() : "normal",
@@ -273,7 +277,7 @@ export function ProjectsView({
       name: "",
       code: "",
       client: "",
-      type: dynamicCategories[0] || "DFM",
+      type: dynamicCategories[0] || "DFM / Sheet Metal",
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -303,8 +307,8 @@ export function ProjectsView({
     const leaderId = projectForm.leaderId || profileId;
 
     const finalType = isCustomCategory
-      ? customCategoryInput.trim() || "DFM"
-      : projectForm.type || "DFM";
+      ? customCategoryInput.trim() || "DFM / Sheet Metal"
+      : projectForm.type || "DFM / Sheet Metal";
 
     const payload: Record<string, any> = {
       name: projectForm.name,
@@ -381,7 +385,7 @@ export function ProjectsView({
       name: "",
       code: "",
       client: "",
-      type: "DFM",
+      type: "DFM / Sheet Metal",
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -1056,8 +1060,8 @@ export function ProjectsView({
                       type="button"
                       onClick={() => setProjectForm({ ...projectForm, projectType: "fixed_deadline" })}
                       className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left cursor-pointer transition ${projectForm.projectType === "fixed_deadline"
-                          ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                         }`}
                     >
                       <span className="text-xs font-black">📅 Fixed Deadline</span>
@@ -1068,8 +1072,8 @@ export function ProjectsView({
                       type="button"
                       onClick={() => setProjectForm({ ...projectForm, projectType: "hourly_ongoing", deadlineDate: "" })}
                       className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left cursor-pointer transition ${projectForm.projectType === "hourly_ongoing"
-                          ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                        ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                         }`}
                     >
                       <span className="text-xs font-black">⏳ Hourly / Ongoing</span>
