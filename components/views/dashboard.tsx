@@ -29,6 +29,7 @@ interface DashboardProps {
   setView: (view: View) => void;
   notify: (message: string) => void;
   onRefresh?: () => void;
+  onSelectProject?: (projectId: string) => void;
 }
 
 export function Dashboard({
@@ -40,6 +41,7 @@ export function Dashboard({
   setView,
   notify,
   onRefresh,
+  onSelectProject,
 }: DashboardProps) {
   const [deadlineFilter, setDeadlineFilter] = React.useState<
     "all" | "fixed_deadline" | "hourly_ongoing"
@@ -256,39 +258,39 @@ export function Dashboard({
               </div>
 
               <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto">
-                {myProjects.map((p) => {
-                  const timeLeft = calculateTimeLeft(p.deadline);
-                  return (
-                    <button
-                      key={p.id}
-                      onClick={() => setView("Projects")}
-                      className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 transition cursor-pointer"
-                    >
-                      <div className="min-w-0 flex-1 pr-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] font-bold text-red-600">
-                            {p.code}
-                          </span>
-                          <p className="font-black text-slate-900 text-xs truncate">
-                            {p.name}
-                          </p>
-                        </div>
-                        <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                          Led by {p.leader}
+                {myProjects.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      if (onSelectProject) {
+                        onSelectProject(p.id);
+                      } else {
+                        setView("Projects");
+                      }
+                    }}
+                    className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 transition cursor-pointer"
+                  >
+                    <div className="min-w-0 flex-1 pr-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[10px] font-bold text-red-600">
+                          {p.code}
+                        </span>
+                        <p className="font-black text-slate-900 text-xs truncate">
+                          {p.name}
                         </p>
                       </div>
+                      <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                        Led by {p.leader}
+                      </p>
+                    </div>
 
-                      <div className="text-right shrink-0">
-                        <Pill color={projectStatusColor(p.status)}>
-                          {projectStatusLabel(p.status)}
-                        </Pill>
-                        <span className={`text-[10px] font-bold block mt-1 ${timeLeft.tone}`}>
-                          {timeLeft.label}
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
+                    <div className="text-right shrink-0">
+                      <Pill color={projectStatusColor(p.status)}>
+                        {projectStatusLabel(p.status)}
+                      </Pill>
+                    </div>
+                  </button>
+                ))}
 
                 {myProjects.length === 0 && (
                   <div className="p-10 text-center text-xs font-semibold text-slate-400">

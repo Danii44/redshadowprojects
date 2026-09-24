@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowRight,
   ArrowUpDown,
@@ -37,6 +37,8 @@ interface ProjectsViewProps {
   profileId: string;
   notify: (message: string) => void;
   onRefresh?: () => void;
+  initialProjectId?: string | null;
+  onClearInitialProject?: () => void;
 }
 
 const DEFAULT_CATEGORIES = [
@@ -58,6 +60,8 @@ export function ProjectsView({
   profileId,
   notify,
   onRefresh,
+  initialProjectId,
+  onClearInitialProject,
 }: ProjectsViewProps) {
   const dynamicCategories = Array.from(
     new Set([
@@ -145,6 +149,16 @@ export function ProjectsView({
       internal_notes: p.internal_notes || "",
     });
   };
+
+  useEffect(() => {
+    if (initialProjectId) {
+      const target = projects.find((p) => p.id === initialProjectId);
+      if (target) {
+        handleOpenDetail(target, "overview");
+      }
+      onClearInitialProject?.();
+    }
+  }, [initialProjectId, projects]);
 
   const statusCounts = {
     active: projects.filter(
@@ -531,7 +545,7 @@ export function ProjectsView({
   };
 
   const changeStatus = async (projectId: string, status: string) => {
-    if (!supabase) return;
+    if (!supabase || !canEdit(role)) return;
     const { error } = await supabase
       .from("projects")
       .update({ status })
@@ -576,8 +590,9 @@ export function ProjectsView({
             Projects
           </h1>
           <p className="mt-0.5 text-xs font-semibold text-slate-500">
-            Showing {sortedProjects.length} of {projects.length} workspace
-            projects
+            {canEdit(role)
+              ? `Showing ${sortedProjects.length} of ${projects.length} workspace projects`
+              : `Showing ${sortedProjects.length} of ${projects.length} assigned projects`}
           </p>
         </div>
 
@@ -606,8 +621,12 @@ export function ProjectsView({
               className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
             >
               <option value="status_workflow">Status Workflow (Open → Closed)</option>
-              <option value="deadline_asc">Due Date (Soonest First)</option>
-              <option value="deadline_desc">Due Date (Furthest First)</option>
+              {canEdit(role) && (
+                <>
+                  <option value="deadline_asc">Due Date (Soonest First)</option>
+                  <option value="deadline_desc">Due Date (Furthest First)</option>
+                </>
+              )}
               <option value="name_asc">Name (A → Z)</option>
               <option value="name_desc">Name (Z → A)</option>
               <option value="priority">Priority (Highest First)</option>
@@ -701,30 +720,32 @@ export function ProjectsView({
             <table className="w-full text-left text-xs">
               <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
                 <tr>
-                  <th className="py-3.5 pl-4 pr-2 w-10">
-                    <input
-                      type="checkbox"
-                      checked={
-                        sortedProjects.length > 0 &&
-                        selectedIds.size === sortedProjects.length
-                      }
-                      onChange={toggleSelectAll}
-                      className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
-                    />
-                  </th>
-                  <th className="py-3.5 px-3">Project</th>
+                  {canEdit(role) && (
+                    <th className="py-3.5 pl-4 pr-2 w-10">
+                      <input
+                        type="checkbox"
+                        checked={
+                          sortedProjects.length > 0 &&
+                          selectedIds.size === sortedProjects.length
+                        }
+                        onChange={toggleSelectAll}
+                        className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
+                      />
+                    </th>
+                  )}
+                  <th className={`py-3.5 ${canEdit(role) ? "px-3" : "pl-4 pr-3"}`}>Project</th>
                   <th className="py-3.5 px-3">Status</th>
                   <th className="py-3.5 px-3">Phase</th>
                   <th className="py-3.5 px-3">Leader</th>
                   <th className="py-3.5 px-3">Team</th>
-                  <th className="py-3.5 px-3">Deadline</th>
+                  {canEdit(role) && <th className="py-3.5 px-3">Deadline</th>}
                   <th className="py-3.5 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
                 {sortedProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={canEdit(role) ? 8 : 6} className="py-12 text-center text-slate-400">
                       No projects found matching criteria.
                     </td>
                   </tr>
@@ -740,15 +761,17 @@ export function ProjectsView({
                         className={`hover:bg-slate-50/80 transition ${selected ? "bg-red-50/30" : ""
                           }`}
                       >
-                        <td className="py-3.5 pl-4 pr-2">
-                          <input
-                            type="checkbox"
-                            checked={selected}
-                            onChange={() => toggleSelectOne(p.id)}
-                            className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
-                          />
-                        </td>
-                        <td className="py-3.5 px-3">
+                        {canEdit(role) && (
+                          <td className="py-3.5 pl-4 pr-2">
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              onChange={() => toggleSelectOne(p.id)}
+                              className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
+                            />
+                          </td>
+                        )}
+                        <td className={`py-3.5 ${canEdit(role) ? "px-3" : "pl-4 pr-3"}`}>
                           <button
                             onClick={() => handleOpenDetail(p, "overview")}
                             className="text-left group cursor-pointer"
@@ -794,16 +817,18 @@ export function ProjectsView({
                             )}
                           </div>
                         </td>
-                        <td className="py-3.5 px-3">
-                          <div>
-                            <span className="text-slate-900 font-bold block">
-                              {p.due}
-                            </span>
-                            <span className={`text-[10px] font-bold ${timeLeft.tone}`}>
-                              {timeLeft.label}
-                            </span>
-                          </div>
-                        </td>
+                        {canEdit(role) && (
+                          <td className="py-3.5 px-3">
+                            <div>
+                              <span className="text-slate-900 font-bold block">
+                                {p.due}
+                              </span>
+                              <span className={`text-[10px] font-bold ${timeLeft.tone}`}>
+                                {timeLeft.label}
+                              </span>
+                            </div>
+                          </td>
+                        )}
                         <td className="py-3.5 pr-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
@@ -869,10 +894,12 @@ export function ProjectsView({
                     <span className="text-slate-400">Leader</span>
                     <span className="text-slate-900">{p.leader}</span>
                   </div>
-                  <div className="flex items-center justify-between text-xs font-bold">
-                    <span className="text-slate-400">Deadline</span>
-                    <span className={timeLeft.tone}>{p.due}</span>
-                  </div>
+                  {canEdit(role) && (
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-400">Deadline</span>
+                      <span className={timeLeft.tone}>{p.due}</span>
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between pt-1">
                     <div className="flex -space-x-1">
@@ -1251,14 +1278,16 @@ export function ProjectsView({
                       </p>
                     </div>
 
-                    <div className="rounded-xl border border-slate-200 p-3.5">
-                      <p className="text-[10px] font-bold uppercase text-slate-400">
-                        Deadline
-                      </p>
-                      <p className="mt-1 font-bold text-slate-900">
-                        {activeProject.due || "No deadline"}
-                      </p>
-                    </div>
+                    {canEdit(role) && (
+                      <div className="rounded-xl border border-slate-200 p-3.5">
+                        <p className="text-[10px] font-bold uppercase text-slate-400">
+                          Deadline
+                        </p>
+                        <p className="mt-1 font-bold text-slate-900">
+                          {activeProject.due || "No deadline"}
+                        </p>
+                      </div>
+                    )}
 
                     <div className="rounded-xl border border-slate-200 p-3.5">
                       <p className="text-[10px] font-bold uppercase text-slate-400">
@@ -1343,7 +1372,7 @@ export function ProjectsView({
                     </div>
                   )}
 
-                  {activeProject.internal_notes && (
+                  {canEdit(role) && activeProject.internal_notes && (
                     <div>
                       <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
                         Internal Notes

@@ -41,6 +41,7 @@ export default function Home() {
   const { toast, notify } = useToast();
 
   const [view, setView] = useState<View>("Dashboard");
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [accountPanel, setAccountPanel] = useState<"profile" | "password" | null>(
@@ -169,6 +170,10 @@ export default function Home() {
               setView={setView}
               notify={notify}
               onRefresh={refreshData}
+              onSelectProject={(id: string) => {
+                setSelectedProjectId(id);
+                setView("Projects");
+              }}
             />
           )}
 
@@ -180,6 +185,8 @@ export default function Home() {
               profileId={profileId}
               notify={notify}
               onRefresh={refreshData}
+              initialProjectId={selectedProjectId}
+              onClearInitialProject={() => setSelectedProjectId(null)}
             />
           )}
 

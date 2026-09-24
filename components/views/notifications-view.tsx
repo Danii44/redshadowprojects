@@ -1,5 +1,15 @@
-import React from "react";
-import { Bell, BellRing, CheckCheck, CircleAlert, Info, TriangleAlert } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import {
+  Bell,
+  BellRing,
+  CheckCheck,
+  CircleAlert,
+  Info,
+  Monitor,
+  TriangleAlert,
+  User,
+  X,
+} from "lucide-react";
 import type { Notification } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import {
@@ -19,6 +29,30 @@ export function NotificationsView({
   notify,
 }: NotificationsViewProps) {
   const unread = notifications.filter((n) => !n.read_at);
+  const [permBanner, setPermBanner] = useState<"pending" | "hidden">("hidden");
+
+  // Show permission banner if not yet granted
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission === "default") {
+      setPermBanner("pending");
+    }
+  }, []);
+
+  const handleAllowDesktopNotifs = async () => {
+    const status = await requestBrowserNotificationPermission();
+    if (status === "granted") {
+      sendBrowserNotification("🔔 Red Shadow Alerts Active", {
+        body: "You will now receive desktop notifications for tasks and projects.",
+      });
+      notify("Desktop notifications enabled!");
+    } else if (status === "denied") {
+      notify(
+        "Notifications blocked. Enable them in browser settings (click the 🔒 lock icon in the address bar).",
+      );
+    }
+    setPermBanner("hidden");
+  };
 
   const markRead = async (id: string) => {
     if (!supabase) return;
@@ -81,25 +115,7 @@ export function NotificationsView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          <button
-            onClick={async () => {
-              const status = await requestBrowserNotificationPermission();
-              if (status === "granted") {
-                sendBrowserNotification("🔔 Notification Test", {
-                  body: "Browser desktop notifications are active! You will receive alerts on all browser tabs.",
-                });
-                notify("Desktop notifications active!");
-              } else if (status === "denied") {
-                notify("Notifications are blocked in browser settings. Please enable them in browser permissions.");
-              } else {
-                notify("Notification permission requested.");
-              }
-            }}
-            className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 transition shadow-xs cursor-pointer"
-          >
-            <BellRing size={15} />
-            Test Desktop Alerts
-          </button>
+
 
           {unread.length > 0 && (
             <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-black text-red-700">
@@ -118,14 +134,44 @@ export function NotificationsView({
         </div>
       </div>
 
-      {/* List */}
+      {/* Desktop notification permission banner */}
+      {permBanner === "pending" && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4">
+          <div className="flex items-center gap-3">
+            <BellRing size={20} className="text-blue-600 shrink-0" />
+            <div>
+              <p className="text-sm font-black text-blue-900">
+                Enable desktop notifications
+              </p>
+              <p className="text-xs font-semibold text-blue-600">
+                Get Windows alerts for tasks, deadlines, and project updates — even when you&apos;re in another tab.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={handleAllowDesktopNotifs}
+              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer"
+            >
+              Allow
+            </button>
+            <button
+              onClick={() => setPermBanner("hidden")}
+              className="rounded-lg p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notifications list */}
       <div className="space-y-2.5 max-w-4xl">
         {notifications.map((item) => (
           <div
             key={item.id}
-            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-white p-5 transition ${
-              severityBorder(item.severity)
-            } ${item.read_at ? "border-slate-200 opacity-60" : "border-slate-200 shadow-xs"}`}
+            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-white p-5 transition ${severityBorder(item.severity)
+              } ${item.read_at ? "border-slate-200 opacity-60" : "border-slate-200 shadow-xs"}`}
           >
             <div className="mt-0.5">{severityIcon(item.severity)}</div>
 
@@ -151,6 +197,16 @@ export function NotificationsView({
                   {item.body}
                 </p>
               )}
+
+              {/* Show who performed the action */}
+              {item.actor?.name && (
+                <div className="mt-2 flex items-center gap-1.5">
+                  <User size={11} className="text-slate-400" />
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    by {item.actor.name}
+                  </span>
+                </div>
+              )}
             </div>
 
             {!item.read_at && (
@@ -169,11 +225,12 @@ export function NotificationsView({
             <Bell size={32} className="mx-auto text-slate-300 mb-3" />
             <h3 className="font-black text-slate-800 text-base">All caught up!</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">
-              No notifications yet. You'll be notified about project updates, task assignments, and deadlines.
+              No notifications yet. You&apos;ll be notified about project updates, task assignments, and deadlines.
             </p>
           </div>
         )}
       </div>
+
     </div>
   );
 }

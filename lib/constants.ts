@@ -65,7 +65,13 @@ export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
     "Notifications",
     "Settings",
   ],
-  "Team Member": ["Dashboard", "Tasks", "Daily Work", "Notifications"],
+  "Team Member": [
+    "Dashboard",
+    "Projects",
+    "Tasks",
+    "Daily Work",
+    "Notifications",
+  ],
 };
 
 /** Pill/badge color classes keyed by color name */

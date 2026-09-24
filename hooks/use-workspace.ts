@@ -63,7 +63,8 @@ export function useWorkspace() {
       client.from("users").select("id,name,email,role,active").eq("active", true),
       client
         .from("notifications")
-        .select("*")
+        .select("*, actor:actor_id(id,name)")
+        .eq("user_id", profile.id)
         .order("created_at", { ascending: false }),
     ]);
 

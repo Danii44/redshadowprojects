@@ -162,6 +162,8 @@ export interface Notification {
   body?: string | null;
   entity_type?: string | null;
   entity_id?: string | null;
+  actor_id?: string | null;
+  actor?: { id: string; name: string } | null;
   read_at?: string | null;
   created_at: string;
   updated_at?: string;
