@@ -65,6 +65,7 @@ export function TasksView({
           title: taskForm.title.trim(),
           project_id: taskForm.projectId,
           assignee_id: taskForm.assigneeId || null,
+          created_by: profileId || null,
           due_at: taskForm.deadline
             ? new Date(taskForm.deadline).toISOString()
             : null,
@@ -73,6 +74,13 @@ export function TasksView({
       ]);
 
       if (error) return notify(`Error creating task: ${error.message}`);
+
+      if (taskForm.assigneeId && taskForm.projectId) {
+        await supabase.from("project_members").upsert(
+          { project_id: taskForm.projectId, user_id: taskForm.assigneeId },
+          { onConflict: "project_id,user_id" }
+        );
+      }
     }
 
     notify("Task created successfully");

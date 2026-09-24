@@ -643,12 +643,23 @@ BEGIN
         RETURN NEW;
     END IF;
 
+    -- If no assignee, do not send assignment notification
+    IF NEW.assignee_id IS NULL THEN
+        RETURN NEW;
+    END IF;
+
     INSERT INTO public.notifications (user_id, type, severity, title, body, entity_type, entity_id)
     SELECT recipient.id,
            'task_assigned',
            'information'::public.alert_level,
-           'Task assigned',
-           NEW.title || ' was assigned in project ' || COALESCE(p.name, 'Unknown') || '.',
+           CASE 
+               WHEN recipient.id = NEW.assignee_id THEN 'New task assigned to you'
+               ELSE 'Task assigned'
+           END,
+           CASE
+               WHEN recipient.id = NEW.assignee_id THEN 'You have been assigned to: "' || NEW.title || '" in project ' || COALESCE(p.name, 'Unknown') || '.'
+               ELSE '"' || NEW.title || '" was assigned in project ' || COALESCE(p.name, 'Unknown') || '.'
+           END,
            'task', NEW.id
     FROM public.projects p
     JOIN LATERAL (
@@ -656,7 +667,7 @@ BEGIN
         UNION
         SELECT p.leader_id WHERE p.leader_id IS NOT NULL
         UNION
-        SELECT NEW.assignee_id WHERE NEW.assignee_id IS NOT NULL
+        SELECT NEW.assignee_id
     ) recipient ON true
     WHERE p.id = NEW.project_id;
     RETURN NEW;
@@ -717,6 +728,48 @@ AFTER INSERT ON public.teams
 FOR EACH ROW EXECUTE FUNCTION public.notify_management_of_new_team();
 
 
+-- ── When a team member is added to a project ─────────────────
+-- This notifies the member directly so they know they've been assigned.
+CREATE OR REPLACE FUNCTION public.notify_project_member_added()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
+AS $$
+DECLARE
+    v_project_name text;
+    v_project_code text;
+    v_leader_id    uuid;
+BEGIN
+    -- Get project name, code, and leader
+    SELECT name, code, leader_id INTO v_project_name, v_project_code, v_leader_id
+    FROM public.projects WHERE id = NEW.project_id;
+
+    -- Avoid notifying if the user is the project leader (they already know from project creation)
+    IF NEW.user_id = v_leader_id THEN
+        RETURN NEW;
+    END IF;
+
+    -- Notify the newly added member
+    INSERT INTO public.notifications (user_id, type, severity, title, body, entity_type, entity_id)
+    VALUES (
+        NEW.user_id,
+        'project_assigned',
+        'information'::public.alert_level,
+        'You were added to a project',
+        'You have been assigned to project: ' || COALESCE(v_project_name, 'Unknown')
+            || ' (' || COALESCE(v_project_code, '?') || ').',
+        'project',
+        NEW.project_id
+    );
+
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS notify_project_member_added_trigger ON public.project_members;
+CREATE TRIGGER notify_project_member_added_trigger
+AFTER INSERT ON public.project_members
+FOR EACH ROW EXECUTE FUNCTION public.notify_project_member_added();
+
+
 -- ============================================================
 -- SAFE MIGRATIONS  (run on an EXISTING database)
 -- Each block is idempotent — safe to run multiple times.
@@ -752,5 +805,19 @@ DO $$ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_cast
         WHERE castsource = 'text'::regtype AND casttarget = 'public.alert_level'::regtype)
     THEN CREATE CAST (text AS public.alert_level) WITH INOUT AS IMPLICIT; END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+-- Enable Realtime publication for notifications (required for browser push notifications)
+ALTER TABLE public.notifications REPLICA IDENTITY FULL;
+DO $$ BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_publication_tables 
+        WHERE pubname = 'supabase_realtime' 
+          AND schemaname = 'public' 
+          AND tablename = 'notifications'
+    ) THEN
+        ALTER PUBLICATION supabase_realtime ADD TABLE public.notifications;
+    END IF;
 EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
