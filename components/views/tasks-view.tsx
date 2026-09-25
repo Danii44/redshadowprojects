@@ -28,7 +28,8 @@ export function TasksView({
 }: TasksViewProps) {
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("all");
+  const [selectedPersonId, setSelectedPersonId] = useState<string>("all");
+  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "open" | "in_progress" | "in_review" | "completed">("all");
   const [creating, setCreating] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: "",
@@ -38,16 +39,80 @@ export function TasksView({
   });
 
   const userCanEdit = canEdit(role);
+  const isManagerRole = role !== "Team Member";
+  const selectedPerson = people.find((person) => person.id === selectedPersonId);
+  const memberProfile = people.find((person) => person.id === profileId);
 
-  // Filter tasks according to user role, search, and project
+  const memberTaskSet = tasks.filter(
+    (task) =>
+      task.assignee_id === profileId ||
+      task.owner === memberProfile?.name,
+  );
+
+  const personTaskSet =
+    selectedPersonId === "all"
+      ? tasks
+      : tasks.filter(
+          (task) =>
+            task.assignee_id === selectedPersonId ||
+            task.owner === selectedPerson?.name,
+        );
+
+  const personStats = {
+    total: personTaskSet.length,
+    completed: personTaskSet.filter((task) =>
+      ["Completed", "Closed", "Cancelled"].includes(task.state),
+    ).length,
+    active: personTaskSet.filter(
+      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
+    ).length,
+  };
+
+  const memberStats = {
+    total: memberTaskSet.length,
+    completed: memberTaskSet.filter((task) =>
+      ["Completed", "Closed", "Cancelled"].includes(task.state),
+    ).length,
+    active: memberTaskSet.filter(
+      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
+    ).length,
+  };
+
+  const matchesTaskStatus = (task: Task) => {
+    switch (taskStatusFilter) {
+      case "open":
+        return task.state === "Open";
+      case "in_progress":
+        return task.state === "In Progress";
+      case "in_review":
+        return ["In Review", "In Revision"].includes(task.state);
+      case "completed":
+        return ["Completed", "Closed", "Cancelled"].includes(task.state);
+      case "all":
+      default:
+        return true;
+    }
+  };
+
+  // Filter tasks according to user role, search, selected assignee/person, and status
   const visibleTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.project ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesProject =
-      selectedProjectId === "all" || task.project_id === selectedProjectId;
 
-    return matchesSearch && matchesProject;
+    if (!isManagerRole) {
+      const matchesSelf =
+        task.assignee_id === profileId || task.owner === memberProfile?.name;
+      return matchesSearch && matchesSelf && matchesTaskStatus(task);
+    }
+
+    const matchesPerson =
+      selectedPersonId === "all" ||
+      task.assignee_id === selectedPersonId ||
+      task.owner === selectedPerson?.name;
+
+    return matchesSearch && matchesPerson && matchesTaskStatus(task);
   });
 
   const refresh = () => {
@@ -179,26 +244,28 @@ export function TasksView({
             />
             <input
               type="text"
-              placeholder="Search tasks..."
+              placeholder="Search tasks or people..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
             />
           </div>
 
-          {/* Project Filter */}
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
-          >
-            <option value="all">All Projects</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          {/* Team member view: no people filter */}
+          {isManagerRole && (
+            <select
+              value={selectedPersonId}
+              onChange={(e) => setSelectedPersonId(e.target.value)}
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+            >
+              <option value="all">All People</option>
+              {people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+          )}
 
           {/* View Mode Toggle */}
           <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
@@ -239,6 +306,67 @@ export function TasksView({
         </div>
       </div>
 
+      <div className="grid gap-3 sm:grid-cols-5">
+        {[
+          {
+            key: "all",
+            label: isManagerRole ? "All people" : "My tasks",
+            value: isManagerRole ? personStats.total : memberStats.total,
+            tone: "bg-slate-900 text-white border-slate-900",
+          },
+          {
+            key: "open",
+            label: "Open",
+            value: isManagerRole ? personStats.active : memberStats.active,
+            tone: "bg-sky-500 text-white border-sky-500",
+          },
+          {
+            key: "in_progress",
+            label: "In Progress",
+            value: isManagerRole
+              ? personTaskSet.filter((task) => task.state === "In Progress").length
+              : memberTaskSet.filter((task) => task.state === "In Progress").length,
+            tone: "bg-blue-500 text-white border-blue-500",
+          },
+          {
+            key: "in_review",
+            label: "In Review",
+            value: isManagerRole
+              ? personTaskSet.filter((task) => ["In Review", "In Revision"].includes(task.state)).length
+              : memberTaskSet.filter((task) => ["In Review", "In Revision"].includes(task.state)).length,
+            tone: "bg-amber-500 text-white border-amber-500",
+          },
+          {
+            key: "completed",
+            label: "Completed",
+            value: isManagerRole ? personStats.completed : memberStats.completed,
+            tone: "bg-emerald-500 text-white border-emerald-500",
+          },
+        ].map((stat) => {
+          const isActive = taskStatusFilter === stat.key;
+
+          return (
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() =>
+                setTaskStatusFilter(
+                  stat.key as "all" | "open" | "in_progress" | "in_review" | "completed",
+                )
+              }
+              className={`rounded-2xl border p-4 shadow-sm text-left transition ${stat.tone} ${
+                isActive ? "ring-4 ring-slate-200/70 scale-[1.01]" : "opacity-90 hover:opacity-100"
+              }`}
+            >
+              <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-80">
+                {stat.label}
+              </p>
+              <p className="mt-2 text-2xl font-black leading-none">{stat.value}</p>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Main View: List or Board */}
       {viewMode === "list" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -263,7 +391,7 @@ export function TasksView({
                 assignTask={updateAssignee}
                 deleteTask={deleteTask}
                 editable={userCanEdit}
-                statusEditable={true}
+                statusEditable={role !== "Team Member"}
                 onDragStart={() => {}}
               />
             ))
@@ -340,17 +468,23 @@ export function TasksView({
                         </div>
 
                         {/* Status selector */}
-                        <select
-                          value={task.state}
-                          onChange={(e) => updateTask(task.id, e.target.value)}
-                          className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
-                        >
-                          <option value="Open">Open</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="In Review">In Review</option>
-                          <option value="In Revision">In Revision</option>
-                          <option value="Completed">Completed</option>
-                        </select>
+                        {isManagerRole ? (
+                          <select
+                            value={task.state}
+                            onChange={(e) => updateTask(task.id, e.target.value)}
+                            className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
+                          >
+                            <option value="Open">Open</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="In Review">In Review</option>
+                            <option value="In Revision">In Revision</option>
+                            <option value="Completed">Completed</option>
+                          </select>
+                        ) : (
+                          <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-700">
+                            {task.state}
+                          </span>
+                        )}
                       </div>
                     </div>
                   ))}

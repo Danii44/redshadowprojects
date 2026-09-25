@@ -59,6 +59,18 @@ function getDisplayRoleTitle(userRole: string): string {
   return "Team Member";
 }
 
+interface TeamRecord {
+  id: string;
+  name: string;
+  leader_id?: string | null;
+}
+
+interface TeamMemberRecord {
+  id: string;
+  team_id: string;
+  user_id: string;
+}
+
 export function SettingsView({
   people,
   projects = [],
@@ -67,9 +79,9 @@ export function SettingsView({
   notify,
   onRefresh,
 }: SettingsViewProps) {
-  const [members, setMembers] = useState<User[]>(people);
-  const [teams, setTeams] = useState<any[]>([]);
-  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const members = people;
+  const [teams, setTeams] = useState<TeamRecord[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
 
   // Modals
   const [creatingMember, setCreatingMember] = useState(false);
@@ -95,10 +107,6 @@ export function SettingsView({
     email: string;
     tempPassword?: string;
   } | null>(null);
-
-  useEffect(() => {
-    setMembers(people);
-  }, [people]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -219,7 +227,6 @@ export function SettingsView({
     const result = (await response.json()) as { error?: string };
     if (!response.ok) return notify(result.error || "Could not remove member");
 
-    setMembers((items) => items.filter((item) => item.id !== member.id));
     notify("Member access removed");
     refresh();
   };

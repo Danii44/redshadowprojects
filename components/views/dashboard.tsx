@@ -1,16 +1,7 @@
 import React from "react";
-import {
-  ArrowRight,
-  CheckCircle2,
-  Clock,
-  Eye,
-  FileClock,
-  Layers,
-  ListTodo,
-  Plus,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Clock, Eye, ListTodo, Plus, Sparkles } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
+import { DashboardMetricCard } from "./dashboard-metric-card";
 import {
   calculateTimeLeft,
   getInitials,
@@ -30,6 +21,7 @@ interface DashboardProps {
   notify: (message: string) => void;
   onRefresh?: () => void;
   onSelectProject?: (projectId: string) => void;
+  onReviewDecision?: (task: Task, nextState: "Completed" | "Open") => void;
 }
 
 export function Dashboard({
@@ -39,13 +31,21 @@ export function Dashboard({
   profileId = "",
   userName = "Team Member",
   setView,
-  notify,
-  onRefresh,
   onSelectProject,
+  onReviewDecision,
 }: DashboardProps) {
   const [deadlineFilter, setDeadlineFilter] = React.useState<
     "all" | "fixed_deadline" | "hourly_ongoing"
   >("all");
+  const [now, setNow] = React.useState<number>(() => Date.now());
+
+  React.useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 60000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   // ─── TEAM MEMBER DASHBOARD ───────────────────────────────────────────────
   if (role === "Team Member") {
@@ -344,7 +344,7 @@ export function Dashboard({
     if (!p.deadline) return false;
 
     const diffHours =
-      (new Date(p.deadline).getTime() - Date.now()) / (1000 * 60 * 60);
+      (new Date(p.deadline).getTime() - now) / (1000 * 60 * 60);
     return diffHours <= 48;
   });
 
@@ -352,7 +352,6 @@ export function Dashboard({
     const timeA = new Date(a.deadline!).getTime();
     const timeB = new Date(b.deadline!).getTime();
 
-    const now = Date.now();
     const diffDaysA = Math.ceil((timeA - now) / (1000 * 60 * 60 * 24));
     const diffDaysB = Math.ceil((timeB - now) / (1000 * 60 * 60 * 24));
 
@@ -407,6 +406,11 @@ export function Dashboard({
     return true; // "all"
   });
 
+  const reviewQueue = tasks.filter((task) => {
+    const state = (task.state || task.status || "").toLowerCase();
+    return ["in_review", "in_revision"].includes(state.replace(/\s+/g, "_"));
+  });
+
   const sortedDeadlines = [...filteredDeadlines].sort((a, b) => {
     const isHourlyA = a.project_type === "hourly_ongoing" || !a.deadline;
     const isHourlyB = b.project_type === "hourly_ongoing" || !b.deadline;
@@ -428,33 +432,6 @@ export function Dashboard({
         ? new Date(b.created_at).getTime()
         : 0;
     return timeB - timeA;
-  });
-
-  const pendingRevisions = projects.filter((p) => {
-    const normStatus = normalizeProjectStatus(p.status);
-    const rawStatus = (p.status || "").toLowerCase();
-    const isRevisionStatus =
-      normStatus === "revisions" ||
-      normStatus === "in_review" ||
-      rawStatus.includes("revision") ||
-      rawStatus.includes("review") ||
-      rawStatus === "waiting_client";
-
-    const hasActiveChildRevision = (p.revisions ?? []).some(
-      (rev) =>
-        rev.state !== "approved" &&
-        rev.state !== "closed" &&
-        rev.state !== "completed",
-    );
-
-    return isRevisionStatus || hasActiveChildRevision;
-  });
-
-  const pendingTaskReviews = tasks.filter((t) => {
-    const s = (t.state || t.status || "").toLowerCase().replace(/_/g, " ");
-    const isReviewOrRevision = s.includes("revision") || s.includes("review");
-    const isNotDone = !["completed", "closed", "cancelled"].includes(s);
-    return isReviewOrRevision && isNotDone;
   });
 
   return (
@@ -481,44 +458,35 @@ export function Dashboard({
 
       {/* Top Metric Cards Row (6 Cards) */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs hover:shadow-xs transition">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
-            Total
-          </p>
-          <p className="mt-2 text-3xl font-black text-slate-900">{totalCount}</p>
-          <p className="mt-1 text-xs font-bold text-slate-600">
-            {activeCount} active
-          </p>
-        </div>
+          <DashboardMetricCard label="Total" value={totalCount} subtitle={`${activeCount} active`} />
 
-        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
-          openCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
-        }`}>
-          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
-            Open
-          </p>
-          <p className={`mt-2 text-3xl font-black ${openCount === 0 ? "text-slate-400" : "text-slate-900"}`}>
-            {openCount}
-          </p>
-          <p className="mt-1 text-xs font-bold text-slate-600">
-            not started yet
-          </p>
-        </div>
+          <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+            openCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+          }`}>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+              Open
+            </p>
+            <p className={`mt-2 text-3xl font-black ${openCount === 0 ? "text-slate-400" : "text-slate-900"}`}>
+              {openCount}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-600">
+              not started yet
+            </p>
+          </div>
 
-        <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
-          inProgressCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
-        }`}>
-          <p className="text-xs font-black uppercase tracking-wider text-slate-600">
-            In Progress
-          </p>
-          <p className={`mt-2 text-3xl font-black ${inProgressCount === 0 ? "text-slate-400" : "text-blue-600"}`}>
-            {inProgressCount}
-          </p>
-          <p className="mt-1 text-xs font-bold text-slate-600">
-            work happening
-          </p>
-        </div>
-
+          <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
+            inProgressCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
+          }`}>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-600">
+              In Progress
+            </p>
+            <p className={`mt-2 text-3xl font-black ${inProgressCount === 0 ? "text-slate-400" : "text-blue-600"}`}>
+              {inProgressCount}
+            </p>
+            <p className="mt-1 text-xs font-bold text-slate-600">
+              work happening
+            </p>
+          </div>
         <div className={`rounded-2xl border bg-white p-4 shadow-2xs transition ${
           inReviewCount === 0 ? "border-slate-200/60 opacity-65" : "border-slate-200"
         }`}>
@@ -561,6 +529,57 @@ export function Dashboard({
           </p>
         </div>
       </div>
+
+      <section className="rounded-2xl border border-violet-200 bg-violet-50/80 p-4 shadow-2xs">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-violet-700">
+              Awaiting review
+            </p>
+            <h2 className="mt-1 text-xl font-black text-slate-900">
+              {reviewQueue.length} task{reviewQueue.length === 1 ? "" : "s"} waiting for approval
+            </h2>
+          </div>
+
+          {reviewQueue.length > 0 && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {reviewQueue.slice(0, 3).map((task) => (
+                <div
+                  key={task.id}
+                  className="rounded-xl border border-violet-200 bg-white p-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs font-black text-slate-900">{task.title}</p>
+                      <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                        {task.owner} · {task.project || "General"}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black uppercase text-violet-700">
+                      {task.state}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onReviewDecision?.(task, "Completed")}
+                      className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-100 cursor-pointer"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onReviewDecision?.(task, "Open")}
+                      className="flex-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700 transition hover:bg-amber-100 cursor-pointer"
+                    >
+                      Rework
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
 
       {/* Middle Section (2-Column Grid: Needs Attention & Open Projects) */}
       <div className="grid gap-6 lg:grid-cols-2">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { CheckCircle2, CircleAlert, FileClock, RefreshCw } from "lucide-react";
+import { FileClock, RefreshCw } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import type { Project, Revision, Role, Task } from "@/lib/types";
 import { normalizeProjectStatus, projectStatusColor, projectStatusLabel } from "@/lib/utils";

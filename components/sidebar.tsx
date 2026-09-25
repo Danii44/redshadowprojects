@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ChevronDown, X } from "lucide-react";
 import { nav, visibleViewsByRole } from "@/lib/constants";
 import type { Notification, Role, View } from "@/lib/types";
@@ -25,6 +26,7 @@ export function Sidebar({
   setMenuOpen,
   setAccountPanel,
 }: SidebarProps) {
+  const router = useRouter();
   const [accountMenu, setAccountMenu] = useState(false);
 
   const initials = userName
@@ -131,7 +133,7 @@ export function Sidebar({
             <button
               onClick={async () => {
                 await supabase?.auth.signOut();
-                window.location.href = "/login";
+                router.push("/login");
               }}
               className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-red-500/15 cursor-pointer"
             >

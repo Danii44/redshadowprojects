@@ -6,18 +6,19 @@ import { supabase } from "@/lib/supabase";
 
 export default function Login() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem("red-shadow-login-email") ?? "";
+  });
   const [password, setPassword] = useState("");
-  const [rememberEmail, setRememberEmail] = useState(false);
+  const [rememberEmail, setRememberEmail] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(window.localStorage.getItem("red-shadow-login-email"));
+  });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const savedEmail = window.localStorage.getItem("red-shadow-login-email");
-    if (savedEmail) {
-      setEmail(savedEmail);
-      setRememberEmail(true);
-    }
     if (supabase) {
       supabase.auth.getSession().then(({ data }) => {
         if (data.session) {

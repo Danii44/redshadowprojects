@@ -1,9 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarCheck,
-  CheckCircle2,
-  Clock,
   Download,
   FileSpreadsheet,
   FileText,
@@ -14,7 +12,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { Pill } from "@/components/ui/pill";
 import type { Project, Role, Task, User } from "@/lib/types";
 import { getInitials } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -57,6 +54,7 @@ export function DailyWorkView({
   // View & Filter states
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
   const [workViewMode, setWorkViewMode] = useState<"stream" | "datasheet">("datasheet");
+  const [dailyTab, setDailyTab] = useState<"overview" | "work" | "logs">("overview");
 
   // Modal states
   const [addingSelfTask, setAddingSelfTask] = useState(false);
@@ -96,14 +94,30 @@ export function DailyWorkView({
     else window.location.reload();
   };
 
-  // Active tasks assigned
+  const isManagerRole = role !== "Team Member";
+  const assignedMemberIds = useMemo(
+    () =>
+      new Set(
+        tasks
+          .map((task) => task.assignee_id)
+          .filter((assigneeId): assigneeId is string => Boolean(assigneeId)),
+      ),
+    [tasks],
+  );
+
+  const canLogWork = (task: Task) =>
+    role === "Team Member" &&
+    (task.assignee_id === profileId || task.owner === userName) &&
+    !["In Review", "Completed", "Closed", "Cancelled"].includes(task.state);
+
+  // Active tasks assigned: review items stay visible so the member can see they are waiting for approval.
   const myAssignedTasks = tasks.filter(
     (t) =>
       (role !== "Team Member" || t.assignee_id === profileId || t.owner === userName) &&
       !["Completed", "Closed", "Cancelled"].includes(t.state),
   );
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!supabase) return;
     setLoadingLogs(true);
 
@@ -120,8 +134,26 @@ export function DailyWorkView({
 
     const projectMap = new Map(projects.map((p) => [p.id, p.name]));
 
+    type TaskCommentItem = {
+      id: string;
+      task_id: string;
+      author_id: string;
+      body: string;
+      created_at: string;
+      tasks?:
+        | { title?: string | null; project_id?: string | null }
+        | Array<{ title?: string | null; project_id?: string | null }>
+        | null;
+      users?: { name?: string | null } | Array<{ name?: string | null }> | null;
+    };
+
     const parsed: LogEntry[] = (data ?? [])
-      .map((item: any) => {
+      .map((item: TaskCommentItem) => {
+        const userNameFromRow = Array.isArray(item.users)
+          ? item.users[0]?.name
+          : item.users?.name;
+        const taskData = Array.isArray(item.tasks) ? item.tasks[0] : item.tasks;
+
         let notesText = item.body;
         let comp = 50;
         let hours = 0;
@@ -129,7 +161,12 @@ export function DailyWorkView({
 
         try {
           if (item.body.startsWith("{")) {
-            const json = JSON.parse(item.body);
+            const json = JSON.parse(item.body) as {
+              notes?: string;
+              completionPct?: number;
+              hoursSpent?: number;
+              blocker?: string | null;
+            };
             notesText = json.notes || item.body;
             comp = json.completionPct ?? 50;
             hours = json.hoursSpent ?? 0;
@@ -143,9 +180,9 @@ export function DailyWorkView({
           id: item.id,
           task_id: item.task_id,
           author_id: item.author_id,
-          author_name: item.users?.name || "Team Member",
-          task_title: item.tasks?.title || "Assigned Task",
-          project_name: projectMap.get(item.tasks?.project_id) || "General Work",
+          author_name: userNameFromRow || "Team Member",
+          task_title: taskData?.title || "Assigned Task",
+          project_name: projectMap.get(taskData?.project_id ?? "") || "General Work",
           notes: notesText,
           completionPct: comp,
           hoursSpent: hours,
@@ -157,21 +194,178 @@ export function DailyWorkView({
 
     setLogs(parsed);
     setLoadingLogs(false);
-  };
+  }, [profileId, projects, role]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [profileId, role]);
+    const timer = window.setTimeout(() => {
+      void fetchLogs();
+    }, 0);
 
-  const filteredLogs = logs.filter((log) =>
-    selectedMemberFilter === "all" ? true : log.author_id === selectedMemberFilter,
+    return () => window.clearTimeout(timer);
+  }, [fetchLogs]);
+
+  const filteredLogs = logs.filter((log) => {
+    if (role === "Team Member") return log.author_id === profileId;
+    if (selectedMemberFilter === "all") return assignedMemberIds.has(log.author_id);
+    return log.author_id === selectedMemberFilter;
+  });
+
+  const filteredAssignedTasks = useMemo(
+    () =>
+      myAssignedTasks.filter((task) => {
+        if (selectedMemberFilter === "all") return true;
+        const targetPerson = people.find((p) => p.id === selectedMemberFilter);
+        return (
+          task.assignee_id === selectedMemberFilter ||
+          task.owner === targetPerson?.name
+        );
+      }),
+    [myAssignedTasks, people, selectedMemberFilter],
   );
 
-  const filteredAssignedTasks = myAssignedTasks.filter((task) => {
-    if (selectedMemberFilter === "all") return true;
-    const targetPerson = people.find((p) => p.id === selectedMemberFilter);
-    return task.assignee_id === selectedMemberFilter || task.owner === targetPerson?.name;
-  });
+  const todaySummary = useMemo(() => {
+    const today = new Date();
+    const dueTodayCount = filteredAssignedTasks.filter((task) => {
+      if (!task.due_at) return false;
+      const dueDate = new Date(task.due_at);
+      return (
+        dueDate.toDateString() === today.toDateString() &&
+        !["Completed", "Closed", "Cancelled"].includes(task.state)
+      );
+    }).length;
+
+    const blockedCount = filteredAssignedTasks.filter(
+      (task) => task.state === "In Review" || task.state === "In Revision",
+    ).length;
+
+    const overdueCount = filteredAssignedTasks.filter((task) => {
+      if (!task.due_at) return false;
+      const dueDate = new Date(task.due_at);
+      return (
+        dueDate.getTime() < today.getTime() &&
+        !["Completed", "Closed", "Cancelled"].includes(task.state)
+      );
+    }).length;
+
+    return {
+      total: filteredAssignedTasks.length,
+      dueToday: dueTodayCount,
+      blocked: blockedCount,
+      overdue: overdueCount,
+    };
+  }, [filteredAssignedTasks]);
+
+  const todayPriorities = useMemo(() => {
+    const activeTasks = filteredAssignedTasks.filter(
+      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
+    );
+
+    return [...activeTasks]
+      .sort((a, b) => {
+        const aUrgency = Number(a.priority === "critical") * 3 + Number(a.priority === "high") * 2 + Number(!!a.due_at);
+        const bUrgency = Number(b.priority === "critical") * 3 + Number(b.priority === "high") * 2 + Number(!!b.due_at);
+        return bUrgency - aUrgency;
+      })
+      .slice(0, 3);
+  }, [filteredAssignedTasks]);
+
+  const completedTodayTasks = useMemo(() => {
+    const today = new Date();
+
+    return [...tasks]
+      .filter((task) => ["Completed", "Closed", "Cancelled"].includes(task.state))
+      .filter((task) => {
+        const lastUpdate = new Date(
+          task.reviewed_at || task.submitted_at || task.updated_at || task.created_at || new Date(0).toISOString(),
+        );
+        return lastUpdate.toDateString() === today.toDateString();
+      })
+      .sort((a, b) => {
+        const aDate = new Date(a.reviewed_at || a.submitted_at || a.updated_at || a.created_at || new Date(0).toISOString()).getTime();
+        const bDate = new Date(b.reviewed_at || b.submitted_at || b.updated_at || b.created_at || new Date(0).toISOString()).getTime();
+        return bDate - aDate;
+      });
+  }, [tasks]);
+
+  const reviewQueue = useMemo(() => {
+    return [...tasks]
+      .filter((task) => ["In Review", "In Revision"].includes(task.state))
+      .filter(
+        (task) =>
+          role !== "Team Member" ||
+          task.assignee_id === profileId ||
+          task.owner === userName,
+      )
+      .sort((a, b) => {
+        const aDate = new Date(
+          a.submitted_at || a.updated_at || a.created_at || new Date(0).toISOString(),
+        ).getTime();
+        const bDate = new Date(
+          b.submitted_at || b.updated_at || b.created_at || new Date(0).toISOString(),
+        ).getTime();
+        return bDate - aDate;
+      });
+  }, [tasks, role, profileId, userName]);
+
+  const handleReviewDecision = async (task: Task, nextState: "Completed" | "Open") => {
+    if (!supabase) return;
+
+    const databaseState = nextState.toLowerCase();
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        status: databaseState,
+        completion_percentage:
+          nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", task.id);
+
+    if (error) {
+      notify(`Could not update review status: ${error.message}`);
+      return;
+    }
+
+    if (nextState === "Open" && task.assignee_id) {
+      const { error: notifError } = await supabase.from("notifications").insert({
+        user_id: task.assignee_id,
+        type: "task_rework",
+        severity: "warning",
+        title: "Task returned for rework",
+        body: `"${task.title}" was sent back to Open. Please update it and resubmit for review.`,
+        entity_type: "task",
+        entity_id: String(task.id),
+        actor_id: profileId,
+      });
+
+      if (notifError) {
+        console.error("Task rework notification failed:", notifError.message);
+      }
+    }
+
+    await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: profileId,
+      body: JSON.stringify({
+        type: "review_decision",
+        notes:
+          nextState === "Completed"
+            ? "Approved by admin and marked complete."
+            : "Returned to Open for rework by admin.",
+        completionPct: nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
+        hoursSpent: 0,
+        blocker: null,
+      }),
+    });
+
+    notify(
+      nextState === "Completed"
+        ? "Task approved and marked complete"
+        : "Task sent back to Open for rework",
+    );
+    refresh();
+  };
 
   // Export Datasheet as CSV
   const exportDatasheetCSV = () => {
@@ -207,7 +401,7 @@ export function DailyWorkView({
     if (!supabase || !selfTaskForm.title.trim()) return;
     setSubmitting(true);
 
-    const { data: newTask, error } = await supabase
+    const { error } = await supabase
       .from("tasks")
       .insert({
         title: selfTaskForm.title.trim(),
@@ -255,7 +449,7 @@ export function DailyWorkView({
     if (!supabase || !assignForm.title.trim() || !assignForm.assigneeId) return;
     setSubmitting(true);
 
-    const { data: newTask, error } = await supabase
+    const { error } = await supabase
       .from("tasks")
       .insert({
         title: assignForm.title.trim(),
@@ -302,6 +496,13 @@ export function DailyWorkView({
   const handleSubmitProgress = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase || !loggingProgressTask) return;
+
+    if (role === "Team Member" && ["In Review", "Completed", "Closed", "Cancelled"].includes(loggingProgressTask.state)) {
+      notify("This task is already in review or completed and can only be managed by an admin.");
+      setLoggingProgressTask(null);
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = JSON.stringify({
@@ -356,6 +557,45 @@ export function DailyWorkView({
     refresh();
   };
 
+  const handleQuickCompleteTask = async (task: Task) => {
+    if (!supabase || task.state === "In Review") return;
+
+    setSubmitting(true);
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        completion_percentage: 100,
+        status: "in_review",
+        submitted_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", task.id);
+
+    setSubmitting(false);
+
+    if (error) {
+      notify(`Could not send task to review: ${error.message}`);
+      return;
+    }
+
+    await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: profileId,
+      body: JSON.stringify({
+        type: "daily_progress",
+        notes: "Task submitted for admin review.",
+        completionPct: 100,
+        hoursSpent: 0,
+        blocker: null,
+      }),
+    });
+
+    notify("Task sent to review");
+    fetchLogs();
+    refresh();
+  };
+
   return (
     <div className="space-y-7">
       {/* Top Header & Action Bar */}
@@ -379,7 +619,7 @@ export function DailyWorkView({
             className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs cursor-pointer"
           >
             <Plus size={16} />
-            + Add What I'm Working On Today
+            + Add What I&apos;m Working On Today
           </button>
 
           {/* ADMIN / LEADER: Assign task to team member */}
@@ -396,7 +636,7 @@ export function DailyWorkView({
       </div>
 
       {/* ADMIN / LEADER TEAM WORKSPACE BAR & FILTERS */}
-      {role !== "Team Member" && (
+      {isManagerRole && (
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
             {/* Team Member Filter */}
@@ -404,18 +644,29 @@ export function DailyWorkView({
               <Users size={16} className="text-slate-400" />
               <span className="text-xs font-bold text-slate-700">Filter Team Member:</span>
             </div>
-            <select
-              value={selectedMemberFilter}
-              onChange={(e) => setSelectedMemberFilter(e.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-900 outline-none focus:border-red-400 cursor-pointer min-w-44"
-            >
-              <option value="all">All Team Members ({people.length})</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.role})
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedMemberFilter}
+                onChange={(e) => setSelectedMemberFilter(e.target.value)}
+                className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-900 outline-none focus:border-red-400 cursor-pointer min-w-44"
+              >
+                <option value="all">All Team Members ({people.length})</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.role})
+                  </option>
+                ))}
+              </select>
+              {selectedMemberFilter !== "all" && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedMemberFilter("all")}
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -457,108 +708,317 @@ export function DailyWorkView({
         </div>
       )}
 
-      {/* TODAY'S ASSIGNED TASKS GRID */}
-      <section className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-          <h2 className="text-lg font-black text-slate-900">
-            {role === "Team Member" ? "Your Daily Tasks Today" : "Active Assigned Tasks"}
-          </h2>
-          <span className="text-xs font-bold text-slate-500">
-            {filteredAssignedTasks.length} active tasks
-          </span>
+      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-2xs">
+        <div className="flex flex-wrap gap-2">
+          {[
+            { key: "overview", label: "Overview" },
+            { key: "work", label: "Work Queue" },
+            { key: "logs", label: "Logs" },
+          ].map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setDailyTab(tab.key as typeof dailyTab)}
+              className={`rounded-xl px-3.5 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
+                dailyTab === tab.key
+                  ? "bg-slate-900 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
+      </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredAssignedTasks.map((task) => {
-            const compPct = task.completion_percentage ?? 25;
-            return (
-              <div
-                key={task.id}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-slate-400">
-                      {task.project || "General"}
-                    </span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+      {dailyTab === "overview" && (
+        <>
+          {todaySummary.overdue > 0 || todaySummary.dueToday > 0 ? (
+            <div className={`rounded-2xl border p-4 ${todaySummary.overdue > 0 ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={18} className={todaySummary.overdue > 0 ? "text-red-600" : "text-amber-600"} />
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-600">
+                      {todaySummary.overdue > 0 ? "Urgent attention" : "Due soon"}
+                    </p>
+                    <p className="text-sm font-black text-slate-900">
+                      {todaySummary.overdue > 0
+                        ? `${todaySummary.overdue} task${todaySummary.overdue === 1 ? "" : "s"} overdue`
+                        : `${todaySummary.dueToday} task${todaySummary.dueToday === 1 ? "" : "s"} due today`}
+                    </p>
+                  </div>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${todaySummary.overdue > 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                  {todaySummary.overdue > 0 ? "Action needed" : "Today"}
+                </span>
+              </div>
+            </div>
+          ) : null}
+
+          <section className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                { label: "Active tasks", value: todaySummary.total, tone: "bg-slate-900 text-white" },
+                { label: "Due today", value: todaySummary.dueToday, tone: "bg-amber-500 text-white" },
+                { label: "In review", value: todaySummary.blocked, tone: "bg-red-500 text-white" },
+              ].map((stat) => (
+                <div key={stat.label} className={`rounded-2xl border border-slate-200 p-4 shadow-sm ${stat.tone}`}>
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                    {stat.label}
+                  </p>
+                  <p className="mt-2 text-2xl font-black leading-none">{stat.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-900">Today&apos;s priorities</h3>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Top 3</span>
+              </div>
+              <div className="space-y-2.5">
+                {todayPriorities.length ? (
+                  todayPriorities.map((task) => (
+                    <div key={task.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-slate-900">{task.title}</p>
+                        <p className="text-[10px] font-semibold text-slate-500">
+                          {task.owner} · {task.project || "General"}
+                        </p>
+                      </div>
+                      <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase ${
                         task.priority === "critical"
-                          ? "bg-red-50 text-red-700"
+                          ? "bg-red-100 text-red-700"
                           : task.priority === "high"
-                          ? "bg-amber-50 text-amber-700"
-                          : "bg-slate-100 text-slate-600"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-slate-200 text-slate-700"
+                      }`}>
+                        {task.priority || "normal"}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs font-semibold text-slate-400">No active tasks flagged right now.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+
+      {dailyTab === "work" && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+            <h2 className="text-lg font-black text-slate-900">
+              {role === "Team Member" ? "Your Daily Tasks Today" : "Active Assigned Tasks"}
+            </h2>
+            <span className="text-xs font-bold text-slate-500">
+              {filteredAssignedTasks.length} active tasks
+            </span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredAssignedTasks.map((task) => {
+              const compPct = task.completion_percentage ?? 25;
+              return (
+                <div
+                  key={task.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono text-xs font-bold text-slate-400">
+                        {task.project || "General"}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                          task.priority === "critical"
+                            ? "bg-red-50 text-red-700"
+                            : task.priority === "high"
+                            ? "bg-amber-50 text-amber-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {task.priority}
+                      </span>
+                    </div>
+
+                    <h3 className="mt-3 text-base font-black text-slate-900 leading-snug">
+                      {task.title}
+                    </h3>
+                    <p className="mt-1 text-xs font-semibold text-slate-500">
+                      Assigned to: <span className="text-slate-900 font-bold">{task.owner}</span> · Target: {task.due}
+                    </p>
+
+                    <div className="mt-4 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold">
+                        <span className="text-slate-400 text-[11px] uppercase">
+                          Progress
+                        </span>
+                        <span className="text-slate-900">{compPct}%</span>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+                        <div
+                          className="h-full bg-[#e3292f] rounded-full transition-all duration-300"
+                          style={{ width: `${compPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
+                        task.state === "Open"
+                          ? "border-sky-200 bg-sky-50 text-sky-700"
+                          : task.state === "In Progress"
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : task.state === "In Review"
+                          ? "border-violet-200 bg-violet-50 text-violet-700"
+                          : task.state === "In Revision"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : task.state === "Completed" || task.state === "Closed"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 bg-slate-100 text-slate-600"
                       }`}
                     >
-                      {task.priority}
+                      {task.state}
                     </span>
-                  </div>
-
-                  <h3 className="mt-3 text-base font-black text-slate-900 leading-snug">
-                    {task.title}
-                  </h3>
-                  <p className="mt-1 text-xs font-semibold text-slate-500">
-                    Assigned to: <span className="text-slate-900 font-bold">{task.owner}</span> · Target: {task.due}
-                  </p>
-
-                  {/* Completion Progress Bar */}
-                  <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-400 text-[11px] uppercase">
-                        Progress
-                      </span>
-                      <span className="text-slate-900">{compPct}%</span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                      <div
-                        className="h-full bg-[#e3292f] rounded-full transition-all duration-300"
-                        style={{ width: `${compPct}%` }}
-                      />
+                    <div className="flex items-center gap-2">
+                      {role === "Team Member" && canLogWork(task) && (
+                        <button
+                          type="button"
+                          onClick={() => handleQuickCompleteTask(task)}
+                          disabled={submitting}
+                          className="rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700 hover:bg-emerald-50 transition cursor-pointer disabled:opacity-60"
+                        >
+                          Done
+                        </button>
+                      )}
+                      {canLogWork(task) && (
+                        <button
+                          onClick={() => {
+                            setLoggingProgressTask(task);
+                            setProgressForm({
+                              notes: "",
+                              completionPct: compPct,
+                              hoursSpent: "4",
+                              blocker: "",
+                              taskState: task.state || "In Progress",
+                            });
+                          }}
+                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
+                        >
+                          <FileText size={14} />
+                          Log Work
+                        </button>
+                      )}
+                      {(["In Review", "Completed", "Closed", "Cancelled"].includes(task.state)) && (
+                        <span className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-700">
+                          Awaiting review
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
+              );
+            })}
 
-                <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between">
-                  <Pill>{task.state}</Pill>
-                  <button
-                    onClick={() => {
-                      setLoggingProgressTask(task);
-                      setProgressForm({
-                        notes: "",
-                        completionPct: compPct,
-                        hoursSpent: "4",
-                        blocker: "",
-                        taskState: task.state || "In Progress",
-                      });
-                    }}
-                    className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
-                  >
-                    <FileText size={14} />
-                    Log Progress
-                  </button>
-                </div>
+            {!filteredAssignedTasks.length && (
+              <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                <CalendarCheck size={32} className="mx-auto text-slate-300 mb-2" />
+                <h3 className="font-black text-slate-800 text-base">
+                  No active tasks listed for this view!
+                </h3>
+                <p className="mt-1 text-xs font-semibold text-slate-400">
+                  {role === "Team Member"
+                    ? "Admin or Project Leader hasn&apos;t assigned a task yet. Click '+ Add What I&apos;m Working On Today' to add your task."
+                    : "Try clearing the team member filter or assign a new task using the button above."}
+                </p>
               </div>
-            );
-          })}
+            )}
+          </div>
 
-          {!filteredAssignedTasks.length && (
-            <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-              <CalendarCheck size={32} className="mx-auto text-slate-300 mb-2" />
-              <h3 className="font-black text-slate-800 text-base">
-                No active tasks listed for this view!
-              </h3>
-              <p className="mt-1 text-xs font-semibold text-slate-400">
-                {role === "Team Member"
-                  ? "Admin or Project Leader hasn't assigned a task yet. Click '+ Add What I'm Working On Today' to add your task."
-                  : "Try clearing the team member filter or assign a new task using the button above."}
-              </p>
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-900">Completed today</h3>
+              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                {completedTodayTasks.length} done
+              </span>
             </div>
+
+            {completedTodayTasks.length ? (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {completedTodayTasks.map((task) => (
+                  <div key={task.id} className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black text-slate-900 truncate">{task.title}</p>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700">
+                        {task.state}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      {task.owner} · {task.project || "General"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400">
+                No task was completed today yet.
+              </p>
+            )}
+          </section>
+
+          {isManagerRole && reviewQueue.length > 0 && (
+            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-sm font-black text-slate-900">Awaiting review</h3>
+                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+                  {reviewQueue.length} waiting
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {reviewQueue.map((task) => (
+                  <div key={task.id} className="rounded-xl border border-violet-200 bg-violet-50 p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-black text-slate-900 truncate">{task.title}</p>
+                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black uppercase text-violet-700">
+                        {task.state}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                      {task.owner} · {task.project || "General"}
+                    </p>
+
+                    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/60 p-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleReviewDecision(task, "Completed")}
+                        className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-100 cursor-pointer"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleReviewDecision(task, "Open")}
+                        className="flex-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700 transition hover:bg-amber-100 cursor-pointer"
+                      >
+                        Rework
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
         </div>
-      </section>
+      )}
 
-      {/* DAILY PROGRESS LOGS SECTION: DATASHEET TABLE OR STREAM */}
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+      {dailyTab === "logs" && (
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
         <div className="border-b border-slate-100 p-5 flex items-center justify-between">
           <div>
             <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
@@ -720,6 +1180,7 @@ export function DailyWorkView({
           </div>
         )}
       </section>
+      )}
 
       {/* MODAL 1: TEAM MEMBER SELF-ADDS TASK */}
       {addingSelfTask && (

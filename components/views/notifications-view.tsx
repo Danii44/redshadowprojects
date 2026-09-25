@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   Bell,
   BellRing,
@@ -30,27 +30,28 @@ export function NotificationsView({
   notify,
 }: NotificationsViewProps) {
   const unread = notifications.filter((n) => !n.read_at);
-  const [permBanner, setPermBanner] = useState<
-    "pending" | "denied" | "hidden" | "unsupported"
-  >("hidden");
-  const [requesting, setRequesting] = useState(false);
 
-  // Show banner based on current permission (only after mount)
-  useEffect(() => {
+  const getInitialPermitState = (): "pending" | "denied" | "hidden" | "unsupported" => {
     if (!canUseNotifications()) {
       if (typeof window !== "undefined" && !window.isSecureContext) {
-        setPermBanner("unsupported");
-      } else if (typeof window !== "undefined" && !("Notification" in window)) {
-        setPermBanner("unsupported");
+        return "unsupported";
       }
-      return;
+      if (typeof window !== "undefined" && !("Notification" in window)) {
+        return "unsupported";
+      }
+      return "unsupported";
     }
 
     const perm = getNotificationPermission();
-    if (perm === "default") setPermBanner("pending");
-    else if (perm === "denied") setPermBanner("denied");
-    else setPermBanner("hidden"); // already granted
-  }, []);
+    if (perm === "default") return "pending";
+    if (perm === "denied") return "denied";
+    return "hidden";
+  };
+
+  const [permBanner, setPermBanner] = useState<
+    "pending" | "denied" | "hidden" | "unsupported"
+  >(getInitialPermitState);
+  const [requesting, setRequesting] = useState(false);
 
   const handleAllowDesktopNotifs = async () => {
     if (requesting) return;
@@ -183,7 +184,7 @@ export function NotificationsView({
               </p>
               <p className="text-xs font-semibold text-blue-600">
                 Get Windows alerts for tasks, deadlines, and project updates —
-                even when you're in another tab.
+                even when you&apos;re in another tab.
               </p>
             </div>
           </div>
@@ -319,7 +320,7 @@ export function NotificationsView({
             <Bell size={32} className="mx-auto text-slate-300 mb-3" />
             <h3 className="font-black text-slate-800 text-base">All caught up!</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">
-              No notifications yet. You'll be notified about project updates,
+              No notifications yet. You&apos;ll be notified about project updates,
               task assignments, and deadlines.
             </p>
           </div>

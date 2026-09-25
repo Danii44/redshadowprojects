@@ -1,14 +1,5 @@
-import React, { useEffect, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  FileText,
-  Plus,
-  Send,
-  UserCheck,
-} from "lucide-react";
-import { Pill } from "@/components/ui/pill";
+import React, { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, FileText, Send } from "lucide-react";
 import type { Role, Task } from "@/lib/types";
 import { getInitials } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -61,9 +52,10 @@ export function DailyProgressWidget({
       !["Completed", "Closed", "Cancelled"].includes(t.state),
   );
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     if (!supabase) return;
     setLoadingLogs(true);
+
     const { data, error } = await supabase
       .from("task_comments")
       .select("id, task_id, author_id, body, created_at, tasks(title), users(name)")
@@ -75,8 +67,25 @@ export function DailyProgressWidget({
       return;
     }
 
+    type ProgressLogRow = {
+      id: string;
+      task_id: string;
+      author_id: string;
+      body: string;
+      created_at: string;
+      users?: { name?: string | null } | Array<{ name?: string | null }> | null;
+      tasks?: { title?: string | null } | Array<{ title?: string | null }> | null;
+    };
+
     const parsed: LogEntry[] = (data ?? [])
-      .map((item: any) => {
+      .map((item: ProgressLogRow) => {
+        const userNameFromRow = Array.isArray(item.users)
+          ? item.users[0]?.name
+          : item.users?.name;
+        const taskTitleFromRow = Array.isArray(item.tasks)
+          ? item.tasks[0]?.title
+          : item.tasks?.title;
+
         let notesText = item.body;
         let comp = 50;
         let hours = 0;
@@ -98,8 +107,8 @@ export function DailyProgressWidget({
           id: item.id,
           task_id: item.task_id,
           author_id: item.author_id,
-          author_name: item.users?.name || "Team Member",
-          task_title: item.tasks?.title || "Assigned Task",
+          author_name: userNameFromRow || "Team Member",
+          task_title: taskTitleFromRow || "Assigned Task",
           notes: notesText,
           completionPct: comp,
           hoursSpent: hours,
@@ -111,11 +120,15 @@ export function DailyProgressWidget({
 
     setLogs(parsed);
     setLoadingLogs(false);
-  };
+  }, [profileId, role]);
 
   useEffect(() => {
-    fetchLogs();
-  }, [profileId, role]);
+    const timeoutId = window.setTimeout(() => {
+      void fetchLogs();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [fetchLogs]);
 
   const handleSubmitLog = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,7 +201,7 @@ export function DailyProgressWidget({
               Log Daily Progress
             </h2>
             <p className="text-xs font-semibold text-slate-500">
-              Record today's task work, hours, progress percentage, and roadblocks.
+              Record today&apos;s task work, hours, progress percentage, and roadblocks.
             </p>
           </div>
         </div>

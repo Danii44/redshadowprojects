@@ -81,8 +81,8 @@ export interface ProjectRow {
   description?: string | null;
   requirements?: string | null;
   internal_notes?: string | null;
-  status: string;
-  priority: string;
+  status?: string;
+  priority?: string;
   leader_id?: string | null;
   start_date?: string | null;
   deadline?: string | null;
@@ -122,15 +122,15 @@ export interface Project extends ProjectRow {
 /** Raw task row from Supabase */
 export interface TaskRow {
   id: string;
-  project_id: string;
+  project_id?: string | null;
   phase_id?: string | null;
   title: string;
   description?: string | null;
   assignee_id?: string | null;
-  created_by: string;
+  created_by?: string;
   reviewer_id?: string | null;
-  status: string;
-  priority: string;
+  status?: string;
+  priority?: string;
   completion_percentage?: number;
   due_at?: string | null;
   blocked_reason?: string | null;
@@ -150,6 +150,8 @@ export interface Task extends TaskRow {
   due: string;
   dueTone?: string;
   checklist: string;
+  status: string;
+  created_by: string;
 }
 
 /** A notification from the `notifications` table */

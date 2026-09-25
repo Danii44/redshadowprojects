@@ -150,27 +150,31 @@ export function TaskCard({
     >
       {/* â”€â”€ Deadline Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
-        className={`flex items-center justify-between gap-2 border-t-4 px-4 py-2.5 ${
+        className={`flex items-center justify-between gap-3 border-t-[5px] px-3.5 py-3 shadow-sm ring-1 ring-inset ring-black/5 ${
           dl.bgClass
         } ${dl.borderClass}`}
       >
-        <div className="flex items-center gap-1.5">
-          {dl.icon}
-          <span
-            className={`text-xs font-black ${
-              dl.pulse ? "animate-pulse" : ""
-            } ${dl.textClass}`}
-          >
-            {dl.label}
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 shadow-sm">
+            {dl.icon}
           </span>
-          {dl.sublabel && (
-            <span className={`text-[11px] font-semibold ${dl.textClass} opacity-70`}>
-              Â· {dl.sublabel}
+          <div className="min-w-0">
+            <span
+              className={`block text-sm font-black tracking-wide ${
+                dl.pulse ? "animate-pulse" : ""
+              } ${dl.textClass}`}
+            >
+              {dl.label}
             </span>
-          )}
+            {dl.sublabel && (
+              <span className={`block text-[10px] font-bold uppercase tracking-[0.12em] ${dl.textClass} opacity-80`}>
+                {dl.sublabel}
+              </span>
+            )}
+          </div>
         </div>
         {dl.label !== "No deadline" && (
-          <Calendar size={13} className={`shrink-0 ${dl.textClass} opacity-50`} />
+          <Calendar size={14} className={`shrink-0 ${dl.textClass} opacity-75`} />
         )}
       </div>
 

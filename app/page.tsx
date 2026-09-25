@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { Toast } from "@/components/ui/toast";
@@ -48,22 +48,25 @@ export default function Home() {
   const [accountPanel, setAccountPanel] = useState<"profile" | "password" | null>(
     null,
   );
-  const [hasNotifiedLogin, setHasNotifiedLogin] = useState(false);
+  const loginNotificationSentRef = useRef(false);
 
   // Notify user upon login / initial load if unread notifications exist
   useEffect(() => {
-    if (ready && !hasNotifiedLogin && notifications.length > 0) {
-      const unreadCount = notifications.filter((n) => !n.read_at).length;
-      if (unreadCount > 0) {
-        notify(
-          `📢 Welcome back, ${userName}! You have ${unreadCount} unread ${
-            unreadCount === 1 ? "notification" : "notifications"
-          }.`,
-        );
-      }
-      setHasNotifiedLogin(true);
+    if (!ready || loginNotificationSentRef.current || notifications.length === 0) {
+      return;
     }
-  }, [ready, notifications, userName, hasNotifiedLogin, notify]);
+
+    const unreadCount = notifications.filter((n) => !n.read_at).length;
+    if (unreadCount > 0) {
+      notify(
+        `📢 Welcome back, ${userName}! You have ${unreadCount} unread ${
+          unreadCount === 1 ? "notification" : "notifications"
+        }.`,
+      );
+    }
+
+    loginNotificationSentRef.current = true;
+  }, [ready, notifications, userName, notify]);
 
   const filteredProjects = projects.filter((p) =>
     (p.name + (p.client ?? "") + p.code)
@@ -74,6 +77,11 @@ export default function Home() {
   const updateTaskStatus = async (id: string | number, nextState: string) => {
     const current = tasks.find((task) => task.id === id);
     const databaseState = nextState.toLowerCase().replaceAll(" ", "_");
+
+    if (role === "Team Member") {
+      notify("Team members submit work for review from the Daily Work page. Status changes are managed by admins and leaders.");
+      return;
+    }
 
     // Optimistic UI update — show change immediately
     setTasks((prev) =>
@@ -97,11 +105,8 @@ export default function Home() {
         payload.reviewed_at = new Date().toISOString();
       }
 
-      // Team members can only update their own assigned tasks (enforced by RLS)
-      let query = supabase.from("tasks").update(payload).eq("id", id);
-      if (role === "Team Member") {
-        query = query.eq("assignee_id", profileId);
-      }
+      // Team members are blocked before this point, and their task updates are enforced by RLS.
+      const query = supabase.from("tasks").update(payload).eq("id", id);
 
       const { error } = await query;
 
@@ -125,6 +130,84 @@ export default function Home() {
 
     notify(`Task moved to ${nextState}`);
     // Realtime will also pick this up; light schedule keeps other views in sync
+    scheduleRefresh();
+  };
+
+  const handleReviewDecision = async (
+    task: { id: string | number; assignee_id?: string | null; title: string; completion_percentage?: number; owner?: string; project?: string },
+    nextState: "Completed" | "Open",
+  ) => {
+    if (!task || !supabase || role === "Team Member") {
+      return;
+    }
+
+    const currentTask = tasks.find((item) => item.id === task.id);
+    const databaseState = nextState.toLowerCase();
+    const actionLabel = nextState === "Completed" ? "approved and marked complete" : "sent back to Open for rework";
+
+    setTasks((prev) =>
+      prev.map((item) =>
+        item.id === task.id
+          ? {
+              ...item,
+              state: nextState,
+              status: databaseState,
+              completion_percentage:
+                nextState === "Completed" ? 100 : item.completion_percentage ?? 60,
+              reviewed_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            }
+          : item,
+      ),
+    );
+
+    const { error } = await supabase
+      .from("tasks")
+      .update({
+        status: databaseState,
+        completion_percentage:
+          nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
+        reviewed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", task.id);
+
+    if (error) {
+      setTasks((prev) =>
+        prev.map((item) =>
+          item.id === task.id
+            ? {
+                ...item,
+                state: currentTask?.state ?? item.state,
+                status: currentTask?.status ?? item.status,
+                completion_percentage:
+                  currentTask?.completion_percentage ?? item.completion_percentage,
+              }
+            : item,
+        ),
+      );
+      notify(`Could not update review: ${error.message}`);
+      return;
+    }
+
+    if (nextState === "Open" && task.assignee_id) {
+      const { error: notifError } = await supabase.from("notifications").insert({
+        user_id: task.assignee_id,
+        type: "task_rework",
+        severity: "warning",
+        title: "Task returned for rework",
+        body: `"${task.title}" was sent back to Open. Please update it and resubmit for review.`,
+        entity_type: "task",
+        entity_id: String(task.id),
+        actor_id: profileId,
+      });
+
+      if (notifError) {
+        console.error("Task rework notification failed:", notifError.message);
+      }
+    }
+
+    notify(`Task ${actionLabel}`);
     scheduleRefresh();
   };
 
@@ -189,6 +272,7 @@ export default function Home() {
               setView={setView}
               notify={notify}
               onRefresh={onRefresh}
+              onReviewDecision={handleReviewDecision}
               onSelectProject={(id: string) => {
                 setSelectedProjectId(id);
                 setView("Projects");

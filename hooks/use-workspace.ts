@@ -4,36 +4,103 @@ import { deadlineTone, getAppRole } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { sendBrowserNotification } from "@/lib/notifications";
 
+type ProjectMemberRow = { user_id: string };
+type ProjectPhaseRow = { state?: string; name?: string; position: number };
+type ProjectRevisionRow = { number: number };
+type ProjectRow = {
+  id: string;
+  leader_id?: string | null;
+  project_members?: ProjectMemberRow[];
+  project_phases?: ProjectPhaseRow[];
+  revisions?: ProjectRevisionRow[];
+  name: string;
+  code?: string | null;
+  client?: string | null;
+  type?: string | null;
+  project_type?: string;
+  description?: string | null;
+  requirements?: string | null;
+  internal_notes?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  start_date?: string | null;
+  deadline?: string | null;
+  completion_percentage?: number | null;
+  last_activity_at?: string | null;
+  archived_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+type TaskRowData = {
+  id: string | number;
+  project_id?: string | null;
+  assignee_id?: string | null;
+  title: string;
+  status?: string | null;
+  due_at?: string | null;
+  priority?: string | null;
+  completion_percentage?: number | null;
+  created_by?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  submitted_at?: string | null;
+  reviewed_at?: string | null;
+  owner?: string;
+};
+
 function mapProjects(
-  projectRows: any[],
+  projectRows: ProjectRow[],
   peopleMap: Map<string, string>,
   profileId: string,
   currentRole: Role,
 ): Project[] {
   const visibleProjectRows = (projectRows ?? []).filter(
-    (project: any) =>
+    (project: ProjectRow) =>
       currentRole === "Admin" ||
       project.leader_id === profileId ||
       project.project_members?.some(
-        (member: any) => member.user_id === profileId,
+        (member: ProjectMemberRow) => member.user_id === profileId,
       ),
   );
 
-  return visibleProjectRows.map((project: any) => {
+  return visibleProjectRows.map((project: ProjectRow) => {
+    const leaderId = project.leader_id ?? "";
+    const sortedPhases = [...(project.project_phases ?? [])].sort(
+      (a: ProjectPhaseRow, b: ProjectPhaseRow) => a.position - b.position,
+    );
     const phase =
-      project.project_phases?.find((item: any) => item.state === "active") ??
-      project.project_phases?.sort(
-        (a: any, b: any) => a.position - b.position,
-      )[0];
+      project.project_phases?.find((item: ProjectPhaseRow) => item.state === "active") ??
+      sortedPhases[0];
+    const normalizedPriority = project.priority?.trim() || "normal";
+    const displayPriority =
+      normalizedPriority.charAt(0).toUpperCase() + normalizedPriority.slice(1);
 
     return {
-      ...project,
+      id: project.id,
+      code: project.code ?? "",
+      name: project.name,
+      client: project.client ?? null,
+      type: project.type ?? null,
+      project_type: project.project_type ?? "fixed_deadline",
+      description: project.description ?? null,
+      requirements: project.requirements ?? null,
+      internal_notes: project.internal_notes ?? null,
+      status: project.status ?? "open",
+      priority: displayPriority,
+      leader_id: project.leader_id ?? null,
+      start_date: project.start_date ?? null,
+      deadline: project.deadline ?? null,
+      completion_percentage: project.completion_percentage ?? undefined,
+      last_activity_at: project.last_activity_at ?? null,
+      archived_at: project.archived_at ?? null,
+      created_at: project.created_at ?? undefined,
+      updated_at: project.updated_at ?? undefined,
       phase: phase?.name ?? "Requirements",
       revision: project.revisions?.length
-        ? `R${Math.max(...project.revisions.map((item: any) => item.number))}`
+        ? `R${Math.max(...project.revisions.map((item: ProjectRevisionRow) => item.number))}`
         : "No revision",
-      leader: peopleMap.get(project.leader_id) ?? "Unassigned",
-      team: (project.project_members ?? []).map((member: any) =>
+      leader: peopleMap.get(leaderId) ?? "Unassigned",
+      team: (project.project_members ?? []).map((member: ProjectMemberRow) =>
         String(peopleMap.get(member.user_id) ?? "TM")
           .split(" ")
           .map((part) => part[0])
@@ -48,9 +115,6 @@ function mapProjects(
             ? new Date(project.deadline).toLocaleDateString()
             : "No deadline",
       deadlineTone: deadlineTone(project.deadline, project.project_type),
-      priority:
-        project.priority?.charAt(0).toUpperCase() +
-          project.priority?.slice(1) || "Normal",
       color:
         project.priority === "critical"
           ? "#ef4444"
@@ -61,12 +125,12 @@ function mapProjects(
         project.requirements ??
         project.description ??
         "No requirements added",
-    };
+    } as Project;
   });
 }
 
 function mapTasks(
-  taskRows: any[],
+  taskRows: TaskRowData[],
   projectById: Map<string, string>,
   peopleMap: Map<string, string>,
   visibleProjectIds: Set<string>,
@@ -74,21 +138,28 @@ function mapTasks(
   currentRole: Role,
 ): Task[] {
   const visibleTaskRows = (taskRows ?? []).filter(
-    (task: any) =>
+    (task: TaskRowData) =>
       currentRole !== "Team Member" || task.assignee_id === profileId,
   );
 
   return visibleTaskRows
     .filter(
-      (task: any) =>
+      (task: TaskRowData) =>
         !task.project_id || visibleProjectIds.has(task.project_id),
     )
-    .map((task: any) => {
-      const owner = peopleMap.get(task.assignee_id) ?? "Unassigned";
+    .map((task: TaskRowData) => {
+      const owner = peopleMap.get(task.assignee_id ?? "") ?? "Unassigned";
+      const projectId = task.project_id ?? "";
+      const status = task.status ?? "open";
+
       return {
         ...task,
+        id: String(task.id),
         title: task.title,
-        project: projectById.get(task.project_id) ?? "General Task",
+        status,
+        completion_percentage: task.completion_percentage ?? undefined,
+        created_by: task.created_by ?? profileId,
+        project: projectById.get(projectId) ?? "General Task",
         owner,
         initials: String(owner)
           .split(" ")
@@ -96,7 +167,7 @@ function mapTasks(
           .join("")
           .slice(0, 2)
           .toUpperCase(),
-        state: task.status
+        state: status
           .split("_")
           .map(
             (part: string) => part.charAt(0).toUpperCase() + part.slice(1),
@@ -112,15 +183,40 @@ function mapTasks(
     });
 }
 
-/** Keep only the first occurrence of each notification id (newest first). */
+/** Deduplicate notifications by id and by the intended event payload.
+ * This avoids duplicate rows when the same task/project update can trigger
+ * multiple realtime or refetch events in quick succession.
+ */
+function notificationSignature(row: Partial<Notification>): string {
+  return [
+    row.user_id ?? "",
+    row.type ?? "",
+    row.title ?? "",
+    row.body ?? "",
+    row.entity_type ?? "",
+    row.entity_id ?? "",
+    row.actor_id ?? "",
+    row.created_at ?? "",
+  ].join("|");
+}
+
 function dedupeNotifications(rows: Notification[]): Notification[] {
-  const seen = new Set<string>();
+  const seenIds = new Set<string>();
+  const seenSignatures = new Set<string>();
   const result: Notification[] = [];
+
   for (const row of rows) {
-    if (!row?.id || seen.has(row.id)) continue;
-    seen.add(row.id);
+    if (!row) continue;
+
+    const signature = notificationSignature(row);
+    if (row.id && seenIds.has(row.id)) continue;
+    if (!row.id && seenSignatures.has(signature)) continue;
+
+    if (row.id) seenIds.add(row.id);
+    seenSignatures.add(signature);
     result.push(row);
   }
+
   return result;
 }
 
@@ -146,8 +242,8 @@ export function useWorkspace() {
 
   const applyData = useCallback(
     (
-      projectRows: any[],
-      taskRows: any[],
+      projectRows: ProjectRow[],
+      taskRows: TaskRowData[],
       peopleRows: User[],
       notificationRows?: Notification[],
     ) => {
@@ -160,7 +256,7 @@ export function useWorkspace() {
       const pid = profileIdRef.current;
 
       const mappedProjects = mapProjects(
-        projectRows,
+        projectRows as ProjectRow[],
         peopleMap,
         pid,
         currentRole,
@@ -174,7 +270,7 @@ export function useWorkspace() {
       setProjects(mappedProjects);
       setTasks(
         mapTasks(
-          taskRows,
+          taskRows as TaskRowData[],
           projectById,
           peopleMap,
           visibleProjectIds,
@@ -183,10 +279,13 @@ export function useWorkspace() {
         ),
       );
       if (notificationRows) {
-        setNotifications(dedupeNotifications(notificationRows));
-        // Mark already-loaded ids so reconnect does not re-push browser alerts
-        for (const n of notificationRows) {
+        const dedupedRows = dedupeNotifications(notificationRows);
+        setNotifications(dedupedRows);
+        // Mark loaded notifications as already delivered so a refresh does not
+        // replay the same browser desktop alert for each row in the list.
+        for (const n of dedupedRows) {
           if (n?.id) pushedNotifIdsRef.current.add(n.id);
+          pushedNotifIdsRef.current.add(notificationSignature(n));
         }
       }
     },
@@ -199,6 +298,8 @@ export function useWorkspace() {
 
     const { data: sessionData } = await client.auth.getSession();
     if (!sessionData.session) {
+      // Redirect back to the login page when the session has expired.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/login";
       return;
     }
@@ -263,9 +364,13 @@ export function useWorkspace() {
   }, [fetchData]);
 
   useEffect(() => {
-    fetchData();
+    const timer = window.setTimeout(() => {
+      void fetchData();
+    }, 0);
+
     // Do NOT request notification permission here — browsers require a user click.
     return () => {
+      window.clearTimeout(timer);
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     };
   }, [fetchData]);
@@ -311,22 +416,36 @@ export function useWorkspace() {
         },
         (payload) => {
           const newNotif = payload.new as Notification;
-          if (!newNotif?.id) return;
+          if (!newNotif?.title) return;
 
-          // Never add the same notification twice to the list
+          const signature = notificationSignature(newNotif);
+          const notificationKey = newNotif.id || signature;
+
           setNotifications((prev) => {
-            if (prev.some((n) => n.id === newNotif.id)) return prev;
+            const alreadyPresent = prev.some(
+              (n) =>
+                (n.id && newNotif.id && n.id === newNotif.id) ||
+                notificationSignature(n) === signature,
+            );
+
+            if (alreadyPresent) return prev;
             return dedupeNotifications([newNotif, ...prev]);
           });
 
-          // Browser desktop alert only once per notification id
-          if (!pushedNotifIdsRef.current.has(newNotif.id)) {
-            pushedNotifIdsRef.current.add(newNotif.id);
+          const alreadyPushed =
+            pushedNotifIdsRef.current.has(notificationKey) ||
+            pushedNotifIdsRef.current.has(signature) ||
+            pushedNotifIdsRef.current.has(newNotif.id ?? "");
+
+          if (!alreadyPushed) {
+            pushedNotifIdsRef.current.add(notificationKey);
             sendBrowserNotification(newNotif.title || "Red Shadow Alert", {
               body: newNotif.body || "You have a new workspace notification.",
-              tag: `rs-notif-${newNotif.id}`,
+              tag: `rs-notif-${notificationKey}`,
             });
           }
+
+          scheduleRefresh();
         },
       )
       .on(
@@ -343,6 +462,7 @@ export function useWorkspace() {
           setNotifications((prev) =>
             prev.map((n) => (n.id === updated.id ? { ...n, ...updated } : n)),
           );
+          scheduleRefresh();
         },
       )
       .subscribe();

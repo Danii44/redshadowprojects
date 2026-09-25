@@ -69,6 +69,35 @@ export async function requestBrowserNotificationPermission(): Promise<NotifPermi
   }
 }
 
+function playNotificationSound() {
+  if (typeof window === "undefined") return;
+
+  try {
+    const AudioCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return;
+
+    const audioContext = new AudioCtor();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(1320, audioContext.currentTime + 0.12);
+
+    gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.14, audioContext.currentTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.35);
+
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + 0.38);
+  } catch {
+    // Ignore sound errors silently so the notification still works if audio is blocked.
+  }
+}
+
 export function sendBrowserNotification(
   title: string,
   options?: {
@@ -91,9 +120,10 @@ export function sendBrowserNotification(
       body: options?.body,
       icon: options?.icon || "/favicon.svg",
       tag: options?.tag || `notif-${Date.now()}`,
-      // Keep visible a bit longer on Windows so the user notices it
       requireInteraction: false,
     });
+
+    playNotificationSound();
 
     notification.onclick = () => {
       try {
