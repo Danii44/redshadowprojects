@@ -20,6 +20,7 @@ import { useWorkspace } from "@/hooks/use-workspace";
 import { useToast } from "@/hooks/use-toast";
 import type { View } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
+import { updateTaskWithFallback } from "@/lib/utils";
 
 export default function Home() {
   const {
@@ -161,16 +162,13 @@ export default function Home() {
       ),
     );
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        status: databaseState,
-        completion_percentage:
-          nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id);
+    const { error } = await updateTaskWithFallback(supabase, task.id, {
+      status: databaseState,
+      completion_percentage:
+        nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
     if (error) {
       setTasks((prev) =>
@@ -190,20 +188,31 @@ export default function Home() {
       return;
     }
 
-    if (nextState === "Open" && task.assignee_id) {
+    if (task.assignee_id) {
       const { error: notifError } = await supabase.from("notifications").insert({
         user_id: task.assignee_id,
-        type: "task_rework",
-        severity: "warning",
-        title: "Task returned for rework",
-        body: `"${task.title}" was sent back to Open. Please update it and resubmit for review.`,
+        type: nextState === "Open" ? "task_rework" : "task_approved",
+        severity: nextState === "Open" ? "warning" : "success",
+        title:
+          nextState === "Open"
+            ? "Task returned for rework"
+            : "Task approved",
+        body:
+          nextState === "Open"
+            ? `"${task.title}" was sent back to Open. Please update it and resubmit for review.`
+            : `"${task.title}" was approved and marked complete. Great work!`,
         entity_type: "task",
         entity_id: String(task.id),
         actor_id: profileId,
       });
 
       if (notifError) {
-        console.error("Task rework notification failed:", notifError.message);
+        console.error(
+          nextState === "Open"
+            ? "Task rework notification failed:"
+            : "Task approval notification failed:",
+          notifError.message,
+        );
       }
     }
 

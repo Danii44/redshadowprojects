@@ -60,6 +60,7 @@ export function TasksView({
 
   const personStats = {
     total: personTaskSet.length,
+    open: personTaskSet.filter((task) => task.state === "Open").length,
     completed: personTaskSet.filter((task) =>
       ["Completed", "Closed", "Cancelled"].includes(task.state),
     ).length,
@@ -70,6 +71,7 @@ export function TasksView({
 
   const memberStats = {
     total: memberTaskSet.length,
+    open: memberTaskSet.filter((task) => task.state === "Open").length,
     completed: memberTaskSet.filter((task) =>
       ["Completed", "Closed", "Cancelled"].includes(task.state),
     ).length,
@@ -317,7 +319,7 @@ export function TasksView({
           {
             key: "open",
             label: "Open",
-            value: isManagerRole ? personStats.active : memberStats.active,
+            value: isManagerRole ? personStats.open : memberStats.open,
             tone: "bg-sky-500 text-white border-sky-500",
           },
           {

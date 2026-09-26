@@ -1,8 +1,32 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   LEGACY_PROJECT_STATUSES,
   PROJECT_STATUSES,
 } from "./constants";
 import type { ProjectStatus, Role } from "./types";
+
+export async function updateTaskWithFallback(
+  supabase: SupabaseClient,
+  taskId: string | number,
+  payload: Record<string, unknown>,
+) {
+  const initialUpdate = await supabase
+    .from("tasks")
+    .update(payload)
+    .eq("id", taskId);
+
+  if (!initialUpdate.error || !initialUpdate.error.message.toLowerCase().includes("completion_percentage")) {
+    return initialUpdate;
+  }
+
+  const fallbackPayload = { ...payload };
+  delete fallbackPayload.completion_percentage;
+
+  return await supabase
+    .from("tasks")
+    .update(fallbackPayload)
+    .eq("id", taskId);
+}
 
 /** Normalize any status string (including legacy values) to a canonical ProjectStatus */
 export function normalizeProjectStatus(

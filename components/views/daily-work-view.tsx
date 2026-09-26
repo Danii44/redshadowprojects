@@ -13,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import type { Project, Role, Task, User } from "@/lib/types";
-import { getInitials } from "@/lib/utils";
+import { getInitials, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface DailyWorkViewProps {
@@ -311,36 +311,44 @@ export function DailyWorkView({
     if (!supabase) return;
 
     const databaseState = nextState.toLowerCase();
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        status: databaseState,
-        completion_percentage:
-          nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
-        reviewed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id);
+    const { error } = await updateTaskWithFallback(supabase, task.id, {
+      status: databaseState,
+      completion_percentage:
+        nextState === "Completed" ? 100 : task.completion_percentage ?? 60,
+      reviewed_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
     if (error) {
       notify(`Could not update review status: ${error.message}`);
       return;
     }
 
-    if (nextState === "Open" && task.assignee_id) {
+    if (task.assignee_id) {
       const { error: notifError } = await supabase.from("notifications").insert({
         user_id: task.assignee_id,
-        type: "task_rework",
-        severity: "warning",
-        title: "Task returned for rework",
-        body: `"${task.title}" was sent back to Open. Please update it and resubmit for review.`,
+        type: nextState === "Open" ? "task_rework" : "task_approved",
+        severity: nextState === "Open" ? "warning" : "success",
+        title:
+          nextState === "Open"
+            ? "Task returned for rework"
+            : "Task approved",
+        body:
+          nextState === "Open"
+            ? `"${task.title}" was sent back to Open. Please update it and resubmit for review.`
+            : `"${task.title}" was approved and marked complete. Great work!`,
         entity_type: "task",
         entity_id: String(task.id),
         actor_id: profileId,
       });
 
       if (notifError) {
-        console.error("Task rework notification failed:", notifError.message);
+        console.error(
+          nextState === "Open"
+            ? "Task rework notification failed:"
+            : "Task approval notification failed:",
+          notifError.message,
+        );
       }
     }
 
@@ -532,15 +540,12 @@ export function DailyWorkView({
 
     // Update task status and completion percentage
     const databaseState = progressForm.taskState.toLowerCase().replaceAll(" ", "_");
-    await supabase
-      .from("tasks")
-      .update({
-        completion_percentage: progressForm.completionPct,
-        status: databaseState,
-        submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", loggingProgressTask.id);
+    await updateTaskWithFallback(supabase, loggingProgressTask.id, {
+      completion_percentage: progressForm.completionPct,
+      status: databaseState,
+      submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    });
 
     setSubmitting(false);
     setLoggingProgressTask(null);
@@ -562,15 +567,12 @@ export function DailyWorkView({
 
     setSubmitting(true);
 
-    const { error } = await supabase
-      .from("tasks")
-      .update({
-        completion_percentage: 100,
-        status: "in_review",
-        submitted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", task.id);
+    const { error } = await updateTaskWithFallback(supabase, task.id, {
+      completion_percentage: 100,
+      status: "in_review",
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
 
     setSubmitting(false);
 

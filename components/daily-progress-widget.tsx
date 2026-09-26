@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, FileText, Send } from "lucide-react";
 import type { Role, Task } from "@/lib/types";
-import { getInitials } from "@/lib/utils";
+import { getInitials, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface DailyProgressWidgetProps {
@@ -169,15 +169,12 @@ export function DailyProgressWidget({
 
     // 2. Update task completion and status
     const databaseState = taskState.toLowerCase().replaceAll(" ", "_");
-    await supabase
-      .from("tasks")
-      .update({
-        completion_percentage: completionPct,
-        status: databaseState,
-        submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", selectedTaskId);
+    await updateTaskWithFallback(supabase, selectedTaskId, {
+      completion_percentage: completionPct,
+      status: databaseState,
+      submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    });
 
     setSubmitting(false);
     setNotes("");
