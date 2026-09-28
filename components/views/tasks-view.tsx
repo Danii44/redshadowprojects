@@ -42,6 +42,9 @@ export function TasksView({
   const isManagerRole = role !== "Team Member";
   const selectedPerson = people.find((person) => person.id === selectedPersonId);
   const memberProfile = people.find((person) => person.id === profileId);
+  const completedTaskStates = ["Completed", "Closed", "Cancelled"];
+
+  const isCompletedTask = (task: Task) => completedTaskStates.includes(task.state);
 
   const memberTaskSet = tasks.filter(
     (task) =>
@@ -59,28 +62,20 @@ export function TasksView({
         );
 
   const personStats = {
-    total: personTaskSet.length,
+    total: personTaskSet.filter((task) => !isCompletedTask(task)).length,
     open: personTaskSet.filter((task) => task.state === "Open").length,
-    completed: personTaskSet.filter((task) =>
-      ["Completed", "Closed", "Cancelled"].includes(task.state),
-    ).length,
-    active: personTaskSet.filter(
-      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
-    ).length,
+    completed: personTaskSet.filter((task) => isCompletedTask(task)).length,
+    active: personTaskSet.filter((task) => !isCompletedTask(task)).length,
   };
 
   const memberStats = {
-    total: memberTaskSet.length,
+    total: memberTaskSet.filter((task) => !isCompletedTask(task)).length,
     open: memberTaskSet.filter((task) => task.state === "Open").length,
-    completed: memberTaskSet.filter((task) =>
-      ["Completed", "Closed", "Cancelled"].includes(task.state),
-    ).length,
-    active: memberTaskSet.filter(
-      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
-    ).length,
+    completed: memberTaskSet.filter((task) => isCompletedTask(task)).length,
+    active: memberTaskSet.filter((task) => !isCompletedTask(task)).length,
   };
 
-  const matchesTaskStatus = (task: Task) => {
+  const matchesTaskStatus = (task: Task, includeCompleted = false) => {
     switch (taskStatusFilter) {
       case "open":
         return task.state === "Open";
@@ -89,15 +84,15 @@ export function TasksView({
       case "in_review":
         return ["In Review", "In Revision"].includes(task.state);
       case "completed":
-        return ["Completed", "Closed", "Cancelled"].includes(task.state);
+        return isCompletedTask(task);
       case "all":
       default:
-        return true;
+        return includeCompleted || !isCompletedTask(task);
     }
   };
 
-  // Filter tasks according to user role, search, selected assignee/person, and status
-  const visibleTasks = tasks.filter((task) => {
+  // List view hides completed tasks by default; board view can still show them.
+  const listVisibleTasks = tasks.filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -106,7 +101,7 @@ export function TasksView({
     if (!isManagerRole) {
       const matchesSelf =
         task.assignee_id === profileId || task.owner === memberProfile?.name;
-      return matchesSearch && matchesSelf && matchesTaskStatus(task);
+      return matchesSearch && matchesSelf && matchesTaskStatus(task, false);
     }
 
     const matchesPerson =
@@ -114,8 +109,30 @@ export function TasksView({
       task.assignee_id === selectedPersonId ||
       task.owner === selectedPerson?.name;
 
-    return matchesSearch && matchesPerson && matchesTaskStatus(task);
+    return matchesSearch && matchesPerson && matchesTaskStatus(task, false);
   });
+
+  const boardVisibleTasks = tasks.filter((task) => {
+    const matchesSearch =
+      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (task.project ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+
+    if (!isManagerRole) {
+      const matchesSelf =
+        task.assignee_id === profileId || task.owner === memberProfile?.name;
+      return matchesSearch && matchesSelf && matchesTaskStatus(task, true);
+    }
+
+    const matchesPerson =
+      selectedPersonId === "all" ||
+      task.assignee_id === selectedPersonId ||
+      task.owner === selectedPerson?.name;
+
+    return matchesSearch && matchesPerson && matchesTaskStatus(task, true);
+  });
+
+  const visibleTasks = viewMode === "list" ? listVisibleTasks : boardVisibleTasks;
 
   const refresh = () => {
     onRefresh?.();
@@ -214,7 +231,7 @@ export function TasksView({
     },
     {
       label: "Completed",
-      states: ["Closed", "Completed"],
+      states: ["Closed", "Completed", "Cancelled"],
       color: "border-t-emerald-500",
       badge: "bg-emerald-50 text-emerald-700",
     },
@@ -403,7 +420,7 @@ export function TasksView({
         /* Board View (Kanban) */
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {taskBoardColumns.map((col) => {
-            const colTasks = visibleTasks.filter((t) =>
+            const colTasks = boardVisibleTasks.filter((t) =>
               col.states.some(
                 (s) => s.toLowerCase() === t.state.toLowerCase(),
               ),
