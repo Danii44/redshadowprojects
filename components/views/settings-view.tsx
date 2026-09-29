@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Edit2, Plus, Trash2, Users, X } from "lucide-react";
+import { Edit2, KeyRound, Plus, Trash2, Users, X } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import type { Project, Role, Task, User } from "@/lib/types";
 import { getInitials } from "@/lib/utils";
@@ -102,10 +102,16 @@ export function SettingsView({
   const [teamForm, setTeamForm] = useState({ name: "", leaderId: "" });
   const [assignment, setAssignment] = useState({ teamId: "", userId: "" });
   const [submitting, setSubmitting] = useState(false);
+  const [resettingMemberId, setResettingMemberId] = useState<string | null>(null);
   const [createdUserInfo, setCreatedUserInfo] = useState<{
     name: string;
     email: string;
     tempPassword?: string;
+  } | null>(null);
+  const [resetPasswordInfo, setResetPasswordInfo] = useState<{
+    name: string;
+    email: string | null;
+    tempPassword: string;
   } | null>(null);
 
   useEffect(() => {
@@ -231,6 +237,45 @@ export function SettingsView({
     refresh();
   };
 
+  const resetMemberPassword = async (member: User) => {
+    if (
+      !supabase ||
+      !window.confirm(
+        `Reset ${member.name}'s password? Their current password will stop working.`,
+      )
+    )
+      return;
+
+    setResettingMemberId(member.id);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${sessionData.session?.access_token}`,
+      },
+      body: JSON.stringify({ action: "reset-password", profileId: member.id }),
+    });
+
+    const result = (await response.json()) as {
+      error?: string;
+      name?: string;
+      email?: string | null;
+      tempPassword?: string;
+    };
+    setResettingMemberId(null);
+
+    if (!response.ok || !result.tempPassword)
+      return notify(result.error || "Could not reset member password");
+
+    setResetPasswordInfo({
+      name: result.name || member.name,
+      email: result.email ?? member.email,
+      tempPassword: result.tempPassword,
+    });
+    notify("Password reset successfully");
+  };
+
   const createTeam = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!supabase) return;
@@ -340,6 +385,28 @@ export function SettingsView({
         </div>
       )}
 
+      {resetPasswordInfo && (
+        <div className="flex items-start justify-between rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950 shadow-xs">
+          <div>
+            <h3 className="text-base font-black">Password Reset</h3>
+            <p className="mt-1 text-xs font-medium">
+              Temporary password for <strong>{resetPasswordInfo.name}</strong>{" "}
+              ({resetPasswordInfo.email || "No email on file"}). Share it securely.
+            </p>
+            <div className="mt-2.5 inline-block rounded-xl border border-amber-200 bg-white px-3.5 py-1.5 font-mono text-xs font-bold">
+              Temporary Password: <span className="text-red-600">{resetPasswordInfo.tempPassword}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setResetPasswordInfo(null)}
+            className="rounded-lg p-1 text-amber-800 hover:bg-amber-100"
+            title="Dismiss password notice"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
       {/* TEAM MEMBERS TABLE */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div className="overflow-x-auto">
@@ -409,6 +476,16 @@ export function SettingsView({
                     {currentUserRole === "Admin" && (
                       <td className="py-3.5 px-4 text-right pr-6">
                         <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => resetMemberPassword(m)}
+                            disabled={resettingMemberId === m.id}
+                            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
+                            title="Reset password"
+                            aria-label={`Reset password for ${m.name}`}
+                          >
+                            <KeyRound size={15} />
+                          </button>
+
                           <button
                             onClick={() => {
                               setEditingMember(m);

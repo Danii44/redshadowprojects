@@ -1233,7 +1233,7 @@ export function DailyWorkView({
                   <option value="">No project / standalone task</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.code})
+                      {p.name}
                     </option>
                   ))}
                 </select>
@@ -1361,7 +1361,7 @@ export function DailyWorkView({
                   <option value="">No project / standalone task</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.code})
+                      {p.name}
                     </option>
                   ))}
                 </select>

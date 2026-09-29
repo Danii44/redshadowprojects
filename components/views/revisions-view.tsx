@@ -81,7 +81,6 @@ export function RevisionsView({
           activeChild?.submitted_at || project.updated_at || project.created_at,
         type: "project" as const,
         projectName: project.name,
-        projectCode: project.code,
         projectPhase: project.phase || "Detailed Design",
         status: project.status,
       };
@@ -233,9 +232,9 @@ export function RevisionsView({
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 font-mono text-xs font-bold text-slate-400">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-slate-400">
                     <FileClock size={15} className="text-violet-500" />
-                    {rev.projectCode}
+                    Project Revision
                   </span>
                   <Pill color={projectStatusColor(rev.status)}>
                     {projectStatusLabel(rev.status)}

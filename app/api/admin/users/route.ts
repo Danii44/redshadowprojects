@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 
 type CreateUserBody = {
+  action?: "reset-password";
+  profileId?: string;
   name: string;
   email: string;
   role: "admin" | "project_leader" | "team_member";
@@ -58,6 +60,44 @@ export async function POST(request: Request) {
     );
 
   const body = (await request.json()) as Partial<CreateUserBody>;
+
+  if (body.action === "reset-password") {
+    if (!body.profileId)
+      return NextResponse.json(
+        { error: "A user profile is required." },
+        { status: 400 },
+      );
+
+    const { data: member } = await adminClient
+      .from("users")
+      .select("id, name, email, auth_user_id, active")
+      .eq("id", body.profileId)
+      .single();
+
+    if (!member)
+      return NextResponse.json({ error: "Member not found." }, { status: 404 });
+    if (!member.active || !member.auth_user_id)
+      return NextResponse.json(
+        { error: "This member does not have an active login." },
+        { status: 400 },
+      );
+
+    const tempPassword = "#RSD2026";
+    const { error } = await adminClient.auth.admin.updateUserById(
+      member.auth_user_id,
+      { password: tempPassword },
+    );
+
+    if (error)
+      return NextResponse.json({ error: error.message }, { status: 400 });
+
+    return NextResponse.json({
+      name: member.name,
+      email: member.email,
+      tempPassword,
+    });
+  }
+
   const name = body.name?.trim();
   const email = body.email?.trim().toLowerCase();
   const role = body.role;

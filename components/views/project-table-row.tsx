@@ -1,7 +1,12 @@
 import { Edit2, Eye } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import type { Project } from "@/lib/types";
-import { calculateTimeLeft, projectStatusColor, projectStatusLabel } from "@/lib/utils";
+import {
+  calculateTimeLeft,
+  normalizeProjectStatus,
+  projectStatusColor,
+  projectStatusLabel,
+} from "@/lib/utils";
 import { TeamAvatarStack } from "./team-avatar-stack";
 
 interface ProjectTableRowProps {
@@ -19,11 +24,20 @@ export function ProjectTableRow({
   onOpenDetail,
   onToggleSelect,
 }: ProjectTableRowProps) {
-  const timeLeft = calculateTimeLeft(project.deadline);
+  const timeLeft = calculateTimeLeft(project.deadline, project.project_type);
+  const isOpenDueSoon =
+    normalizeProjectStatus(project.status) === "open" &&
+    ["today", "soon"].includes(timeLeft.urgencyLevel);
 
   return (
     <tr
-      className={`hover:bg-slate-50/80 transition ${selected ? "bg-red-50/30" : ""}`}
+      className={`transition ${
+        isOpenDueSoon
+          ? "bg-red-50/80 hover:bg-red-100/80"
+          : selected
+            ? "bg-red-50/30 hover:bg-slate-50/80"
+            : "hover:bg-slate-50/80"
+      }`}
     >
       {canEditProject && (
         <td className="py-3.5 pl-4 pr-2">
@@ -40,9 +54,6 @@ export function ProjectTableRow({
           onClick={() => onOpenDetail(project, "overview")}
           className="text-left group cursor-pointer"
         >
-          <span className="font-mono text-[10px] font-bold text-red-600 block">
-            {project.code}
-          </span>
           <span className="font-bold text-slate-900 group-hover:text-red-600 transition text-sm">
             {project.name}
           </span>

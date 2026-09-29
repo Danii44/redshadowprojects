@@ -67,9 +67,6 @@ export function ProjectDetailDrawer({
         <div className="p-6 border-b border-slate-200 bg-slate-50/50">
           <div className="flex items-start justify-between">
             <div>
-              <span className="font-mono text-xs font-bold text-red-600">
-                {project.code}
-              </span>
               <h2 className="text-2xl font-black text-slate-900 mt-1">
                 {project.name}
               </h2>
@@ -504,7 +501,7 @@ export function ProjectDetailDrawer({
         </div>
 
         {role === "Admin" && (
-          <div className="p-4 border-t border-slate-200 bg-slate-50 flex justify-between items-center">
+          <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center">
             <button
               type="button"
               onClick={() => onDelete(project)}
@@ -514,9 +511,6 @@ export function ProjectDetailDrawer({
               Delete Project
             </button>
 
-            <span className="text-[10px] font-mono font-semibold text-slate-400">
-              ID: {project.id}
-            </span>
           </div>
         )}
       </div>

@@ -271,14 +271,9 @@ export function Dashboard({
                     className="flex w-full items-center justify-between p-4 text-left hover:bg-slate-50 transition cursor-pointer"
                   >
                     <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[10px] font-bold text-red-600">
-                          {p.code}
-                        </span>
-                        <p className="font-black text-slate-900 text-xs truncate">
-                          {p.name}
-                        </p>
-                      </div>
+                      <p className="font-black text-slate-900 text-xs truncate">
+                        {p.name}
+                      </p>
                       <p className="text-[11px] text-slate-400 font-medium mt-0.5">
                         Led by {p.leader}
                       </p>
@@ -609,14 +604,9 @@ export function Dashboard({
                     className={`flex w-full items-center justify-between p-4 text-left transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
                     <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-slate-500">
-                          {p.code}
-                        </span>
-                        <p className="font-black text-slate-900 text-xs truncate">
-                          {p.name}
-                        </p>
-                      </div>
+                      <p className="font-black text-slate-900 text-xs truncate">
+                        {p.name}
+                      </p>
                       <span className={`inline-block mt-1.5 rounded-full px-2.5 py-0.5 text-[11px] ${timeLeft.badgeClass}`}>
                         {timeLeft.label}
                       </span>
@@ -687,14 +677,9 @@ export function Dashboard({
                     className={`flex w-full items-center justify-between p-4 text-left transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
                     <div className="min-w-0 flex-1 pr-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-slate-500">
-                          {p.code}
-                        </span>
-                        <p className="font-black text-slate-900 text-xs truncate">
-                          {p.name}
-                        </p>
-                      </div>
+                      <p className="font-black text-slate-900 text-xs truncate">
+                        {p.name}
+                      </p>
 
                       <div className="mt-1.5 flex items-center gap-2">
                         {isHourly ? (
@@ -795,7 +780,6 @@ export function Dashboard({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-black uppercase tracking-wider text-slate-500">
-                <th className="py-3 px-4">CODE</th>
                 <th className="py-3 px-4">PROJECT</th>
                 <th className="py-3 px-4">ASSIGNED</th>
                 <th className="py-3 px-4">STATUS</th>
@@ -820,10 +804,6 @@ export function Dashboard({
                     onClick={() => setView("Projects")}
                     className={`transition cursor-pointer ${timeLeft.borderClass} ${timeLeft.bgClass}`}
                   >
-                    <td className="py-3.5 px-4 font-mono font-bold text-red-600">
-                      {p.code}
-                    </td>
-
                     <td className="py-3.5 px-4 font-black text-slate-900">
                       <div className="flex items-center gap-2">
                         <span>{p.name}</span>
@@ -896,7 +876,7 @@ export function Dashboard({
               {!sortedDeadlines.length && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={6}
                     className="py-8 text-center text-xs font-semibold text-slate-400"
                   >
                     No active projects found matching filter.

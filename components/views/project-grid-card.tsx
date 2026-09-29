@@ -1,6 +1,11 @@
 import { Pill } from "@/components/ui/pill";
 import type { Project } from "@/lib/types";
-import { calculateTimeLeft, projectStatusColor, projectStatusLabel } from "@/lib/utils";
+import {
+  calculateTimeLeft,
+  normalizeProjectStatus,
+  projectStatusColor,
+  projectStatusLabel,
+} from "@/lib/utils";
 
 interface ProjectGridCardProps {
   project: Project;
@@ -13,13 +18,21 @@ export function ProjectGridCard({
   canEditProject,
   onOpenDetail,
 }: ProjectGridCardProps) {
-  const timeLeft = calculateTimeLeft(project.deadline);
+  const timeLeft = calculateTimeLeft(project.deadline, project.project_type);
+  const isOpenDueSoon =
+    normalizeProjectStatus(project.status) === "open" &&
+    ["today", "soon"].includes(timeLeft.urgencyLevel);
 
   return (
-    <div className="group relative flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs hover:shadow-md transition">
+    <div
+      className={`group relative flex flex-col justify-between rounded-2xl border p-5 shadow-2xs transition hover:shadow-md ${
+        isOpenDueSoon
+          ? "border-red-300 bg-red-50/80 ring-1 ring-red-200"
+          : "border-slate-200 bg-white"
+      }`}
+    >
       <div>
-        <div className="flex items-start justify-between">
-          <span className="font-mono text-xs font-bold text-red-600">{project.code}</span>
+        <div className="flex items-start justify-end">
           <Pill color={projectStatusColor(project.status)}>
             {projectStatusLabel(project.status)}
           </Pill>

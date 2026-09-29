@@ -1,5 +1,12 @@
 ﻿import React from "react";
-import { Calendar, Clock, AlertCircle, CheckCircle } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  FileText,
+} from "lucide-react";
 import type { Task, User } from "@/lib/types";
 
 interface TaskCardProps {
@@ -10,6 +17,10 @@ interface TaskCardProps {
   deleteTask: (task: Task) => void;
   editable: boolean;
   statusEditable: boolean;
+  canLogWork: boolean;
+  workSubmitting: boolean;
+  onLogWork: () => void;
+  onDone: () => void;
   onDragStart: () => void;
 }
 
@@ -119,6 +130,10 @@ export function TaskCard({
   deleteTask,
   editable,
   statusEditable,
+  canLogWork,
+  workSubmitting,
+  onLogWork,
+  onDone,
   onDragStart,
 }: TaskCardProps) {
   const dl = getDeadlineInfo(t.due_at);
@@ -218,6 +233,29 @@ export function TaskCard({
             </span>
           </div>
         </div>
+
+        {canLogWork && (
+          <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+            <button
+              type="button"
+              onClick={onDone}
+              disabled={workSubmitting}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 px-2.5 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+            >
+              <CheckCircle2 size={14} />
+              Done
+            </button>
+            <button
+              type="button"
+              onClick={onLogWork}
+              disabled={workSubmitting}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+            >
+              <FileText size={14} />
+              Log Work
+            </button>
+          </div>
+        )}
 
         {/* Admin controls */}
         {(editable || statusEditable) && (

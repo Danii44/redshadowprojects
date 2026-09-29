@@ -14,8 +14,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       onClick={onClick}
       className="rounded-2xl border border-slate-200 p-4 text-left hover:shadow-md transition-shadow bg-white"
     >
-      <div className="mb-4 flex items-start justify-between">
-        <span className="text-xs font-black text-slate-400">{project.code}</span>
+      <div className="mb-4 flex items-start justify-end">
         <Pill color={projectStatusColor(project.status)}>
           {projectStatusLabel(project.status)}
         </Pill>

@@ -1,8 +1,19 @@
 import React, { useState } from "react";
-import { Layers, List, Columns3, Plus, Search, Clock } from "lucide-react";
+import {
+  CheckCircle2,
+  FileText,
+  Layers,
+  List,
+  Columns3,
+  Plus,
+  Search,
+  Clock,
+  Send,
+  X,
+} from "lucide-react";
 import { TaskCard } from "@/components/task-card";
 import type { Project, Role, Task, User } from "@/lib/types";
-import { canEdit, getInitials } from "@/lib/utils";
+import { canEdit, getInitials, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface TasksViewProps {
@@ -28,6 +39,15 @@ export function TasksView({
 }: TasksViewProps) {
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [searchQuery, setSearchQuery] = useState("");
+  const [loggingProgressTask, setLoggingProgressTask] = useState<Task | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [progressForm, setProgressForm] = useState({
+    notes: "",
+    completionPct: 50,
+    hoursSpent: "4",
+    blocker: "",
+    taskState: "In Progress",
+  });
   const [selectedPersonId, setSelectedPersonId] = useState<string>("all");
   const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "open" | "in_progress" | "in_review" | "completed">("all");
   const [creating, setCreating] = useState(false);
@@ -45,6 +65,22 @@ export function TasksView({
   const completedTaskStates = ["Completed", "Closed", "Cancelled"];
 
   const isCompletedTask = (task: Task) => completedTaskStates.includes(task.state);
+
+  const canMemberLogWork = (task: Task) =>
+    role === "Team Member" &&
+    (task.assignee_id === profileId || task.owner === memberProfile?.name) &&
+    !["In Review", "Completed", "Closed", "Cancelled"].includes(task.state);
+
+  const startProgressLog = (task: Task) => {
+    setLoggingProgressTask(task);
+    setProgressForm({
+      notes: "",
+      completionPct: task.completion_percentage ?? 25,
+      hoursSpent: "4",
+      blocker: "",
+      taskState: task.state || "In Progress",
+    });
+  };
 
   const memberTaskSet = tasks.filter(
     (task) =>
@@ -207,6 +243,98 @@ export function TasksView({
     const { error } = await supabase.from("tasks").delete().eq("id", task.id);
     if (error) return notify(error.message);
     notify("Task deleted");
+    refresh();
+  };
+
+  const handleQuickCompleteTask = async (task: Task) => {
+    if (!supabase || !canMemberLogWork(task)) return;
+
+    setSubmitting(true);
+    const { error } = await updateTaskWithFallback(supabase, task.id, {
+      completion_percentage: 100,
+      status: "in_review",
+      submitted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    setSubmitting(false);
+
+    if (error) {
+      notify(`Could not send task to review: ${error.message}`);
+      return;
+    }
+
+    await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: profileId,
+      body: JSON.stringify({
+        type: "daily_progress",
+        notes: "Task submitted for admin review.",
+        completionPct: 100,
+        hoursSpent: 0,
+        blocker: null,
+      }),
+    });
+
+    notify("Task sent to review");
+    refresh();
+  };
+
+  const handleSubmitProgress = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase || !loggingProgressTask) return;
+
+    if (!canMemberLogWork(loggingProgressTask)) {
+      notify("This task is already in review or completed and cannot be updated.");
+      setLoggingProgressTask(null);
+      return;
+    }
+
+    setSubmitting(true);
+    const databaseState = progressForm.taskState.toLowerCase().replaceAll(" ", "_");
+
+    await supabase.from("daily_updates").insert({
+      user_id: profileId,
+      project_id: loggingProgressTask.project_id || null,
+      summary: progressForm.notes.trim(),
+      blockers: progressForm.blocker.trim() || null,
+      next_steps: `Completion: ${progressForm.completionPct}%, Hours: ${progressForm.hoursSpent}h`,
+      update_date: new Date().toISOString().slice(0, 10),
+    });
+
+    await supabase.from("task_comments").insert({
+      task_id: loggingProgressTask.id,
+      author_id: profileId,
+      body: JSON.stringify({
+        type: "daily_progress",
+        notes: progressForm.notes.trim(),
+        completionPct: progressForm.completionPct,
+        hoursSpent: parseFloat(progressForm.hoursSpent) || 0,
+        blocker: progressForm.blocker.trim() || null,
+      }),
+    });
+
+    const { error } = await updateTaskWithFallback(supabase, loggingProgressTask.id, {
+      completion_percentage: progressForm.completionPct,
+      status: databaseState,
+      submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    });
+    setSubmitting(false);
+
+    if (error) {
+      notify(`Could not update task progress: ${error.message}`);
+      return;
+    }
+
+    setLoggingProgressTask(null);
+    setProgressForm({
+      notes: "",
+      completionPct: 50,
+      hoursSpent: "4",
+      blocker: "",
+      taskState: "In Progress",
+    });
+    notify("Daily progress log recorded successfully!");
     refresh();
   };
 
@@ -411,6 +539,10 @@ export function TasksView({
                 deleteTask={deleteTask}
                 editable={userCanEdit}
                 statusEditable={role !== "Team Member"}
+                canLogWork={canMemberLogWork(task)}
+                workSubmitting={submitting}
+                onLogWork={() => startProgressLog(task)}
+                onDone={() => handleQuickCompleteTask(task)}
                 onDragStart={() => {}}
               />
             ))
@@ -505,6 +637,29 @@ export function TasksView({
                           </span>
                         )}
                       </div>
+
+                      {canMemberLogWork(task) && (
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleQuickCompleteTask(task)}
+                            disabled={submitting}
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 px-2 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                          >
+                            <CheckCircle2 size={12} />
+                            Done
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startProgressLog(task)}
+                            disabled={submitting}
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 text-[10px] font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                          >
+                            <FileText size={12} />
+                            Log Work
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ))}
 
@@ -618,6 +773,124 @@ export function TasksView({
                   className="rounded-xl bg-[#e3292f] px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
                 >
                   Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {loggingProgressTask && (
+        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/45 p-4">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                  {loggingProgressTask.project}
+                </p>
+                <h2 className="mt-0.5 text-xl font-black text-slate-900">
+                  Log Progress: {loggingProgressTask.title}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLoggingProgressTask(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                aria-label="Close progress log"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitProgress} className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Task Status Update
+                  <select
+                    value={progressForm.taskState}
+                    onChange={(event) =>
+                      setProgressForm({ ...progressForm, taskState: event.target.value })
+                    }
+                    className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900"
+                  >
+                    <option value="In Progress">In Progress</option>
+                    <option value="In Review">Submit for Review</option>
+                    <option value="In Revision">In Revision</option>
+                    <option value="Completed">Completed</option>
+                  </select>
+                </label>
+                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  Hours Worked Today
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    max="24"
+                    value={progressForm.hoursSpent}
+                    onChange={(event) =>
+                      setProgressForm({ ...progressForm, hoursSpent: event.target.value })
+                    }
+                    className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
+                  />
+                </label>
+              </div>
+
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Completion: {progressForm.completionPct}%
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  value={progressForm.completionPct}
+                  onChange={(event) =>
+                    setProgressForm({
+                      ...progressForm,
+                      completionPct: Number.parseInt(event.target.value, 10),
+                    })
+                  }
+                  className="mt-2 h-2 w-full accent-[#e3292f]"
+                />
+              </label>
+
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Work Accomplished Notes *
+                <textarea
+                  required
+                  rows={3}
+                  value={progressForm.notes}
+                  onChange={(event) =>
+                    setProgressForm({ ...progressForm, notes: event.target.value })
+                  }
+                  className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-900"
+                />
+              </label>
+
+              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                Blockers / Help Needed (Optional)
+                <input
+                  value={progressForm.blocker}
+                  onChange={(event) =>
+                    setProgressForm({ ...progressForm, blocker: event.target.value })
+                  }
+                  className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
+                />
+              </label>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setLoggingProgressTask(null)}
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  disabled={submitting || !progressForm.notes.trim()}
+                  className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-black text-white disabled:opacity-50"
+                >
+                  <Send size={14} />
+                  {submitting ? "Saving..." : "Save Progress Log"}
                 </button>
               </div>
             </form>
