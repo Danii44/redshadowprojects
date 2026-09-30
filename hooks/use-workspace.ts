@@ -158,7 +158,7 @@ function mapTasks(
         title: task.title,
         status,
         completion_percentage: task.completion_percentage ?? undefined,
-        created_by: task.created_by ?? profileId,
+        created_by: task.created_by ?? "",
         project: projectById.get(projectId) ?? "General Task",
         owner,
         initials: String(owner)

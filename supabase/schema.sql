@@ -182,7 +182,7 @@ CREATE TABLE public.project_phase_history (
 
 CREATE TABLE public.tasks (
     id                      uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id              uuid        NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
+    project_id              uuid        REFERENCES public.projects(id) ON DELETE CASCADE,
     phase_id                uuid        REFERENCES public.project_phases(id) ON DELETE SET NULL,
     title                   text        NOT NULL,
     description             text,
@@ -539,6 +539,12 @@ CREATE POLICY tasks_read ON public.tasks FOR SELECT TO authenticated
 CREATE POLICY tasks_admin_manage ON public.tasks FOR ALL TO authenticated
     USING (public.is_admin()) WITH CHECK (public.is_admin());
 
+CREATE POLICY tasks_assignee_insert ON public.tasks FOR INSERT TO authenticated
+    WITH CHECK (
+        assignee_id = (SELECT id FROM public.current_profile())
+        AND created_by = (SELECT id FROM public.current_profile())
+    );
+
 CREATE POLICY tasks_assignee_update ON public.tasks FOR UPDATE TO authenticated
     USING (assignee_id = (SELECT id FROM public.current_profile()))
     WITH CHECK (assignee_id = (SELECT id FROM public.current_profile()));
@@ -559,10 +565,27 @@ CREATE POLICY task_checklists_access ON public.task_checklists FOR ALL TO authen
     WITH CHECK (EXISTS (SELECT 1 FROM public.tasks t WHERE t.id = task_id AND public.can_access_project(t.project_id)));
 
 CREATE POLICY task_comments_read ON public.task_comments FOR SELECT TO authenticated
-    USING (EXISTS (SELECT 1 FROM public.tasks t WHERE t.id = task_id AND public.can_access_project(t.project_id)));
+    USING (EXISTS (
+        SELECT 1 FROM public.tasks t
+        WHERE t.id = task_id
+          AND (
+              public.can_access_project(t.project_id)
+              OR t.assignee_id = (SELECT id FROM public.current_profile())
+          )
+    ));
 
 CREATE POLICY task_comments_insert ON public.task_comments FOR INSERT TO authenticated
-    WITH CHECK (EXISTS (SELECT 1 FROM public.tasks t WHERE t.id = task_id AND public.can_access_project(t.project_id)));
+    WITH CHECK (
+        author_id = (SELECT id FROM public.current_profile())
+        AND EXISTS (
+            SELECT 1 FROM public.tasks t
+            WHERE t.id = task_id
+              AND (
+                  public.can_access_project(t.project_id)
+                  OR t.assignee_id = (SELECT id FROM public.current_profile())
+              )
+        )
+    );
 
 -- ── REVISIONS ───────────────────────────────────────────────
 CREATE POLICY revisions_read ON public.revisions FOR SELECT TO authenticated

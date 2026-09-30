@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Clock, Eye, ListTodo, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarCheck, Clock, Eye, Plus, Sparkles } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { DashboardMetricCard } from "./dashboard-metric-card";
 import {
@@ -91,7 +91,7 @@ export function Dashboard({
     const myOpen = myTasks.filter((t) => t.state === "Open").length;
 
     const urgentTasks = myTasks.filter(
-      (t) => t.state !== "Completed" && t.state !== "Closed",
+      (t) => !["Completed", "Closed", "Cancelled"].includes(t.state),
     );
 
     return (
@@ -113,11 +113,11 @@ export function Dashboard({
 
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setView("Tasks")}
+              onClick={() => setView("Daily Work")}
               className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
             >
-              <ListTodo size={16} />
-              View My Tasks ({myTasks.length})
+              <CalendarCheck size={16} />
+              Daily Work ({urgentTasks.length})
             </button>
           </div>
         </div>
@@ -442,13 +442,22 @@ export function Dashboard({
           </p>
         </div>
 
-        <button
-          onClick={() => setView("Projects")}
-          className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto cursor-pointer"
-        >
-          <Plus size={16} />
-          New Project
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => setView("Daily Work")}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-800 hover:bg-slate-50 transition self-start sm:self-auto cursor-pointer"
+          >
+            <CalendarCheck size={16} />
+            Daily Work ({tasks.filter((task) => !["Completed", "Closed", "Cancelled"].includes(task.state)).length})
+          </button>
+          <button
+            onClick={() => setView("Projects")}
+            className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto cursor-pointer"
+          >
+            <Plus size={16} />
+            New Project
+          </button>
+        </div>
       </div>
 
       {/* Top Metric Cards Row (6 Cards) */}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CalendarCheck,
+  Check,
   Download,
   FileSpreadsheet,
   FileText,
@@ -13,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import type { Project, Role, Task, User } from "@/lib/types";
-import { getInitials, updateTaskWithFallback } from "@/lib/utils";
+import { getAppRole, getInitials, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface DailyWorkViewProps {
@@ -54,7 +55,6 @@ export function DailyWorkView({
   // View & Filter states
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
   const [workViewMode, setWorkViewMode] = useState<"stream" | "datasheet">("datasheet");
-  const [dailyTab, setDailyTab] = useState<"overview" | "work" | "logs">("overview");
 
   // Modal states
   const [addingSelfTask, setAddingSelfTask] = useState(false);
@@ -95,19 +95,18 @@ export function DailyWorkView({
   };
 
   const isManagerRole = role !== "Team Member";
-  const assignedMemberIds = useMemo(
-    () =>
-      new Set(
-        tasks
-          .map((task) => task.assignee_id)
-          .filter((assigneeId): assigneeId is string => Boolean(assigneeId)),
-      ),
-    [tasks],
+  const teamMembers = useMemo(
+    () => people.filter((person) => getAppRole(person.role) === "Team Member"),
+    [people],
   );
-
+  const teamMemberIds = useMemo(
+    () => new Set(teamMembers.map((person) => person.id)),
+    [teamMembers],
+  );
   const canLogWork = (task: Task) =>
-    role === "Team Member" &&
-    (task.assignee_id === profileId || task.owner === userName) &&
+    (role === "Team Member"
+      ? task.assignee_id === profileId || task.owner === userName
+      : task.created_by === profileId && task.assignee_id === profileId) &&
     !["In Review", "Completed", "Closed", "Cancelled"].includes(task.state);
 
   // Active tasks assigned: review items stay visible so the member can see they are waiting for approval.
@@ -125,7 +124,7 @@ export function DailyWorkView({
       .from("task_comments")
       .select("id, task_id, author_id, body, created_at, tasks(title, project_id), users(name)")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(200);
 
     if (error) {
       setLoadingLogs(false);
@@ -202,11 +201,13 @@ export function DailyWorkView({
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [fetchLogs]);
+  }, [fetchLogs, tasks]);
 
   const filteredLogs = logs.filter((log) => {
     if (role === "Team Member") return log.author_id === profileId;
-    if (selectedMemberFilter === "all") return assignedMemberIds.has(log.author_id);
+    if (selectedMemberFilter === "all") {
+      return teamMemberIds.has(log.author_id) || log.author_id === profileId;
+    }
     return log.author_id === selectedMemberFilter;
   });
 
@@ -255,24 +256,18 @@ export function DailyWorkView({
     };
   }, [filteredAssignedTasks]);
 
-  const todayPriorities = useMemo(() => {
-    const activeTasks = filteredAssignedTasks.filter(
-      (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
-    );
-
-    return [...activeTasks]
-      .sort((a, b) => {
-        const aUrgency = Number(a.priority === "critical") * 3 + Number(a.priority === "high") * 2 + Number(!!a.due_at);
-        const bUrgency = Number(b.priority === "critical") * 3 + Number(b.priority === "high") * 2 + Number(!!b.due_at);
-        return bUrgency - aUrgency;
-      })
-      .slice(0, 3);
-  }, [filteredAssignedTasks]);
-
   const completedTodayTasks = useMemo(() => {
     const today = new Date();
+    const selectedPerson = people.find((person) => person.id === selectedMemberFilter);
 
     return [...tasks]
+      .filter(
+        (task) =>
+          role === "Team Member" ||
+          selectedMemberFilter === "all" ||
+          task.assignee_id === selectedMemberFilter ||
+          task.owner === selectedPerson?.name,
+      )
       .filter((task) => ["Completed", "Closed", "Cancelled"].includes(task.state))
       .filter((task) => {
         const lastUpdate = new Date(
@@ -285,27 +280,7 @@ export function DailyWorkView({
         const bDate = new Date(b.reviewed_at || b.submitted_at || b.updated_at || b.created_at || new Date(0).toISOString()).getTime();
         return bDate - aDate;
       });
-  }, [tasks]);
-
-  const reviewQueue = useMemo(() => {
-    return [...tasks]
-      .filter((task) => ["In Review", "In Revision"].includes(task.state))
-      .filter(
-        (task) =>
-          role !== "Team Member" ||
-          task.assignee_id === profileId ||
-          task.owner === userName,
-      )
-      .sort((a, b) => {
-        const aDate = new Date(
-          a.submitted_at || a.updated_at || a.created_at || new Date(0).toISOString(),
-        ).getTime();
-        const bDate = new Date(
-          b.submitted_at || b.updated_at || b.created_at || new Date(0).toISOString(),
-        ).getTime();
-        return bDate - aDate;
-      });
-  }, [tasks, role, profileId, userName]);
+  }, [people, role, selectedMemberFilter, tasks]);
 
   const handleReviewDecision = async (task: Task, nextState: "Completed" | "Open") => {
     if (!supabase) return;
@@ -500,6 +475,53 @@ export function DailyWorkView({
     refresh();
   };
 
+  const handleCompleteSelfTask = async (task: Task) => {
+    if (
+      !supabase ||
+      task.created_by !== profileId ||
+      task.assignee_id !== profileId
+    ) {
+      return;
+    }
+
+    setSubmitting(true);
+    const completedAt = new Date().toISOString();
+    const { error } = await updateTaskWithFallback(supabase, task.id, {
+      completion_percentage: 100,
+      status: "completed",
+      updated_at: completedAt,
+    });
+
+    if (error) {
+      setSubmitting(false);
+      notify(`Could not complete task: ${error.message}`);
+      return;
+    }
+
+    const { error: logError } = await supabase.from("task_comments").insert({
+      task_id: task.id,
+      author_id: profileId,
+      body: JSON.stringify({
+        type: "daily_progress",
+        notes: "Task marked complete by team member.",
+        completionPct: 100,
+        hoursSpent: 0,
+        blocker: null,
+      }),
+    });
+
+    setSubmitting(false);
+    if (logError) {
+      notify(`Task completed, but its daily log could not be saved: ${logError.message}`);
+      refresh();
+      return;
+    }
+
+    notify("Task completed and added to the daily log.");
+    void fetchLogs();
+    refresh();
+  };
+
   // 3. Submit progress log for a task
   const handleSubmitProgress = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -562,42 +584,6 @@ export function DailyWorkView({
     refresh();
   };
 
-  const handleQuickCompleteTask = async (task: Task) => {
-    if (!supabase || task.state === "In Review") return;
-
-    setSubmitting(true);
-
-    const { error } = await updateTaskWithFallback(supabase, task.id, {
-      completion_percentage: 100,
-      status: "in_review",
-      submitted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    setSubmitting(false);
-
-    if (error) {
-      notify(`Could not send task to review: ${error.message}`);
-      return;
-    }
-
-    await supabase.from("task_comments").insert({
-      task_id: task.id,
-      author_id: profileId,
-      body: JSON.stringify({
-        type: "daily_progress",
-        notes: "Task submitted for admin review.",
-        completionPct: 100,
-        hoursSpent: 0,
-        blocker: null,
-      }),
-    });
-
-    notify("Task sent to review");
-    fetchLogs();
-    refresh();
-  };
-
   return (
     <div className="space-y-7">
       {/* Top Header & Action Bar */}
@@ -605,27 +591,24 @@ export function DailyWorkView({
         <div>
           <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
             <CalendarCheck size={28} className="text-[#e3292f]" />
-            Daily Work & Progress Datasheet
+            Daily Tasks
           </h1>
           <p className="mt-1 text-xs font-bold text-slate-500">
             {role === "Team Member"
-              ? "Track assigned daily tasks, log your accomplishments, report blockers, or add what you're working on today."
-              : "Monitor team member daily work datasheets, log streams, and assign daily tasks."}
+              ? "Work through your tasks, log progress, and submit finished work for review."
+              : "Assign work, track progress, and review submitted tasks."}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          {/* TEAM MEMBER: Add what I am working on */}
           <button
             onClick={() => setAddingSelfTask(true)}
             className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs cursor-pointer"
           >
             <Plus size={16} />
-            + Add What I&apos;m Working On Today
+            Add my task
           </button>
-
-          {/* ADMIN / LEADER: Assign task to team member */}
-          {(role === "Admin" || role === "Project Leader") && (
+          {isManagerRole && (
             <button
               onClick={() => setAssigningMemberTask(true)}
               className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
@@ -652,8 +635,8 @@ export function DailyWorkView({
                 onChange={(e) => setSelectedMemberFilter(e.target.value)}
                 className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-900 outline-none focus:border-red-400 cursor-pointer min-w-44"
               >
-                <option value="all">All Team Members ({people.length})</option>
-                {people.map((p) => (
+                <option value="all">All Team Members ({teamMembers.length})</option>
+                {teamMembers.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name} ({p.role})
                   </option>
@@ -671,70 +654,10 @@ export function DailyWorkView({
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* View Mode Toggle: Stream vs Datasheet */}
-            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
-              <button
-                onClick={() => setWorkViewMode("datasheet")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                  workViewMode === "datasheet"
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <FileSpreadsheet size={14} />
-                Datasheet View
-              </button>
-              <button
-                onClick={() => setWorkViewMode("stream")}
-                className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition cursor-pointer ${
-                  workViewMode === "stream"
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:text-slate-900"
-                }`}
-              >
-                <List size={14} />
-                Log Stream
-              </button>
-            </div>
-
-            {/* Export CSV Button */}
-            <button
-              onClick={exportDatasheetCSV}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
-            >
-              <Download size={14} />
-              Export CSV
-            </button>
-          </div>
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-2 shadow-2xs">
-        <div className="flex flex-wrap gap-2">
-          {[
-            { key: "overview", label: "Overview" },
-            { key: "work", label: "Work Queue" },
-            { key: "logs", label: "Logs" },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setDailyTab(tab.key as typeof dailyTab)}
-              className={`rounded-xl px-3.5 py-2 text-xs font-black uppercase tracking-[0.14em] transition ${
-                dailyTab === tab.key
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {dailyTab === "overview" && (
-        <>
+      <>
           {todaySummary.overdue > 0 || todaySummary.dueToday > 0 ? (
             <div className={`rounded-2xl border p-4 ${todaySummary.overdue > 0 ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
               <div className="flex items-center justify-between gap-3">
@@ -774,42 +697,8 @@ export function DailyWorkView({
               ))}
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-black text-slate-900">Today&apos;s priorities</h3>
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">Top 3</span>
-              </div>
-              <div className="space-y-2.5">
-                {todayPriorities.length ? (
-                  todayPriorities.map((task) => (
-                    <div key={task.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-black text-slate-900">{task.title}</p>
-                        <p className="text-[10px] font-semibold text-slate-500">
-                          {task.owner} · {task.project || "General"}
-                        </p>
-                      </div>
-                      <span className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black uppercase ${
-                        task.priority === "critical"
-                          ? "bg-red-100 text-red-700"
-                          : task.priority === "high"
-                          ? "bg-amber-100 text-amber-700"
-                          : "bg-slate-200 text-slate-700"
-                      }`}>
-                        {task.priority || "normal"}
-                      </span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs font-semibold text-slate-400">No active tasks flagged right now.</p>
-                )}
-              </div>
-            </div>
           </section>
-        </>
-      )}
 
-      {dailyTab === "work" && (
         <div className="space-y-5">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3">
             <h2 className="text-lg font-black text-slate-900">
@@ -888,16 +777,6 @@ export function DailyWorkView({
                       {task.state}
                     </span>
                     <div className="flex items-center gap-2">
-                      {role === "Team Member" && canLogWork(task) && (
-                        <button
-                          type="button"
-                          onClick={() => handleQuickCompleteTask(task)}
-                          disabled={submitting}
-                          className="rounded-lg border border-emerald-200 bg-white px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700 hover:bg-emerald-50 transition cursor-pointer disabled:opacity-60"
-                        >
-                          Done
-                        </button>
-                      )}
                       {canLogWork(task) && (
                         <button
                           onClick={() => {
@@ -907,7 +786,8 @@ export function DailyWorkView({
                               completionPct: compPct,
                               hoursSpent: "4",
                               blocker: "",
-                              taskState: task.state || "In Progress",
+                              taskState:
+                                task.state === "In Progress" ? task.state : "In Progress",
                             });
                           }}
                           className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
@@ -916,9 +796,44 @@ export function DailyWorkView({
                           Log Work
                         </button>
                       )}
-                      {(["In Review", "Completed", "Closed", "Cancelled"].includes(task.state)) && (
+                      {task.created_by === profileId &&
+                        task.assignee_id === profileId && (
+                          <button
+                            type="button"
+                            onClick={() => void handleCompleteSelfTask(task)}
+                            disabled={submitting}
+                            className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
+                          >
+                            <Check size={13} />
+                            Complete
+                          </button>
+                        )}
+                      {isManagerRole && task.state === "In Review" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewDecision(task, "Completed")}
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewDecision(task, "Open")}
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-bold text-amber-700 hover:bg-amber-100 transition"
+                          >
+                            Rework
+                          </button>
+                        </>
+                      )}
+                      {role === "Team Member" && task.state === "In Review" && (
                         <span className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-700">
                           Awaiting review
+                        </span>
+                      )}
+                      {task.state === "In Revision" && (
+                        <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700">
+                          Rework requested
                         </span>
                       )}
                     </div>
@@ -935,8 +850,8 @@ export function DailyWorkView({
                 </h3>
                 <p className="mt-1 text-xs font-semibold text-slate-400">
                   {role === "Team Member"
-                    ? "Admin or Project Leader hasn&apos;t assigned a task yet. Click '+ Add What I&apos;m Working On Today' to add your task."
-                    : "Try clearing the team member filter or assign a new task using the button above."}
+                    ? "Add a task to get started, or ask your manager for an assignment."
+                    : "Assign a task or clear the team member filter."}
                 </p>
               </div>
             )}
@@ -973,53 +888,53 @@ export function DailyWorkView({
             )}
           </section>
 
-          {isManagerRole && reviewQueue.length > 0 && (
-            <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
-              <div className="mb-3 flex items-center justify-between">
-                <h3 className="text-sm font-black text-slate-900">Awaiting review</h3>
-                <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
-                  {reviewQueue.length} waiting
-                </span>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {reviewQueue.map((task) => (
-                  <div key={task.id} className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-black text-slate-900 truncate">{task.title}</p>
-                      <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-black uppercase text-violet-700">
-                        {task.state}
-                      </span>
-                    </div>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                      {task.owner} · {task.project || "General"}
-                    </p>
-
-                    <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-violet-100 bg-violet-50/60 p-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleReviewDecision(task, "Completed")}
-                        className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-emerald-700 transition hover:bg-emerald-100 cursor-pointer"
-                      >
-                        Approve
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleReviewDecision(task, "Open")}
-                        className="flex-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700 transition hover:bg-amber-100 cursor-pointer"
-                      >
-                        Rework
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
         </div>
-      )}
+      </>
 
-      {dailyTab === "logs" && (
+      <details className="group rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-black text-slate-900">
+          <span>Progress history</span>
+          <span className="text-xs font-bold text-slate-500">{filteredLogs.length} entries</span>
+        </summary>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <button
+              type="button"
+              onClick={() => setWorkViewMode("datasheet")}
+              aria-pressed={workViewMode === "datasheet"}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold transition ${
+                workViewMode === "datasheet"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <FileSpreadsheet size={14} />
+              Datasheet View
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkViewMode("stream")}
+              aria-pressed={workViewMode === "stream"}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold transition ${
+                workViewMode === "stream"
+                  ? "bg-white text-slate-900 shadow-xs"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <List size={14} />
+              Log Stream
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={exportDatasheetCSV}
+            disabled={!filteredLogs.length}
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Download size={14} />
+            Export CSV
+          </button>
+        </div>
         <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
         <div className="border-b border-slate-100 p-5 flex items-center justify-between">
           <div>
@@ -1037,7 +952,7 @@ export function DailyWorkView({
         </div>
 
         {/* DATASHEET TABLE VIEW (For Admins & Leaders, or toggle) */}
-        {workViewMode === "datasheet" || role === "Team Member" ? (
+        {workViewMode === "datasheet" ? (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
@@ -1182,7 +1097,7 @@ export function DailyWorkView({
           </div>
         )}
       </section>
-      )}
+      </details>
 
       {/* MODAL 1: TEAM MEMBER SELF-ADDS TASK */}
       {addingSelfTask && (
@@ -1327,7 +1242,7 @@ export function DailyWorkView({
                   className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900 cursor-pointer"
                 >
                   <option value="">Select team member...</option>
-                  {people.map((m) => (
+                  {teamMembers.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name} ({m.email})
                     </option>
@@ -1459,8 +1374,6 @@ export function DailyWorkView({
                   >
                     <option value="In Progress">In Progress</option>
                     <option value="In Review">Submit for Review</option>
-                    <option value="In Revision">In Revision</option>
-                    <option value="Completed">Completed</option>
                   </select>
                 </label>
 
@@ -1573,7 +1486,11 @@ export function DailyWorkView({
                   className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50 transition cursor-pointer"
                 >
                   <Send size={14} />
-                  {submitting ? "Saving..." : "Save Progress Log"}
+                  {submitting
+                    ? "Saving..."
+                    : progressForm.taskState === "In Review"
+                      ? "Submit for Review"
+                      : "Save Progress"}
                 </button>
               </div>
             </form>
