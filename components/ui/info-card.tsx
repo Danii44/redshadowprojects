@@ -40,7 +40,7 @@ export function InfoCard({
         )}
       </div>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-extrabold text-slate-900 tracking-tight">
+        <span className="text-3xl font-semibold text-slate-900 tracking-tight">
           {value}
         </span>
         {trend && (

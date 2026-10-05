@@ -7,6 +7,9 @@ import {
   ListTodo,
   Settings,
   Users,
+  CalendarDays,
+  BarChart3,
+  UserRoundCheck,
 } from "lucide-react";
 import type { NavItem, ProjectStatus, Role, View } from "./types";
 
@@ -36,16 +39,20 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", icon: LayoutDashboard },
   { label: "Projects", icon: Command },
   { label: "Tasks", icon: ListTodo },
+  { label: "My Tasks", icon: UserRoundCheck },
   { label: "Daily Work", icon: CalendarCheck },
   { label: "Revisions", icon: FileClock },
   { label: "Team", icon: Users, group: true },
+  { label: "Calendar", icon: CalendarDays },
   { label: "Notifications", icon: Bell },
+  { label: "Reports", icon: BarChart3 },
   { label: "Settings", icon: Settings },
 ];
 
 /** Which views are visible to each role */
 export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
   Admin: [
+    "My Tasks", "Calendar", "Reports",
     "Dashboard",
     "Projects",
     "Tasks",
@@ -56,6 +63,7 @@ export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
     "Settings",
   ],
   "Project Leader": [
+    "My Tasks", "Calendar", "Reports",
     "Dashboard",
     "Projects",
     "Tasks",
@@ -66,6 +74,7 @@ export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
     "Settings",
   ],
   "Team Member": [
+    "My Tasks", "Calendar", "Reports",
     "Dashboard",
     "Projects",
     "Tasks",

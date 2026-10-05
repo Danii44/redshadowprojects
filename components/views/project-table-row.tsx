@@ -31,21 +31,18 @@ export function ProjectTableRow({
 
   return (
     <tr
-      className={`transition ${
-        isOpenDueSoon
-          ? "bg-red-50/80 hover:bg-red-100/80"
-          : selected
-            ? "bg-red-50/30 hover:bg-slate-50/80"
-            : "hover:bg-slate-50/80"
-      }`}
+      className="project-list-row transition"
+      data-urgent={isOpenDueSoon}
+      data-selected={selected}
     >
       {canEditProject && (
         <td className="py-3.5 pl-4 pr-2">
           <input
             type="checkbox"
+            aria-label={`Select ${project.name}`}
             checked={selected}
             onChange={() => onToggleSelect(project.id)}
-            className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
+            className="rounded border-slate-300 text-primary focus:ring-red-400"
           />
         </td>
       )}
@@ -54,11 +51,11 @@ export function ProjectTableRow({
           onClick={() => onOpenDetail(project, "overview")}
           className="text-left group cursor-pointer"
         >
-          <span className="font-bold text-slate-900 group-hover:text-red-600 transition text-sm">
+          <span className="font-semibold text-slate-900 group-hover:text-red-600 transition text-sm">
             {project.name}
           </span>
           {project.client && (
-            <span className="text-[11px] text-slate-400 block font-medium">
+            <span className="text-xs text-slate-400 block font-medium">
               {project.client}
             </span>
           )}
@@ -77,8 +74,8 @@ export function ProjectTableRow({
       {canEditProject && (
         <td className="py-3.5 px-3">
           <div>
-            <span className="text-slate-900 font-bold block">{project.due}</span>
-            <span className={`text-[10px] font-bold ${timeLeft.tone}`}>
+            <span className="text-slate-900 font-semibold block">{project.due}</span>
+            <span className={`text-xs font-semibold ${timeLeft.tone}`}>
               {timeLeft.label}
             </span>
           </div>

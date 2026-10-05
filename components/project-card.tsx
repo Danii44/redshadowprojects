@@ -19,7 +19,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {projectStatusLabel(project.status)}
         </Pill>
       </div>
-      <h3 className="font-black text-slate-900">{project.name}</h3>
+      <h3 className="font-semibold text-slate-900">{project.name}</h3>
       <p
         className={`mt-2 text-sm font-semibold ${
           project.deadlineTone || "text-slate-500"
@@ -29,10 +29,10 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
       </p>
       <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
         <div>
-          <p className="text-[11px] font-bold uppercase text-slate-400">
+          <p className="text-xs font-semibold uppercase text-slate-400">
             Current phase
           </p>
-          <p className="mt-1 text-sm font-bold text-slate-800">
+          <p className="mt-1 text-sm font-semibold text-slate-800">
             {project.phase || "Requirements"} · {project.revision || "R1"}
           </p>
         </div>
@@ -40,7 +40,7 @@ export function ProjectCard({ project, onClick }: ProjectCardProps) {
           {project.team?.map((initials: string, index: number) => (
             <span
               key={`${initials}-${index}`}
-              className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-slate-800 text-[9px] font-black text-white"
+              className="grid h-7 w-7 place-items-center rounded-full border-2 border-white bg-slate-800 text-xs font-semibold text-white"
             >
               {initials}
             </span>

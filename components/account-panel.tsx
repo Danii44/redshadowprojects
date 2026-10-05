@@ -1,3 +1,4 @@
+import { Modal } from "@/components/ui/modal";
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import type { Role } from "@/lib/types";
@@ -40,17 +41,12 @@ export function AccountPanel({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) close();
-      }}
-    >
+    <Modal title={panel === "profile" ? "Your profile" : "Change password"} onClose={close}>
       <section className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-bold text-red-600">Account</p>
-            <h2 className="mt-1 text-2xl font-black">
+            <p className="text-sm font-semibold text-red-600">Account</p>
+            <h2 className="mt-1 text-2xl font-semibold">
               {panel === "profile" ? "Your profile" : "Change password"}
             </h2>
           </div>
@@ -70,7 +66,7 @@ export function AccountPanel({
           </div>
         ) : (
           <form onSubmit={changePassword} className="space-y-4">
-            <label className="block text-sm font-bold">
+            <label className="block text-sm font-semibold">
               New password
               <input
                 required
@@ -81,7 +77,7 @@ export function AccountPanel({
                 className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-red-400"
               />
             </label>
-            <label className="block text-sm font-bold">
+            <label className="block text-sm font-semibold">
               Confirm new password
               <input
                 required
@@ -99,24 +95,24 @@ export function AccountPanel({
             )}
             <button
               disabled={busy}
-              className="h-11 w-full rounded-xl bg-[#e3292f] text-sm font-black text-white disabled:opacity-60"
+              className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-white disabled:opacity-60"
             >
               {busy ? "Updating..." : "Update password"}
             </button>
           </form>
         )}
       </section>
-    </div>
+    </Modal>
   );
 }
 
 export function AccountField({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </p>
-      <p className="mt-1 font-bold text-slate-800">{value}</p>
+      <p className="mt-1 font-semibold text-slate-800">{value}</p>
     </div>
   );
 }

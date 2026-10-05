@@ -146,25 +146,25 @@ export function NotificationsView({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-            <Bell size={26} className="text-[#e3292f]" />
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+            <Bell size={26} className="text-primary" />
             Notifications
           </h1>
-          <p className="mt-1 text-xs font-bold text-slate-500">
+          <p className="mt-1 text-xs font-semibold text-slate-500">
             Your project alerts, task assignments, and required actions.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {unread.length > 0 && (
-            <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-black text-red-700">
+            <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-700">
               {unread.length} unread
             </span>
           )}
           {unread.length > 0 && (
             <button
               onClick={markAllRead}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-xs cursor-pointer"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs cursor-pointer"
             >
               <CheckCheck size={15} />
               Mark All Read
@@ -179,7 +179,7 @@ export function NotificationsView({
           <div className="flex items-center gap-3">
             <BellRing size={20} className="text-blue-600 shrink-0" />
             <div>
-              <p className="text-sm font-black text-blue-900">
+              <p className="text-sm font-semibold text-blue-900">
                 Enable desktop notifications
               </p>
               <p className="text-xs font-semibold text-blue-600">
@@ -193,7 +193,7 @@ export function NotificationsView({
               type="button"
               disabled={requesting}
               onClick={handleAllowDesktopNotifs}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
               {requesting ? "Waiting for browser…" : "Allow"}
             </button>
@@ -215,7 +215,7 @@ export function NotificationsView({
           <div className="flex items-center gap-3">
             <TriangleAlert size={20} className="text-amber-600 shrink-0" />
             <div>
-              <p className="text-sm font-black text-amber-900">
+              <p className="text-sm font-semibold text-amber-900">
                 Desktop notifications are blocked
               </p>
               <p className="text-xs font-semibold text-amber-700">
@@ -265,21 +265,21 @@ export function NotificationsView({
               severityBorder(item.severity)
             } ${
               item.read_at
-                ? "border-slate-200 opacity-60"
+                ? "border-slate-200 bg-slate-50/50"
                 : "border-slate-200 shadow-xs"
             }`}
           >
             <div className="mt-0.5">{severityIcon(item.severity)}</div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-3">
-                <p className="font-black text-slate-900 text-sm leading-snug">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
+                <p className="font-semibold text-slate-900 text-sm leading-snug">
                   {item.title}
                   {!item.read_at && (
-                    <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-[#e3292f] align-middle" />
+                    <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle" />
                   )}
                 </p>
-                <span className="shrink-0 text-[11px] font-semibold text-slate-400 whitespace-nowrap">
+                <span className="shrink-0 text-xs font-semibold text-slate-400 whitespace-nowrap">
                   {new Date(item.created_at).toLocaleDateString()} ·{" "}
                   {new Date(item.created_at).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -297,7 +297,7 @@ export function NotificationsView({
               {item.actor?.name && (
                 <div className="mt-2 flex items-center gap-1.5">
                   <User size={11} className="text-slate-400" />
-                  <span className="text-[11px] font-semibold text-slate-400">
+                  <span className="text-xs font-semibold text-slate-400">
                     by {item.actor.name}
                   </span>
                 </div>
@@ -307,7 +307,7 @@ export function NotificationsView({
             {!item.read_at && (
               <button
                 onClick={() => markRead(item.id)}
-                className="shrink-0 self-start rounded-lg border border-slate-200 px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                className="shrink-0 self-start rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
               >
                 Mark read
               </button>
@@ -318,7 +318,7 @@ export function NotificationsView({
         {!notifications.length && (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
             <Bell size={32} className="mx-auto text-slate-300 mb-3" />
-            <h3 className="font-black text-slate-800 text-base">All caught up!</h3>
+            <h3 className="font-semibold text-slate-800 text-base">All caught up!</h3>
             <p className="mt-1 text-xs font-semibold text-slate-400">
               No notifications yet. You&apos;ll be notified about project updates,
               task assignments, and deadlines.

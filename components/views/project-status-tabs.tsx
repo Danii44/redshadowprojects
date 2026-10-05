@@ -14,10 +14,11 @@ export function ProjectStatusTabs({
   onChange,
 }: ProjectStatusTabsProps) {
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+    <div className="status-strip flex items-center gap-1.5 overflow-x-auto pb-2">
       <button
+        aria-pressed={statusFilter === "active"}
         onClick={() => onChange("active")}
-        className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+        className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
           statusFilter === "active"
             ? "bg-slate-900 text-white"
             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -27,8 +28,9 @@ export function ProjectStatusTabs({
       </button>
 
       <button
+        aria-pressed={statusFilter === "all"}
         onClick={() => onChange("all")}
-        className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-bold transition cursor-pointer ${
+        className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
           statusFilter === "all"
             ? "bg-slate-900 text-white"
             : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
@@ -45,8 +47,9 @@ export function ProjectStatusTabs({
         return (
           <button
             key={val}
+            aria-pressed={active}
             onClick={() => onChange(val as ProjectStatus)}
-            className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition cursor-pointer ${
+            className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition cursor-pointer ${
               active
                 ? "bg-slate-900 text-white"
                 : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"

@@ -1,3 +1,4 @@
+import { Modal } from "@/components/ui/modal";
 import React, { useEffect, useState } from "react";
 import { Edit2, KeyRound, Plus, Trash2, Users, X } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
@@ -6,6 +7,8 @@ import { getInitials } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface SettingsViewProps {
+  section?: "Team" | "Settings";
+  onOpenTeam?: () => void;
   people: User[];
   projects?: Project[];
   tasks?: Task[];
@@ -33,20 +36,20 @@ function getAccessBadge(userRole: string) {
   const norm = userRole.toLowerCase();
   if (norm === "admin") {
     return (
-      <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase text-red-700 tracking-wide">
+      <span className="rounded-md bg-red-100 px-2 py-0.5 text-xs font-semibold uppercase text-red-700 tracking-wide">
         ADMIN
       </span>
     );
   }
   if (norm === "project_leader" || norm === "leader" || norm === "manager") {
     return (
-      <span className="rounded-md bg-violet-100 px-2 py-0.5 text-[10px] font-black uppercase text-violet-700 tracking-wide">
+      <span className="rounded-md bg-violet-100 px-2 py-0.5 text-xs font-semibold uppercase text-violet-700 tracking-wide">
         MANAGER
       </span>
     );
   }
   return (
-    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-black uppercase text-slate-500 tracking-wide">
+    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-500 tracking-wide">
       MEMBER
     </span>
   );
@@ -72,6 +75,8 @@ interface TeamMemberRecord {
 }
 
 export function SettingsView({
+  section = "Team",
+  onOpenTeam,
   people,
   projects = [],
   tasks = [],
@@ -345,18 +350,20 @@ export function SettingsView({
       {/* Header Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900">
-            Team
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+            {section}
           </h1>
           <p className="mt-1 text-sm font-semibold text-slate-500">
-            {members.length} team members
+            {section === "Team" ? `${members.length} team members` : "Manage departments, team assignments, and workspace access."}
           </p>
         </div>
 
-        {currentUserRole === "Admin" && (
+        {section === "Settings" ? (
+          <button onClick={onOpenTeam} className="flex items-center gap-2 rounded-xl border border-border bg-white px-4 py-2.5 text-sm font-medium text-slate-700"><Users size={16} />Manage people</button>
+        ) : currentUserRole === "Admin" && (
           <button
             onClick={() => setCreatingMember(true)}
-            className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto"
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs self-start sm:self-auto"
           >
             <Plus size={16} />
             Add Member
@@ -368,11 +375,11 @@ export function SettingsView({
       {createdUserInfo && (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 shadow-xs flex items-start justify-between">
           <div>
-            <h3 className="font-black text-base">New Member Credentials Created</h3>
+            <h3 className="font-semibold text-base">New Member Credentials Created</h3>
             <p className="mt-1 text-xs font-medium">
               Account created for <strong>{createdUserInfo.name}</strong> ({createdUserInfo.email}).
             </p>
-            <div className="mt-2.5 inline-block rounded-xl bg-white px-3.5 py-1.5 border border-emerald-200 font-mono text-xs font-bold">
+            <div className="mt-2.5 inline-block rounded-xl bg-white px-3.5 py-1.5 border border-emerald-200 font-mono text-xs font-semibold">
               Temporary Password: <span className="text-red-600">{createdUserInfo.tempPassword}</span>
             </div>
           </div>
@@ -388,12 +395,12 @@ export function SettingsView({
       {resetPasswordInfo && (
         <div className="flex items-start justify-between rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950 shadow-xs">
           <div>
-            <h3 className="text-base font-black">Password Reset</h3>
+            <h3 className="text-base font-semibold">Password Reset</h3>
             <p className="mt-1 text-xs font-medium">
               Temporary password for <strong>{resetPasswordInfo.name}</strong>{" "}
               ({resetPasswordInfo.email || "No email on file"}). Share it securely.
             </p>
-            <div className="mt-2.5 inline-block rounded-xl border border-amber-200 bg-white px-3.5 py-1.5 font-mono text-xs font-bold">
+            <div className="mt-2.5 inline-block rounded-xl border border-amber-200 bg-white px-3.5 py-1.5 font-mono text-xs font-semibold">
               Temporary Password: <span className="text-red-600">{resetPasswordInfo.tempPassword}</span>
             </div>
           </div>
@@ -407,12 +414,19 @@ export function SettingsView({
         </div>
       )}
 
+      {section === "Settings" && (
+        <div className="grid gap-4 sm:grid-cols-3">
+          {[{label: "People in your workspace", value: members.length}, {label: "Department teams", value: teams.length}, {label: "Workspace projects", value: projects.length}].map((item) => (
+            <div key={item.label} className="metric-card rounded-2xl border border-border bg-white"><p className="text-slate-600">{item.label}</p><p className="mt-2 text-3xl font-semibold">{item.value}</p></div>
+          ))}
+        </div>
+      )}
       {/* TEAM MEMBERS TABLE */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
+      {section === "Team" && <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/70 text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 <th className="py-3.5 px-4">NAME</th>
                 <th className="py-3.5 px-4">ROLE</th>
                 <th className="py-3.5 px-4">ACCESS</th>
@@ -439,11 +453,11 @@ export function SettingsView({
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         <span
-                          className={`grid h-8 w-8 place-items-center rounded-full font-black text-[10px] shadow-2xs ${bgClass}`}
+                          className={`grid h-8 w-8 place-items-center rounded-full font-semibold text-xs shadow-2xs ${bgClass}`}
                         >
                           {initials}
                         </span>
-                        <span className="font-black text-slate-900 text-sm">
+                        <span className="font-semibold text-slate-900 text-base">
                           {m.name}
                         </span>
                       </div>
@@ -458,17 +472,17 @@ export function SettingsView({
                     <td className="py-3.5 px-4">{getAccessBadge(m.role)}</td>
 
                     {/* EMAIL */}
-                    <td className="py-3.5 px-4 text-slate-500 font-mono text-[11px]">
+                    <td className="py-3.5 px-4 text-slate-500 font-mono text-xs">
                       {m.email || "No email"}
                     </td>
 
                     {/* PROJECTS */}
-                    <td className="py-3.5 px-4 font-black text-red-600 text-sm">
+                    <td className="py-3.5 px-4 font-semibold text-red-600 text-sm">
                       {stats.projectCount}
                     </td>
 
                     {/* OPEN TASKS */}
-                    <td className="py-3.5 px-4 font-black text-slate-900 text-sm">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 text-base">
                       {stats.openTaskCount}
                     </td>
 
@@ -528,14 +542,15 @@ export function SettingsView({
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
 
+      {section === "Settings" && currentUserRole !== "Admin" && <section className="rounded-2xl border border-border bg-white p-6"><h2 className="text-lg font-semibold">Workspace access</h2><p className="mt-2 text-sm text-slate-500">Your role is Project Leader. Department configuration and account access are managed by your workspace administrator.</p><button onClick={onOpenTeam} className="mt-4 rounded-xl border border-border px-4 text-sm">View your team</button></section>}
       {/* GROUPS / TEAMS MANAGEMENT SECTION */}
-      {currentUserRole === "Admin" && (
+      {section === "Settings" && currentUserRole === "Admin" && (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-5">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
             <Users size={18} className="text-slate-700" />
-            <h2 className="text-lg font-black text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Department Teams
             </h2>
           </div>
@@ -543,12 +558,13 @@ export function SettingsView({
           <div className="grid gap-5 md:grid-cols-2">
             {/* Create Team Form */}
             <form onSubmit={createTeam} className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Create Team
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 <input
                   required
+                  aria-label="Department team name"
                   placeholder="Team Name (e.g. CAD Team)"
                   value={teamForm.name}
                   onChange={(e) =>
@@ -557,6 +573,7 @@ export function SettingsView({
                   className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-900 outline-none focus:border-red-400"
                 />
                 <select
+                  aria-label="Department team leader"
                   value={teamForm.leaderId}
                   onChange={(e) =>
                     setTeamForm({ ...teamForm, leaderId: e.target.value })
@@ -571,19 +588,20 @@ export function SettingsView({
                   ))}
                 </select>
               </div>
-              <button className="h-9 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white hover:bg-slate-800 transition">
+              <button className="h-9 rounded-xl bg-slate-900 px-4 text-xs font-semibold text-white hover:bg-slate-800 transition">
                 Create Team
               </button>
             </form>
 
             {/* Add Member to Team */}
             <form onSubmit={addTeamMember} className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Assign Member to Team
               </h3>
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   required
+                  aria-label="Department to assign"
                   value={assignment.teamId}
                   onChange={(e) =>
                     setAssignment({ ...assignment, teamId: e.target.value })
@@ -599,6 +617,7 @@ export function SettingsView({
                 </select>
                 <select
                   required
+                  aria-label="Member to assign"
                   value={assignment.userId}
                   onChange={(e) =>
                     setAssignment({ ...assignment, userId: e.target.value })
@@ -613,7 +632,7 @@ export function SettingsView({
                   ))}
                 </select>
               </div>
-              <button className="h-9 rounded-xl border border-slate-300 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 transition">
+              <button className="h-9 rounded-xl border border-slate-300 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition">
                 Assign Member
               </button>
             </form>
@@ -627,12 +646,12 @@ export function SettingsView({
                 className="rounded-xl border border-slate-200 p-4 bg-slate-50/50"
               >
                 <div className="flex items-center justify-between">
-                  <p className="font-black text-slate-900 text-sm">
+                  <p className="font-semibold text-slate-900 text-base">
                     {team.name}
                   </p>
                   <button
                     onClick={() => deleteTeam(team)}
-                    className="text-[11px] font-bold text-red-600 hover:underline"
+                    className="text-xs font-semibold text-red-600 hover:underline"
                   >
                     Delete
                   </button>
@@ -667,19 +686,20 @@ export function SettingsView({
 
       {/* CREATE MEMBER MODAL */}
       {creatingMember && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
+        <Modal title="Add team member" onClose={() => setCreatingMember(false)}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase text-red-600">
+                <p className="text-xs font-semibold uppercase text-red-600">
                   New Account
                 </p>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900">
                   Add Team Member
                 </h2>
               </div>
               <button
                 onClick={() => setCreatingMember(false)}
+                aria-label="Close add member"
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
               >
                 <X size={18} />
@@ -687,7 +707,7 @@ export function SettingsView({
             </div>
 
             <form onSubmit={createMember} className="space-y-4">
-              <label className="block text-xs font-bold uppercase text-slate-500">
+              <label className="block text-xs font-semibold uppercase text-slate-500">
                 Full Name *
                 <input
                   required
@@ -700,7 +720,7 @@ export function SettingsView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase text-slate-500">
+              <label className="block text-xs font-semibold uppercase text-slate-500">
                 Email Address *
                 <input
                   required
@@ -714,7 +734,7 @@ export function SettingsView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase text-slate-500">
+              <label className="block text-xs font-semibold uppercase text-slate-500">
                 Access Level & Role *
                 <select
                   value={memberForm.role}
@@ -735,37 +755,38 @@ export function SettingsView({
                 <button
                   type="button"
                   onClick={() => setCreatingMember(false)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting}
-                  className="h-10 rounded-xl bg-[#e3292f] px-5 text-xs font-black text-white hover:bg-red-700 disabled:opacity-60 transition"
+                  className="h-10 rounded-xl bg-primary px-5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition"
                 >
                   {submitting ? "Adding..." : "Add Member"}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* EDIT MEMBER MODAL */}
       {editingMember && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
+        <Modal title="Edit team member" onClose={() => setEditingMember(null)}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase text-red-600">
+                <p className="text-xs font-semibold uppercase text-red-600">
                   Manage Access
                 </p>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900">
                   Edit Member
                 </h2>
               </div>
               <button
                 onClick={() => setEditingMember(null)}
+                aria-label="Close edit member"
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
               >
                 <X size={18} />
@@ -773,7 +794,7 @@ export function SettingsView({
             </div>
 
             <form onSubmit={updateMember} className="space-y-4">
-              <label className="block text-xs font-bold uppercase text-slate-500">
+              <label className="block text-xs font-semibold uppercase text-slate-500">
                 Full Name
                 <input
                   required
@@ -785,7 +806,7 @@ export function SettingsView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase text-slate-500">
+              <label className="block text-xs font-semibold uppercase text-slate-500">
                 Access Level
                 <select
                   value={editForm.role}
@@ -802,7 +823,7 @@ export function SettingsView({
                 </select>
               </label>
 
-              <label className="flex items-center gap-2 text-xs font-bold text-slate-700">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                 <input
                   type="checkbox"
                   checked={editForm.active}
@@ -818,17 +839,17 @@ export function SettingsView({
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700"
                 >
                   Cancel
                 </button>
-                <button className="h-10 rounded-xl bg-slate-900 px-5 text-xs font-bold text-white hover:bg-slate-800 transition">
+                <button className="h-10 rounded-xl bg-slate-900 px-5 text-xs font-semibold text-white hover:bg-slate-800 transition">
                   Save Changes
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

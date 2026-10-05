@@ -9,6 +9,7 @@ export function proxy(request: NextRequest) {
     pathname.startsWith("/api") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon")
+    || pathname === "/logo.webp"
   ) {
     return NextResponse.next();
   }

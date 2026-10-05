@@ -1,4 +1,8 @@
-import React, { useState } from "react";
+import { TaskOverview } from "@/components/tasks/task-overview";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PersonIdentity } from "@/components/ui/person-identity";
+import { Modal } from "@/components/ui/modal";
+import React, { useEffect, useState } from "react";
 import {
   CheckCircle2,
   FileText,
@@ -13,7 +17,7 @@ import {
 } from "lucide-react";
 import { TaskCard } from "@/components/task-card";
 import type { Project, Role, Task, User } from "@/lib/types";
-import { canEdit, getInitials, updateTaskWithFallback } from "@/lib/utils";
+import { canEdit, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface TasksViewProps {
@@ -25,6 +29,11 @@ interface TasksViewProps {
   updateTask: (id: string | number, state: string) => void;
   notify: (message: string) => void;
   onRefresh?: () => void;
+  initialSearch?: string;
+  initialTaskId?: string | null;
+  title?: string;
+  detailOnly?: boolean;
+  onOpenTask?: (task: Task) => void;
 }
 
 export function TasksView({
@@ -36,10 +45,19 @@ export function TasksView({
   updateTask,
   notify,
   onRefresh,
+  initialSearch = "",
+  initialTaskId = null,
+  title = "Tasks",
+  detailOnly = false,
+  onOpenTask,
 }: TasksViewProps) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [loggingProgressTask, setLoggingProgressTask] = useState<Task | null>(null);
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [loggingProgressTask, setLoggingProgressTask] = useState<Task | null>(
+    null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [progressForm, setProgressForm] = useState({
     notes: "",
@@ -49,7 +67,12 @@ export function TasksView({
     taskState: "In Progress",
   });
   const [selectedPersonId, setSelectedPersonId] = useState<string>("all");
-  const [taskStatusFilter, setTaskStatusFilter] = useState<"all" | "open" | "in_progress" | "in_review" | "completed">("all");
+  const [taskStatusFilter, setTaskStatusFilter] = useState<
+    "all" | "open" | "in_progress" | "in_review" | "completed"
+  >("all");
+  const [urgency, setUrgency] = useState("all");
+  const [sort, setSort] = useState("deadline");
+  const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: "",
@@ -60,11 +83,14 @@ export function TasksView({
 
   const userCanEdit = canEdit(role);
   const isManagerRole = role !== "Team Member";
-  const selectedPerson = people.find((person) => person.id === selectedPersonId);
+  const selectedPerson = people.find(
+    (person) => person.id === selectedPersonId,
+  );
   const memberProfile = people.find((person) => person.id === profileId);
   const completedTaskStates = ["Completed", "Closed", "Cancelled"];
 
-  const isCompletedTask = (task: Task) => completedTaskStates.includes(task.state);
+  const isCompletedTask = (task: Task) =>
+    completedTaskStates.includes(task.state);
 
   const canMemberLogWork = (task: Task) =>
     role === "Team Member" &&
@@ -84,8 +110,7 @@ export function TasksView({
 
   const memberTaskSet = tasks.filter(
     (task) =>
-      task.assignee_id === profileId ||
-      task.owner === memberProfile?.name,
+      task.assignee_id === profileId || task.owner === memberProfile?.name,
   );
 
   const personTaskSet =
@@ -97,21 +122,7 @@ export function TasksView({
             task.owner === selectedPerson?.name,
         );
 
-  const personStats = {
-    total: personTaskSet.filter((task) => !isCompletedTask(task)).length,
-    open: personTaskSet.filter((task) => task.state === "Open").length,
-    completed: personTaskSet.filter((task) => isCompletedTask(task)).length,
-    active: personTaskSet.filter((task) => !isCompletedTask(task)).length,
-  };
-
-  const memberStats = {
-    total: memberTaskSet.filter((task) => !isCompletedTask(task)).length,
-    open: memberTaskSet.filter((task) => task.state === "Open").length,
-    completed: memberTaskSet.filter((task) => isCompletedTask(task)).length,
-    active: memberTaskSet.filter((task) => !isCompletedTask(task)).length,
-  };
-
-  const matchesTaskStatus = (task: Task, includeCompleted = false) => {
+  const matchesTaskStatus = (task: Task) => {
     switch (taskStatusFilter) {
       case "open":
         return task.state === "Open";
@@ -123,12 +134,21 @@ export function TasksView({
         return isCompletedTask(task);
       case "all":
       default:
-        return includeCompleted || !isCompletedTask(task);
+        return (
+          detailOnly || Boolean(initialSearch) || !isCompletedTask(task)
+        );
     }
   };
 
   // List view hides completed tasks by default; board view can still show them.
   const listVisibleTasks = tasks.filter((task) => {
+    if (
+      initialTaskId &&
+      searchQuery === initialSearch &&
+      searchQuery &&
+      String(task.id) !== initialTaskId
+    )
+      return false;
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -137,7 +157,7 @@ export function TasksView({
     if (!isManagerRole) {
       const matchesSelf =
         task.assignee_id === profileId || task.owner === memberProfile?.name;
-      return matchesSearch && matchesSelf && matchesTaskStatus(task, false);
+      return matchesSearch && matchesSelf && matchesTaskStatus(task);
     }
 
     const matchesPerson =
@@ -145,10 +165,17 @@ export function TasksView({
       task.assignee_id === selectedPersonId ||
       task.owner === selectedPerson?.name;
 
-    return matchesSearch && matchesPerson && matchesTaskStatus(task, false);
+    return matchesSearch && matchesPerson && matchesTaskStatus(task);
   });
 
   const boardVisibleTasks = tasks.filter((task) => {
+    if (
+      initialTaskId &&
+      searchQuery === initialSearch &&
+      searchQuery &&
+      String(task.id) !== initialTaskId
+    )
+      return false;
     const matchesSearch =
       task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -157,7 +184,7 @@ export function TasksView({
     if (!isManagerRole) {
       const matchesSelf =
         task.assignee_id === profileId || task.owner === memberProfile?.name;
-      return matchesSearch && matchesSelf && matchesTaskStatus(task, true);
+      return matchesSearch && matchesSelf && matchesTaskStatus(task);
     }
 
     const matchesPerson =
@@ -165,10 +192,22 @@ export function TasksView({
       task.assignee_id === selectedPersonId ||
       task.owner === selectedPerson?.name;
 
-    return matchesSearch && matchesPerson && matchesTaskStatus(task, true);
+    return matchesSearch && matchesPerson && matchesTaskStatus(task);
   });
 
-  const visibleTasks = viewMode === "list" ? listVisibleTasks : boardVisibleTasks;
+  const scopedTasks = isManagerRole ? personTaskSet : memberTaskSet;
+  const visibleTasks = (viewMode === "list" ? listVisibleTasks : boardVisibleTasks)
+    .filter(task => {
+      if (urgency === "all") return true;
+      if (isCompletedTask(task) || !task.due_at) return false;
+      const delta = new Date(task.due_at).getTime() - now;
+      return urgency === "overdue" ? delta < 0 : delta >= 0 && delta <= 7 * 86400000;
+    }).sort((a, b) => sort === "name" ? a.title.localeCompare(b.title) :
+      (a.due_at ? new Date(a.due_at).getTime() : Infinity) -
+      (b.due_at ? new Date(b.due_at).getTime() : Infinity));
+  const pageCount = Math.max(1, Math.ceil(visibleTasks.length / 12));
+  const currentPage = Math.min(page, pageCount);
+  const pageTasks = visibleTasks.slice((currentPage - 1) * 12, currentPage * 12);
 
   const refresh = () => {
     onRefresh?.();
@@ -196,10 +235,12 @@ export function TasksView({
       if (error) return notify(`Error creating task: ${error.message}`);
 
       if (taskForm.assigneeId && taskForm.projectId) {
-        await supabase.from("project_members").upsert(
-          { project_id: taskForm.projectId, user_id: taskForm.assigneeId },
-          { onConflict: "project_id,user_id" }
-        );
+        await supabase
+          .from("project_members")
+          .upsert(
+            { project_id: taskForm.projectId, user_id: taskForm.assigneeId },
+            { onConflict: "project_id,user_id" },
+          );
       }
     }
 
@@ -222,10 +263,12 @@ export function TasksView({
     if (error) return notify(error.message);
 
     if (assigneeId && task.project_id) {
-      await supabase.from("project_members").upsert(
-        { project_id: task.project_id, user_id: assigneeId },
-        { onConflict: "project_id,user_id" },
-      );
+      await supabase
+        .from("project_members")
+        .upsert(
+          { project_id: task.project_id, user_id: assigneeId },
+          { onConflict: "project_id,user_id" },
+        );
     }
 
     notify("Assignee updated");
@@ -284,13 +327,17 @@ export function TasksView({
     if (!supabase || !loggingProgressTask) return;
 
     if (!canMemberLogWork(loggingProgressTask)) {
-      notify("This task is already in review or completed and cannot be updated.");
+      notify(
+        "This task is already in review or completed and cannot be updated.",
+      );
       setLoggingProgressTask(null);
       return;
     }
 
     setSubmitting(true);
-    const databaseState = progressForm.taskState.toLowerCase().replaceAll(" ", "_");
+    const databaseState = progressForm.taskState
+      .toLowerCase()
+      .replaceAll(" ", "_");
 
     await supabase.from("daily_updates").insert({
       user_id: profileId,
@@ -313,12 +360,17 @@ export function TasksView({
       }),
     });
 
-    const { error } = await updateTaskWithFallback(supabase, loggingProgressTask.id, {
-      completion_percentage: progressForm.completionPct,
-      status: databaseState,
-      submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await updateTaskWithFallback(
+      supabase,
+      loggingProgressTask.id,
+      {
+        completion_percentage: progressForm.completionPct,
+        status: databaseState,
+        submitted_at:
+          databaseState === "in_review" ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      },
+    );
     setSubmitting(false);
 
     if (error) {
@@ -366,44 +418,46 @@ export function TasksView({
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="task-workspace space-y-6">
+      {!detailOnly && <>
       {/* Header & Controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-widest text-[#e3292f]">
-            Task Management
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+            {title === "My Tasks" ? "Your workspace" : "Task Management"}
           </p>
-          <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">
-            Tasks
+          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-slate-900">
+            {title}
           </h1>
           <p className="mt-0.5 text-xs font-semibold text-slate-500">
-            {visibleTasks.length} {visibleTasks.length === 1 ? "task" : "tasks"}{" "}
-            visible
+            {title === "My Tasks" ? "Your assignments, deadlines and progress in one place." : "Track assignments and keep studio work moving."}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
           {/* Search */}
-          <div className="relative flex-1 sm:w-56 sm:flex-none">
+          <div className="relative w-full sm:w-56 sm:flex-none">
             <Search
               size={14}
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
             />
             <input
               type="text"
-              placeholder="Search tasks or people..."
+              aria-label="Search tasks"
+              placeholder="Search tasks or projects…"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
               className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
             />
           </div>
 
           {/* Team member view: no people filter */}
-          {isManagerRole && (
+          {isManagerRole && title !== "My Tasks" && (
             <select
+              aria-label="Filter tasks by person"
               value={selectedPersonId}
               onChange={(e) => setSelectedPersonId(e.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
             >
               <option value="all">All People</option>
               {people.map((person) => (
@@ -417,8 +471,9 @@ export function TasksView({
           {/* View Mode Toggle */}
           <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
             <button
+              aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "list"
                   ? "bg-slate-900 text-white"
                   : "text-slate-600 hover:bg-slate-100"
@@ -428,8 +483,9 @@ export function TasksView({
               List
             </button>
             <button
+              aria-pressed={viewMode === "board"}
               onClick={() => setViewMode("board")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "board"
                   ? "bg-slate-900 text-white"
                   : "text-slate-600 hover:bg-slate-100"
@@ -444,7 +500,7 @@ export function TasksView({
           {userCanEdit && (
             <button
               onClick={() => setCreating(true)}
-              className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
             >
               <Plus size={16} />
               New Task
@@ -453,86 +509,52 @@ export function TasksView({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-5">
-        {[
-          {
-            key: "all",
-            label: isManagerRole ? "All people" : "My tasks",
-            value: isManagerRole ? personStats.total : memberStats.total,
-            tone: "bg-slate-900 text-white border-slate-900",
-          },
-          {
-            key: "open",
-            label: "Open",
-            value: isManagerRole ? personStats.open : memberStats.open,
-            tone: "bg-sky-500 text-white border-sky-500",
-          },
-          {
-            key: "in_progress",
-            label: "In Progress",
-            value: isManagerRole
-              ? personTaskSet.filter((task) => task.state === "In Progress").length
-              : memberTaskSet.filter((task) => task.state === "In Progress").length,
-            tone: "bg-blue-500 text-white border-blue-500",
-          },
-          {
-            key: "in_review",
-            label: "In Review",
-            value: isManagerRole
-              ? personTaskSet.filter((task) => ["In Review", "In Revision"].includes(task.state)).length
-              : memberTaskSet.filter((task) => ["In Review", "In Revision"].includes(task.state)).length,
-            tone: "bg-amber-500 text-white border-amber-500",
-          },
-          {
-            key: "completed",
-            label: "Completed",
-            value: isManagerRole ? personStats.completed : memberStats.completed,
-            tone: "bg-emerald-500 text-white border-emerald-500",
-          },
-        ].map((stat) => {
-          const isActive = taskStatusFilter === stat.key;
+      <TaskOverview now={now} tasks={scopedTasks} personal={title === "My Tasks"} />
+      <section className="studio-panel task-filter-panel" aria-label="Task filters">
+        <div className="task-status-tabs" role="group" aria-label="Filter tasks by status">
+          {([
+            ["all", "Active", scopedTasks.filter(t => !isCompletedTask(t)).length],
+            ["open", "Open", scopedTasks.filter(t => t.state === "Open").length],
+            ["in_progress", "In Progress", scopedTasks.filter(t => t.state === "In Progress").length],
+            ["in_review", "Review / Revision", scopedTasks.filter(t => ["In Review", "In Revision"].includes(t.state)).length],
+            ["completed", "Finished", scopedTasks.filter(isCompletedTask).length],
+          ] as const).map(([key, label, count]) => <button key={key} type="button"
+            aria-pressed={taskStatusFilter === key} onClick={() => { setTaskStatusFilter(key); setPage(1); }}>
+            {label}<span>{count}</span>
+          </button>)}
+        </div>
+        <div className="task-secondary-filters">
+          <span className="studio-meta" aria-live="polite">{visibleTasks.length} matching {visibleTasks.length === 1 ? "task" : "tasks"}</span>
+          <select aria-label="Filter task deadlines" value={urgency} onChange={e => { setUrgency(e.target.value); setPage(1); }}>
+            <option value="all">All deadlines</option><option value="overdue">Overdue</option><option value="soon">Due in 7 days</option>
+          </select>
+          <select aria-label="Sort tasks" value={sort} onChange={e => { setSort(e.target.value); setPage(1); }}>
+            <option value="deadline">Deadline first</option><option value="name">Task name</option>
+          </select>
+        </div>
+      </section>
 
-          return (
-            <button
-              key={stat.label}
-              type="button"
-              onClick={() =>
-                setTaskStatusFilter(
-                  stat.key as "all" | "open" | "in_progress" | "in_review" | "completed",
-                )
-              }
-              className={`rounded-2xl border p-4 shadow-sm text-left transition ${stat.tone} ${
-                isActive ? "ring-4 ring-slate-200/70 scale-[1.01]" : "opacity-90 hover:opacity-100"
-              }`}
-            >
-              <p className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-80">
-                {stat.label}
-              </p>
-              <p className="mt-2 text-2xl font-black leading-none">{stat.value}</p>
-            </button>
-          );
-        })}
-      </div>
-
+      </>}
       {/* Main View: List or Board */}
       {viewMode === "list" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className={detailOnly ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"}>
           {visibleTasks.length === 0 ? (
             <div className="col-span-full grid place-items-center rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
               <Layers className="h-10 w-10 text-slate-300 mb-3" />
-              <h3 className="text-sm font-bold text-slate-700">
+              <h3 className="text-sm font-semibold text-slate-700">
                 No tasks found
               </h3>
               <p className="mt-1 text-xs text-slate-400 max-w-sm">
-                Try adjusting your search query or filters, or create a new
-                task.
+                {searchQuery || urgency !== "all" || taskStatusFilter !== "all" ? "Try another search or reset the filters." : "New assignments will appear here when work is assigned to you."}
               </p>
+              {(searchQuery || urgency !== "all" || taskStatusFilter !== "all") && <button className="studio-button mt-4" onClick={() => { setSearchQuery(""); setUrgency("all"); setTaskStatusFilter("all"); setPage(1); }}>Reset filters</button>}
             </div>
           ) : (
-            visibleTasks.map((task) => (
+            pageTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 t={task}
+                onOpen={onOpenTask ? () => onOpenTask(task) : undefined}
                 people={people}
                 updateTask={updateTask}
                 assignTask={updateAssignee}
@@ -550,12 +572,15 @@ export function TasksView({
         </div>
       ) : (
         /* Board View (Kanban) */
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          role="region"
+          aria-label="Task board"
+          tabIndex={0}
+          className="flex snap-x snap-proximity gap-4 overflow-x-auto pb-4"
+        >
           {taskBoardColumns.map((col) => {
-            const colTasks = boardVisibleTasks.filter((t) =>
-              col.states.some(
-                (s) => s.toLowerCase() === t.state.toLowerCase(),
-              ),
+            const colTasks = visibleTasks.filter((t) =>
+              col.states.some((s) => s.toLowerCase() === t.state.toLowerCase()),
             );
 
             return (
@@ -569,14 +594,14 @@ export function TasksView({
                     updateTask(taskId, col.states[0]);
                   }
                 }}
-                className={`flex flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-3 border-t-4 ${col.color} min-h-[500px]`}
+                className={`flex w-[min(18rem,85vw)] min-w-0 shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-3 border-t-2 ${col.color} min-h-[280px]`}
               >
                 <div className="mb-3 flex items-center justify-between px-1">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-700">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
                     {col.label}
                   </h3>
                   <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold ${col.badge}`}
+                    className={`rounded-full px-2 py-0.5 text-xs font-semibold ${col.badge}`}
                   >
                     {colTasks.length}
                   </span>
@@ -586,44 +611,40 @@ export function TasksView({
                   {colTasks.map((task) => (
                     <div
                       key={task.id}
-                      draggable
+                      draggable={isManagerRole}
                       onDragStart={(e) =>
                         e.dataTransfer.setData("text/plain", String(task.id))
                       }
                       className="group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md transition cursor-grab active:cursor-grabbing"
                     >
                       <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider truncate max-w-[140px]">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[140px]">
                           {task.project || "General"}
                         </span>
                         {task.due && (
-                          <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400">
+                          <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
                             <Clock size={10} />
                             {task.due}
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-xs font-bold text-slate-900 line-clamp-2">
-                        {task.title}
+                      <h4 className="text-base font-semibold text-slate-900 break-words">
+                        {onOpenTask ? <button type="button" className="text-left hover:text-primary" aria-label={`Open ${task.title} in ${task.project || "General work"}`} onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}
                       </h4>
 
-                      <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-800 text-[8px] font-black text-white">
-                            {getInitials(task.owner)}
-                          </span>
-                          <span className="text-[11px] font-semibold text-slate-600 truncate max-w-[90px]">
-                            {task.owner}
-                          </span>
-                        </div>
+                      <div className="mt-3 flex flex-col items-start gap-3 border-t border-slate-100 pt-3">
+                        <PersonIdentity name={task.owner} />
 
                         {/* Status selector */}
                         {isManagerRole ? (
                           <select
+                            aria-label={`Status for ${task.title}`}
                             value={task.state}
-                            onChange={(e) => updateTask(task.id, e.target.value)}
-                            className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[10px] font-bold text-slate-700 outline-none cursor-pointer"
+                            onChange={(e) =>
+                              updateTask(task.id, e.target.value)
+                            }
+                            className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
                           >
                             <option value="Open">Open</option>
                             <option value="In Progress">In Progress</option>
@@ -632,9 +653,7 @@ export function TasksView({
                             <option value="Completed">Completed</option>
                           </select>
                         ) : (
-                          <span className="rounded-md border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-700">
-                            {task.state}
-                          </span>
+                          <StatusBadge status={task.state} task />
                         )}
                       </div>
 
@@ -644,7 +663,7 @@ export function TasksView({
                             type="button"
                             onClick={() => handleQuickCompleteTask(task)}
                             disabled={submitting}
-                            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 px-2 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
                           >
                             <CheckCircle2 size={12} />
                             Done
@@ -653,7 +672,7 @@ export function TasksView({
                             type="button"
                             onClick={() => startProgressLog(task)}
                             disabled={submitting}
-                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 text-[10px] font-bold text-white hover:bg-slate-800 disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
                           >
                             <FileText size={12} />
                             Log Work
@@ -665,7 +684,7 @@ export function TasksView({
 
                   {colTasks.length === 0 && (
                     <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-center">
-                      <p className="text-[10px] font-bold text-slate-400">
+                      <p className="text-xs font-semibold text-slate-400">
                         No tasks
                       </p>
                     </div>
@@ -677,11 +696,17 @@ export function TasksView({
         </div>
       )}
 
+      {!detailOnly && viewMode === "list" && visibleTasks.length > 0 && <nav className="task-pagination" aria-label="Task pagination">
+        <span className="studio-meta">Showing {(currentPage - 1) * 12 + 1}–{Math.min(currentPage * 12, visibleTasks.length)} of {visibleTasks.length} tasks</span>
+        <div><button className="studio-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)}>Previous</button>
+        <span className="studio-meta">{currentPage} / {pageCount}</span>
+        <button className="studio-button" disabled={currentPage === pageCount} onClick={() => setPage(currentPage + 1)}>Next</button></div>
+      </nav>}
       {/* Create Task Modal */}
       {creating && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs">
+        <Modal title="Create new task" onClose={() => setCreating(false)}>
           <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-black text-slate-900">
+            <h2 className="text-lg font-semibold text-slate-900">
               Create New Task
             </h2>
             <p className="mt-1 text-xs font-medium text-slate-500">
@@ -690,7 +715,7 @@ export function TasksView({
 
             <form onSubmit={handleCreateTask} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Task Title *
                 </label>
                 <input
@@ -706,7 +731,7 @@ export function TasksView({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Project *
                 </label>
                 <select
@@ -727,7 +752,7 @@ export function TasksView({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Assignee
                 </label>
                 <select
@@ -747,7 +772,7 @@ export function TasksView({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Deadline
                 </label>
                 <input
@@ -764,31 +789,34 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-[#e3292f] px-4 py-2 text-xs font-bold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
                 >
                   Create Task
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {loggingProgressTask && (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/45 p-4">
+        <Modal
+          title="Log task progress"
+          onClose={() => setLoggingProgressTask(null)}
+        >
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">
                   {loggingProgressTask.project}
                 </p>
-                <h2 className="mt-0.5 text-xl font-black text-slate-900">
+                <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
                   Log Progress: {loggingProgressTask.title}
                 </h2>
               </div>
@@ -804,12 +832,15 @@ export function TasksView({
 
             <form onSubmit={handleSubmitProgress} className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Task Status Update
                   <select
                     value={progressForm.taskState}
                     onChange={(event) =>
-                      setProgressForm({ ...progressForm, taskState: event.target.value })
+                      setProgressForm({
+                        ...progressForm,
+                        taskState: event.target.value,
+                      })
                     }
                     className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900"
                   >
@@ -819,7 +850,7 @@ export function TasksView({
                     <option value="Completed">Completed</option>
                   </select>
                 </label>
-                <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Hours Worked Today
                   <input
                     type="number"
@@ -828,14 +859,17 @@ export function TasksView({
                     max="24"
                     value={progressForm.hoursSpent}
                     onChange={(event) =>
-                      setProgressForm({ ...progressForm, hoursSpent: event.target.value })
+                      setProgressForm({
+                        ...progressForm,
+                        hoursSpent: event.target.value,
+                      })
                     }
                     className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
                   />
                 </label>
               </div>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Completion: {progressForm.completionPct}%
                 <input
                   type="range"
@@ -853,25 +887,31 @@ export function TasksView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Work Accomplished Notes *
                 <textarea
                   required
                   rows={3}
                   value={progressForm.notes}
                   onChange={(event) =>
-                    setProgressForm({ ...progressForm, notes: event.target.value })
+                    setProgressForm({
+                      ...progressForm,
+                      notes: event.target.value,
+                    })
                   }
                   className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-900"
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Blockers / Help Needed (Optional)
                 <input
                   value={progressForm.blocker}
                   onChange={(event) =>
-                    setProgressForm({ ...progressForm, blocker: event.target.value })
+                    setProgressForm({
+                      ...progressForm,
+                      blocker: event.target.value,
+                    })
                   }
                   className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
                 />
@@ -881,13 +921,13 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setLoggingProgressTask(null)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting || !progressForm.notes.trim()}
-                  className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-black text-white disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
                 >
                   <Send size={14} />
                   {submitting ? "Saving..." : "Save Progress Log"}
@@ -895,7 +935,7 @@ export function TasksView({
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

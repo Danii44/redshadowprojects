@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, X } from "lucide-react";
 import { nav, visibleViewsByRole } from "@/lib/constants";
 import type { Notification, Role, View } from "@/lib/types";
+import { Avatar } from "@/components/ui/avatar";
+import { CompanyLogo } from "@/components/ui/company-logo";
 import { supabase } from "@/lib/supabase";
 
 interface SidebarProps {
@@ -10,7 +12,9 @@ interface SidebarProps {
   view: View;
   setView: (view: View) => void;
   userName: string;
+  avatarUrl?: string | null;
   notifications: Notification[];
+  myTaskCount?: number;
   menuOpen: boolean;
   setMenuOpen: (open: boolean) => void;
   setAccountPanel: (panel: "profile" | "password" | null) => void;
@@ -21,22 +25,77 @@ export function Sidebar({
   view,
   setView,
   userName,
+  avatarUrl,
   notifications,
+  myTaskCount = 0,
   menuOpen,
   setMenuOpen,
   setAccountPanel,
 }: SidebarProps) {
   const router = useRouter();
   const [accountMenu, setAccountMenu] = useState(false);
+  const accountRef = useRef<HTMLDivElement>(null);
+  const accountButtonRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
 
-  const initials = userName
-    ? userName
-        .split(" ")
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase()
-    : "RS";
+  useEffect(() => {
+    if (!menuOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    // Focus after the mobile drawer has become visible in the next frame.
+    const focusFrame = window.requestAnimationFrame(() => {
+      sidebarRef.current?.querySelector<HTMLButtonElement>("nav button")?.focus();
+    });
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMenuOpen(false);
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(
+        sidebarRef.current?.querySelectorAll<HTMLElement>(
+          "button:not(:disabled), a[href]",
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("keydown", handleKey);
+      window.cancelAnimationFrame(focusFrame);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [menuOpen, setMenuOpen]);
+
+  useEffect(() => {
+    if (!accountMenu) return;
+    const dismiss = (event: PointerEvent) => {
+      if (!accountRef.current?.contains(event.target as Node))
+        setAccountMenu(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAccountMenu(false);
+        accountButtonRef.current?.focus();
+      }
+    };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [accountMenu]);
 
   const unreadCount = notifications.filter((item) => !item.read_at).length;
   const visibleNavItems = nav.filter((n) =>
@@ -45,59 +104,80 @@ export function Sidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-40 w-[248px] bg-[#15181d] text-white transition-transform lg:translate-x-0 ${
+      ref={sidebarRef}
+      id="workspace-navigation"
+      data-open={menuOpen}
+      onTransitionEnd={(event) => {
+        if (event.target === event.currentTarget && menuOpen &&
+          !event.currentTarget.contains(document.activeElement)) {
+          event.currentTarget.querySelector<HTMLButtonElement>("nav button")?.focus();
+        }
+      }}
+      aria-label="Workspace sidebar"
+      className={`workspace-sidebar fixed inset-y-0 left-0 z-40 flex w-[232px] flex-col text-foreground lg:translate-x-0 ${
         menuOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
-      <div className="flex h-20 items-center gap-3 border-b border-white/10 px-5">
-        <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#e3292f] font-black shadow-lg shadow-red-950/50">
-          R
-        </div>
+      <div className="flex h-20 shrink-0 items-center gap-2 px-4">
+        <CompanyLogo />
         <div>
-          <div className="text-sm font-black tracking-wide">RED SHADOW</div>
-          <div className="text-[11px] font-semibold tracking-[.18em] text-white/40">
+          <div className="text-sm font-semibold tracking-tight">RED SHADOW</div>
+          <div className="mt-0.5 text-xs font-medium tracking-[.18em] text-slate-500">
             DESIGNS
           </div>
         </div>
         <button
-          className="ml-auto lg:hidden cursor-pointer"
+          aria-label="Close navigation"
+          className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-white lg:hidden"
           onClick={() => setMenuOpen(false)}
         >
           <X size={20} />
         </button>
       </div>
 
-      <div className="px-3 py-5">
-        <p className="mb-2 px-3 text-[11px] font-bold uppercase tracking-[.16em] text-white/30">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">
           Workspace
         </p>
-        <nav className="space-y-1">
+        <nav aria-label="Main navigation" className="space-y-1">
           {visibleNavItems.map((n) => (
             <div key={n.label}>
               {n.group && (
-                <p className="mb-2 mt-6 px-3 text-[11px] font-bold uppercase tracking-[.16em] text-white/30">
+                <p className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">
                   Company
                 </p>
               )}
               <button
+                aria-current={view === n.label ? "page" : undefined}
                 onClick={() => {
                   setView(n.label);
                   setMenuOpen(false);
                 }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition cursor-pointer ${
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
                   view === n.label
-                    ? "bg-[#e3292f] text-white"
-                    : "text-white/55 hover:bg-white/10 hover:text-white"
+                    ? "studio-nav-active"
+                    : "text-slate-600 hover:bg-white/60 hover:text-foreground"
                 }`}
               >
-                <n.icon size={18} />
+                <span
+                  className={
+                    view === n.label ? "text-primary" : "text-slate-500"
+                  }
+                >
+                  <n.icon size={18} />
+                </span>
                 {n.label}
+                {n.label === "My Tasks" && myTaskCount > 0 && (
+                  <span className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600" aria-label={`${myTaskCount} active assignments`}>
+                    {myTaskCount}
+                  </span>
+                )}
                 {n.label === "Notifications" && unreadCount > 0 && (
                   <span
-                    className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black transition ${
+                    className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold transition ${
                       view === n.label
-                        ? "bg-white text-[#e3292f]"
-                        : "bg-[#e3292f] text-white"
+                        ? "bg-white text-primary"
+                        : "bg-primary text-white"
                     }`}
                   >
                     {unreadCount > 99 ? "99+" : unreadCount}
@@ -109,15 +189,15 @@ export function Sidebar({
         </nav>
       </div>
 
-      <div className="absolute bottom-4 left-3 right-3">
+      <div ref={accountRef} className="relative mx-4 mb-5 mt-4 shrink-0">
         {accountMenu && (
-          <div className="mb-2 overflow-hidden rounded-2xl border border-white/10 bg-[#24282f] p-1 shadow-xl">
+          <div className="absolute bottom-full mb-2 w-full overflow-hidden rounded-2xl border border-border bg-white p-1.5 shadow-lg">
             <button
               onClick={() => {
                 setAccountPanel("profile");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-foreground cursor-pointer"
             >
               View profile
             </button>
@@ -126,7 +206,7 @@ export function Sidebar({
                 setAccountPanel("password");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-foreground cursor-pointer"
             >
               Change password
             </button>
@@ -135,25 +215,26 @@ export function Sidebar({
                 await supabase?.auth.signOut();
                 router.push("/login");
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-300 hover:bg-red-500/15 cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-700 hover:bg-red-50 cursor-pointer"
             >
               Sign out
             </button>
           </div>
         )}
         <button
+          ref={accountButtonRef}
+          aria-expanded={accountMenu}
+          aria-label={`Account: ${userName}`}
           onClick={() => setAccountMenu((open) => !open)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 text-left hover:bg-white/10 cursor-pointer"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-white/60 p-3 text-left hover:bg-white cursor-pointer"
         >
-          <div className="grid h-9 w-9 place-items-center rounded-full bg-red-100 text-xs font-black text-red-700">
-            {initials}
-          </div>
+          <Avatar name={userName} src={avatarUrl} />
           <div className="min-w-0">
-            <p className="truncate text-sm font-bold">{userName}</p>
-            <p className="text-xs text-white/40">{role}</p>
+            <p className="break-words text-base font-semibold">{userName}</p>
+            <p className="text-xs text-slate-500">{role}</p>
           </div>
           <ChevronDown
-            className={`ml-auto text-white/30 transition ${
+            className={`ml-auto text-slate-500 transition ${
               accountMenu ? "rotate-180" : ""
             }`}
             size={16}

@@ -1,3 +1,4 @@
+import { Modal } from "@/components/ui/modal";
 import React from "react";
 import { X } from "lucide-react";
 import type { User } from "@/lib/types";
@@ -50,11 +51,11 @@ export function ProjectCreateModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-xs">
+    <Modal title="Create new project" onClose={onClose}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4">
           <div>
-            <h2 className="text-xl font-black text-slate-900">
+            <h2 className="text-xl font-semibold text-slate-900">
               Create New Project
             </h2>
             <p className="text-xs font-semibold text-slate-500">
@@ -64,6 +65,7 @@ export function ProjectCreateModal({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close new project"
             className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
           >
             <X size={20} />
@@ -72,7 +74,7 @@ export function ProjectCreateModal({
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Project Category *
               {isCustomCategory ? (
                 <div className="mt-1.5 flex items-center gap-2">
@@ -94,7 +96,7 @@ export function ProjectCreateModal({
                         type: dynamicCategories[0] || "DFM / Sheet Metal",
                       }));
                     }}
-                    className="h-11 px-3 text-xs font-bold text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer shrink-0"
+                    className="h-11 px-3 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer shrink-0"
                   >
                     Cancel
                   </button>
@@ -123,7 +125,7 @@ export function ProjectCreateModal({
               )}
             </label>
 
-            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Project Name *
               <input
                 type="text"
@@ -137,7 +139,7 @@ export function ProjectCreateModal({
               />
             </label>
 
-            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Client Name
               <input
                 type="text"
@@ -150,7 +152,7 @@ export function ProjectCreateModal({
               />
             </label>
 
-            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Project Leader
               <select
                 value={projectForm.leaderId}
@@ -173,7 +175,7 @@ export function ProjectCreateModal({
               </select>
             </label>
 
-            <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
               Priority
               <select
                 value={projectForm.priority}
@@ -192,7 +194,7 @@ export function ProjectCreateModal({
             </label>
 
             <div className="col-span-full">
-              <label className="text-xs font-bold uppercase tracking-wide text-slate-500 block mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 block mb-1.5">
                 Project Mode / Delivery Type *
               </label>
               <div className="grid grid-cols-2 gap-2.5">
@@ -209,8 +211,8 @@ export function ProjectCreateModal({
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                 >
-                  <span className="text-xs font-black">📅 Fixed Deadline</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Strict target delivery date required</span>
+                  <span className="text-xs font-semibold">Fixed Deadline</span>
+                  <span className="text-xs text-slate-500 font-semibold">Strict target delivery date required</span>
                 </button>
 
                 <button
@@ -227,14 +229,14 @@ export function ProjectCreateModal({
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                     }`}
                 >
-                  <span className="text-xs font-black">⏳ Hourly / Ongoing</span>
-                  <span className="text-[10px] text-slate-500 font-semibold">Continuous retainer, no fixed deadline</span>
+                  <span className="text-xs font-semibold">Hourly / Ongoing</span>
+                  <span className="text-xs text-slate-500 font-semibold">Continuous retainer, no fixed deadline</span>
                 </button>
               </div>
             </div>
 
             {projectForm.projectType === "fixed_deadline" && (
-              <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Deadline Date *
                 <input
                   type="date"
@@ -253,7 +255,7 @@ export function ProjectCreateModal({
           </div>
 
           <div className="space-y-2 pt-2">
-            <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
               Assigned Team Members
             </label>
             <div className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto rounded-xl border border-slate-200 p-3 bg-slate-50">
@@ -279,11 +281,11 @@ export function ProjectCreateModal({
                           selectedMembers: next,
                         }));
                       }}
-                      className="h-4 w-4 rounded border-slate-300 text-[#e3292f] focus:ring-red-400 cursor-pointer"
+                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-red-400 cursor-pointer"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-bold text-slate-900">{person.name}</p>
-                      <p className="text-[10px] text-slate-400 capitalize">{person.role}</p>
+                      <p className="break-words text-base font-semibold text-slate-900">{person.name}</p>
+                      <p className="text-xs text-slate-400 capitalize">{person.role}</p>
                     </div>
                   </label>
                 );
@@ -295,20 +297,20 @@ export function ProjectCreateModal({
             <button
               type="button"
               onClick={onClose}
-              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingProject}
-              className="h-11 rounded-xl bg-[#e3292f] px-6 text-sm font-black text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
+              className="h-11 rounded-xl bg-primary px-6 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
             >
               {savingProject ? "Saving..." : "Save Project"}
             </button>
           </div>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

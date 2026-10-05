@@ -1,4 +1,6 @@
-﻿import React from "react";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { PersonIdentity } from "@/components/ui/person-identity";
+import React from "react";
 import {
   Calendar,
   CheckCircle,
@@ -10,6 +12,7 @@ import {
 import type { Task, User } from "@/lib/types";
 
 interface TaskCardProps {
+  onOpen?: () => void;
   t: Task;
   people: User[];
   updateTask: (id: string | number, state: string) => void;
@@ -65,7 +68,7 @@ function getDeadlineInfo(due_at?: string | null): {
   if (diffMs < 0) {
     const days = Math.abs(diffDays);
     return {
-      label: `${days}d overdue`,
+      label: days === 0 ? "Overdue today" : `${days}d overdue`,
       sublabel: dateStr,
       bgClass: "bg-red-50",
       textClass: "text-red-700",
@@ -123,6 +126,7 @@ function getDeadlineInfo(due_at?: string | null): {
 }
 
 export function TaskCard({
+  onOpen,
   t,
   people,
   updateTask,
@@ -136,24 +140,24 @@ export function TaskCard({
   onDone,
   onDragStart,
 }: TaskCardProps) {
-  const dl = getDeadlineInfo(t.due_at);
+  const dl = ["Completed", "Closed", "Cancelled"].includes(t.state)
+    ? {
+        label: t.state === "Cancelled" ? "Cancelled" : "Completed",
+        sublabel: "",
+        bgClass: "bg-slate-50",
+        textClass: "text-slate-600",
+        borderClass: "border-t-slate-200",
+        icon: <CheckCircle size={12} className="text-slate-500" />,
+        pulse: false,
+      }
+    : getDeadlineInfo(t.due_at);
 
   const priorityStyles =
     t.priority === "critical"
       ? "bg-red-50 text-red-700 border border-red-200"
       : t.priority === "high"
-      ? "bg-amber-50 text-amber-700 border border-amber-200"
-      : "bg-slate-100 text-slate-500";
-
-  const stateStyles: Record<string, string> = {
-    "Open": "bg-sky-50 text-sky-700",
-    "In Progress": "bg-blue-50 text-blue-700",
-    "In Review": "bg-purple-50 text-purple-700",
-    "In Revision": "bg-amber-50 text-amber-700",
-    "Closed": "bg-emerald-50 text-emerald-700",
-    "Completed": "bg-emerald-50 text-emerald-700",
-    "Cancelled": "bg-slate-100 text-slate-400",
-  };
+        ? "bg-amber-50 text-amber-700 border border-amber-200"
+        : "bg-slate-100 text-slate-500";
 
   return (
     <div
@@ -165,7 +169,7 @@ export function TaskCard({
     >
       {/* â”€â”€ Deadline Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
-        className={`flex items-center justify-between gap-3 border-t-[5px] px-3.5 py-3 shadow-sm ring-1 ring-inset ring-black/5 ${
+        className={`flex items-center justify-between gap-3 border-t-2 px-3.5 py-3 shadow-sm ring-1 ring-inset ring-black/5 ${
           dl.bgClass
         } ${dl.borderClass}`}
       >
@@ -175,21 +179,24 @@ export function TaskCard({
           </span>
           <div className="min-w-0">
             <span
-              className={`block text-sm font-black tracking-wide ${
-                dl.pulse ? "animate-pulse" : ""
-              } ${dl.textClass}`}
+              className={`block text-sm font-semibold tracking-wide ${""} ${dl.textClass}`}
             >
               {dl.label}
             </span>
             {dl.sublabel && (
-              <span className={`block text-[10px] font-bold uppercase tracking-[0.12em] ${dl.textClass} opacity-80`}>
+              <span
+                className={`block text-xs font-semibold uppercase tracking-[0.12em] ${dl.textClass} opacity-80`}
+              >
                 {dl.sublabel}
               </span>
             )}
           </div>
         </div>
         {dl.label !== "No deadline" && (
-          <Calendar size={14} className={`shrink-0 ${dl.textClass} opacity-75`} />
+          <Calendar
+            size={14}
+            className={`shrink-0 ${dl.textClass} opacity-75`}
+          />
         )}
       </div>
 
@@ -197,41 +204,27 @@ export function TaskCard({
       <div className="px-4 pt-3 pb-4">
         {/* Title + Priority */}
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-black leading-snug text-slate-900 break-words">
-            {t.title}
+          <p className="text-base font-semibold leading-snug text-slate-900 break-words">
+            {onOpen ? <button type="button" onClick={onOpen} className="text-left hover:text-primary" aria-label={`Open ${t.title} in ${t.project || "General work"}`}>{t.title}</button> : t.title}
           </p>
           <span
-            className={`shrink-0 rounded-lg px-2 py-0.5 text-[9px] font-black uppercase tracking-tight ${priorityStyles}`}
+            className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-semibold uppercase tracking-tight ${priorityStyles}`}
           >
             {t.priority || "normal"}
           </span>
         </div>
 
         {/* Project name */}
-        <p className="mt-1.5 text-[11px] font-semibold text-slate-400 truncate">
+        <p className="mt-1.5 text-xs font-medium text-slate-500 break-words">
           {t.project || "General"}
         </p>
 
-        {/* Status + Assignee Row */}
+        <div className="mt-4">
+          <PersonIdentity name={t.owner} />
+        </div>
+        {/* Status */}
         <div className="mt-3 flex items-center justify-between gap-2">
-          <span
-            className={`rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-tight ${
-              stateStyles[t.state] ?? "bg-slate-100 text-slate-500"
-            }`}
-          >
-            {t.state}
-          </span>
-          <div className="flex items-center gap-1.5">
-            <span
-              className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-[9px] font-black text-white ring-2 ring-white"
-              title={t.owner}
-            >
-              {t.initials || "?"}
-            </span>
-            <span className="text-[11px] font-semibold text-slate-500 max-w-[80px] truncate">
-              {t.owner}
-            </span>
-          </div>
+          <StatusBadge status={t.state} task />
         </div>
 
         {canLogWork && (
@@ -240,7 +233,7 @@ export function TaskCard({
               type="button"
               onClick={onDone}
               disabled={workSubmitting}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 px-2.5 py-2 text-xs font-bold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 px-2.5 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
             >
               <CheckCircle2 size={14} />
               Done
@@ -249,7 +242,7 @@ export function TaskCard({
               type="button"
               onClick={onLogWork}
               disabled={workSubmitting}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-bold text-white transition hover:bg-slate-800 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               <FileText size={14} />
               Log Work
@@ -265,7 +258,7 @@ export function TaskCard({
                 aria-label={`Assign ${t.title}`}
                 value={t.assignee_id ?? ""}
                 onChange={(e) => assignTask(String(t.id), e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
+                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
               >
                 <option value="">Unassigned</option>
                 {people.map((person) => (
@@ -277,9 +270,10 @@ export function TaskCard({
             )}
             {statusEditable && (
               <select
+                aria-label={`Status for ${t.title}`}
                 value={t.state}
                 onChange={(e) => updateTask(t.id, e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
+                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
               >
                 {[
                   "Open",
@@ -297,7 +291,7 @@ export function TaskCard({
             {editable && (
               <button
                 onClick={() => deleteTask(t)}
-                className="w-full rounded-xl border border-red-200 px-2.5 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50 transition cursor-pointer"
+                className="w-full rounded-xl border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
               >
                 Delete task
               </button>

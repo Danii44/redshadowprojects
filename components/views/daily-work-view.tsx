@@ -1,3 +1,6 @@
+import { DailyTaskQueue } from "@/components/tasks/daily-task-queue";
+import { PersonIdentity } from "@/components/ui/person-identity";
+import { Modal } from "@/components/ui/modal";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
@@ -26,6 +29,7 @@ interface DailyWorkViewProps {
   role: Role;
   notify: (message: string) => void;
   onRefresh?: () => void;
+  onOpenTask: (task: Task) => void;
 }
 
 interface LogEntry {
@@ -51,6 +55,7 @@ export function DailyWorkView({
   role,
   notify,
   onRefresh,
+  onOpenTask,
 }: DailyWorkViewProps) {
   // View & Filter states
   const [selectedMemberFilter, setSelectedMemberFilter] = useState<string>("all");
@@ -589,11 +594,11 @@ export function DailyWorkView({
       {/* Top Header & Action Bar */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
-            <CalendarCheck size={28} className="text-[#e3292f]" />
-            Daily Tasks
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+            <CalendarCheck size={28} className="text-primary" />
+            Daily Work
           </h1>
-          <p className="mt-1 text-xs font-bold text-slate-500">
+          <p className="mt-1 text-xs font-semibold text-slate-500">
             {role === "Team Member"
               ? "Work through your tasks, log progress, and submit finished work for review."
               : "Assign work, track progress, and review submitted tasks."}
@@ -603,7 +608,7 @@ export function DailyWorkView({
         <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => setAddingSelfTask(true)}
-            className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-black text-white hover:bg-red-700 transition shadow-xs cursor-pointer"
+            className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs cursor-pointer"
           >
             <Plus size={16} />
             Add my task
@@ -611,7 +616,7 @@ export function DailyWorkView({
           {isManagerRole && (
             <button
               onClick={() => setAssigningMemberTask(true)}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
+              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer shadow-xs"
             >
               <UserCheck size={15} />
               Assign Daily Task to Member
@@ -627,13 +632,13 @@ export function DailyWorkView({
             {/* Team Member Filter */}
             <div className="flex items-center gap-2">
               <Users size={16} className="text-slate-400" />
-              <span className="text-xs font-bold text-slate-700">Filter Team Member:</span>
+              <span className="text-xs font-semibold text-slate-700">Filter Team Member:</span>
             </div>
             <div className="flex items-center gap-2">
               <select
                 value={selectedMemberFilter}
                 onChange={(e) => setSelectedMemberFilter(e.target.value)}
-                className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-900 outline-none focus:border-red-400 cursor-pointer min-w-44"
+                className="h-10 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 cursor-pointer min-w-44"
               >
                 <option value="all">All Team Members ({teamMembers.length})</option>
                 {teamMembers.map((p) => (
@@ -646,7 +651,7 @@ export function DailyWorkView({
                 <button
                   type="button"
                   onClick={() => setSelectedMemberFilter("all")}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-[10px] font-bold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
                 >
                   Clear
                 </button>
@@ -664,17 +669,17 @@ export function DailyWorkView({
                 <div className="flex items-center gap-2">
                   <AlertTriangle size={18} className={todaySummary.overdue > 0 ? "text-red-600" : "text-amber-600"} />
                   <div>
-                    <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-600">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                       {todaySummary.overdue > 0 ? "Urgent attention" : "Due soon"}
                     </p>
-                    <p className="text-sm font-black text-slate-900">
+                    <p className="text-sm font-semibold text-slate-900">
                       {todaySummary.overdue > 0
                         ? `${todaySummary.overdue} task${todaySummary.overdue === 1 ? "" : "s"} overdue`
                         : `${todaySummary.dueToday} task${todaySummary.dueToday === 1 ? "" : "s"} due today`}
                     </p>
                   </div>
                 </div>
-                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase ${todaySummary.overdue > 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase ${todaySummary.overdue > 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
                   {todaySummary.overdue > 0 ? "Action needed" : "Today"}
                 </span>
               </div>
@@ -682,17 +687,17 @@ export function DailyWorkView({
           ) : null}
 
           <section className="space-y-4">
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-3 gap-3">
               {[
-                { label: "Active tasks", value: todaySummary.total, tone: "bg-slate-900 text-white" },
-                { label: "Due today", value: todaySummary.dueToday, tone: "bg-amber-500 text-white" },
-                { label: "In review", value: todaySummary.blocked, tone: "bg-red-500 text-white" },
+                { label: "Active tasks", value: todaySummary.total, tone: "bg-white text-slate-900" },
+                { label: "Due today", value: todaySummary.dueToday, tone: "bg-white text-amber-700" },
+                { label: "In review", value: todaySummary.blocked, tone: "bg-white text-violet-700" },
               ].map((stat) => (
-                <div key={stat.label} className={`rounded-2xl border border-slate-200 p-4 shadow-sm ${stat.tone}`}>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] opacity-80">
+                <div key={stat.label} className={`metric-card rounded-2xl border border-border p-4 ${stat.tone}`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-80">
                     {stat.label}
                   </p>
-                  <p className="mt-2 text-2xl font-black leading-none">{stat.value}</p>
+                  <p className="mt-2 text-2xl font-semibold leading-none">{stat.value}</p>
                 </div>
               ))}
             </div>
@@ -700,97 +705,26 @@ export function DailyWorkView({
           </section>
 
         <div className="space-y-5">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-3">
-            <h2 className="text-lg font-black text-slate-900">
-              {role === "Team Member" ? "Your Daily Tasks Today" : "Active Assigned Tasks"}
-            </h2>
-            <span className="text-xs font-bold text-slate-500">
-              {filteredAssignedTasks.length} active tasks
-            </span>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredAssignedTasks.map((task) => {
-              const compPct = task.completion_percentage ?? 25;
-              return (
-                <div
-                  key={task.id}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between"
-                >
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-slate-400">
-                        {task.project || "General"}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
-                          task.priority === "critical"
-                            ? "bg-red-50 text-red-700"
-                            : task.priority === "high"
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {task.priority}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-3 text-base font-black text-slate-900 leading-snug">
-                      {task.title}
-                    </h3>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      Assigned to: <span className="text-slate-900 font-bold">{task.owner}</span> · Target: {task.due}
-                    </p>
-
-                    <div className="mt-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-xs font-bold">
-                        <span className="text-slate-400 text-[11px] uppercase">
-                          Progress
-                        </span>
-                        <span className="text-slate-900">{compPct}%</span>
-                      </div>
-                      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                        <div
-                          className="h-full bg-[#e3292f] rounded-full transition-all duration-300"
-                          style={{ width: `${compPct}%` }}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-5 pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
-                    <span
-                      className={`inline-flex items-center rounded-md border px-2.5 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] ${
-                        task.state === "Open"
-                          ? "border-sky-200 bg-sky-50 text-sky-700"
-                          : task.state === "In Progress"
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : task.state === "In Review"
-                          ? "border-violet-200 bg-violet-50 text-violet-700"
-                          : task.state === "In Revision"
-                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : task.state === "Completed" || task.state === "Closed"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : "border-slate-200 bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {task.state}
-                    </span>
-                    <div className="flex items-center gap-2">
+          <DailyTaskQueue
+            onOpenTask={onOpenTask}
+            tasks={filteredAssignedTasks}
+            people={people}
+            personal={role === "Team Member"}
+            renderActions={(task) => <>
                       {canLogWork(task) && (
                         <button
                           onClick={() => {
                             setLoggingProgressTask(task);
                             setProgressForm({
                               notes: "",
-                              completionPct: compPct,
+                              completionPct: task.completion_percentage ?? 0,
                               hoursSpent: "4",
                               blocker: "",
                               taskState:
                                 task.state === "In Progress" ? task.state : "In Progress",
                             });
                           }}
-                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
+                          className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition cursor-pointer shadow-xs"
                         >
                           <FileText size={14} />
                           Log Work
@@ -802,7 +736,7 @@ export function DailyWorkView({
                             type="button"
                             onClick={() => void handleCompleteSelfTask(task)}
                             disabled={submitting}
-                            className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
+                            className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-60"
                           >
                             <Check size={13} />
                             Complete
@@ -813,54 +747,36 @@ export function DailyWorkView({
                           <button
                             type="button"
                             onClick={() => handleReviewDecision(task, "Completed")}
-                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-[9px] font-bold text-emerald-700 hover:bg-emerald-100 transition"
+                            className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 transition"
                           >
                             Approve
                           </button>
                           <button
                             type="button"
                             onClick={() => handleReviewDecision(task, "Open")}
-                            className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-bold text-amber-700 hover:bg-amber-100 transition"
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition"
                           >
                             Rework
                           </button>
                         </>
                       )}
                       {role === "Team Member" && task.state === "In Review" && (
-                        <span className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-700">
+                        <span className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-violet-700">
                           Awaiting review
                         </span>
                       )}
                       {task.state === "In Revision" && (
-                        <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-amber-700">
+                        <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">
                           Rework requested
                         </span>
                       )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-
-            {!filteredAssignedTasks.length && (
-              <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                <CalendarCheck size={32} className="mx-auto text-slate-300 mb-2" />
-                <h3 className="font-black text-slate-800 text-base">
-                  No active tasks listed for this view!
-                </h3>
-                <p className="mt-1 text-xs font-semibold text-slate-400">
-                  {role === "Team Member"
-                    ? "Add a task to get started, or ask your manager for an assignment."
-                    : "Assign a task or clear the team member filter."}
-                </p>
-              </div>
-            )}
-          </div>
+            </>}
+          />
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-black text-slate-900">Completed today</h3>
-              <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+              <h3 className="text-sm font-semibold text-slate-900">Completed today</h3>
+              <span className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
                 {completedTodayTasks.length} done
               </span>
             </div>
@@ -870,14 +786,13 @@ export function DailyWorkView({
                 {completedTodayTasks.map((task) => (
                   <div key={task.id} className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-black text-slate-900 truncate">{task.title}</p>
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[9px] font-black uppercase text-emerald-700">
+                      <p className="text-xs font-semibold text-slate-900 truncate">{task.title}</p>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold uppercase text-emerald-700">
                         {task.state}
                       </span>
                     </div>
-                    <p className="mt-1 text-[10px] font-semibold text-slate-500">
-                      {task.owner} · {task.project || "General"}
-                    </p>
+                    <div className="mt-3"><PersonIdentity name={task.owner} label="Team member" /></div>
+                    <p className="mt-2 text-sm text-slate-500">{task.project || "General"}</p>
                   </div>
                 ))}
               </div>
@@ -892,9 +807,9 @@ export function DailyWorkView({
       </>
 
       <details className="group rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
-        <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-black text-slate-900">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4 text-sm font-semibold text-slate-900">
           <span>Progress history</span>
-          <span className="text-xs font-bold text-slate-500">{filteredLogs.length} entries</span>
+          <span className="text-xs font-semibold text-slate-500">{filteredLogs.length} entries</span>
         </summary>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3">
           <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 p-1">
@@ -902,7 +817,7 @@ export function DailyWorkView({
               type="button"
               onClick={() => setWorkViewMode("datasheet")}
               aria-pressed={workViewMode === "datasheet"}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
                 workViewMode === "datasheet"
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -915,7 +830,7 @@ export function DailyWorkView({
               type="button"
               onClick={() => setWorkViewMode("stream")}
               aria-pressed={workViewMode === "stream"}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-bold transition ${
+              className={`flex items-center gap-1.5 rounded-md px-3 py-2 text-xs font-semibold transition ${
                 workViewMode === "stream"
                   ? "bg-white text-slate-900 shadow-xs"
                   : "text-slate-600 hover:text-slate-900"
@@ -929,7 +844,7 @@ export function DailyWorkView({
             type="button"
             onClick={exportDatasheetCSV}
             disabled={!filteredLogs.length}
-            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Download size={14} />
             Export CSV
@@ -938,15 +853,15 @@ export function DailyWorkView({
         <section className="rounded-2xl border border-slate-200 bg-white shadow-2xs overflow-hidden">
         <div className="border-b border-slate-100 p-5 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-black text-slate-900 flex items-center gap-2">
-              <FileSpreadsheet size={18} className="text-[#e3292f]" />
+            <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+              <FileSpreadsheet size={18} className="text-primary" />
               {role === "Team Member" ? "Your Progress Log History" : "Team Daily Work Datasheet"}
             </h3>
             <p className="text-xs font-semibold text-slate-400">
               Work logs, hours tracked, completion percentage, and reported blockers
             </p>
           </div>
-          <span className="text-xs font-black text-slate-400">
+          <span className="text-xs font-semibold text-slate-400">
             {filteredLogs.length} logged entries
           </span>
         </div>
@@ -956,7 +871,7 @@ export function DailyWorkView({
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <tr className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-400">
                   <th className="py-3 px-4">Date & Time</th>
                   <th className="py-3 px-4">Member</th>
                   <th className="py-3 px-4">Task Title</th>
@@ -972,38 +887,38 @@ export function DailyWorkView({
                   <tr key={log.id} className="hover:bg-slate-50 transition">
                     <td className="py-3.5 px-4 font-mono text-slate-500 whitespace-nowrap">
                       <div>
-                        <span className="font-bold text-slate-900 block">
+                        <span className="font-semibold text-slate-900 block">
                           {new Date(log.created_at).toLocaleDateString()}
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-xs text-slate-400">
                           {new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[8px] font-black text-white shrink-0">
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[8px] font-semibold text-white shrink-0">
                           {getInitials(log.author_name || "TM")}
                         </span>
-                        <span>{log.author_name}</span>
+                        <span className="text-base">{log.author_name}</span>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-900 max-w-xs truncate">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 max-w-xs truncate">
                       {log.task_title}
                     </td>
 
-                    <td className="py-3.5 px-4 font-semibold text-slate-500 max-w-xs truncate font-mono text-[11px]">
+                    <td className="py-3.5 px-4 font-semibold text-slate-500 max-w-xs truncate font-mono text-xs">
                       {log.project_name}
                     </td>
 
-                    <td className="py-3.5 px-4 font-bold text-slate-900 whitespace-nowrap">
+                    <td className="py-3.5 px-4 font-semibold text-slate-900 whitespace-nowrap">
                       {log.hoursSpent}h
                     </td>
 
                     <td className="py-3.5 px-4 whitespace-nowrap">
-                      <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[10px] font-black text-[#e3292f]">
+                      <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-xs font-semibold text-primary">
                         {log.completionPct}%
                       </span>
                     </td>
@@ -1014,12 +929,12 @@ export function DailyWorkView({
 
                     <td className="py-3.5 px-4 max-w-xs">
                       {log.blocker ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[10px] font-bold text-red-700 border border-red-200">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 border border-red-200">
                           <AlertTriangle size={12} className="shrink-0 text-red-500" />
                           <span className="truncate">{log.blocker}</span>
                         </span>
                       ) : (
-                        <span className="text-slate-300 text-[11px]">—</span>
+                        <span className="text-slate-300 text-xs">—</span>
                       )}
                     </td>
                   </tr>
@@ -1045,18 +960,18 @@ export function DailyWorkView({
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center gap-2.5">
-                    <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-[10px] font-black text-white shadow-2xs">
+                    <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white shadow-2xs">
                       {getInitials(log.author_name || "TM")}
                     </span>
                     <div>
-                      <p className="font-black text-slate-900 text-xs">
+                      <p className="font-semibold text-slate-900 text-xs">
                         {log.task_title}{" "}
                         <span className="text-slate-400 font-normal font-mono">
                           ({log.project_name})
                         </span>
                       </p>
-                      <p className="text-[10px] font-semibold text-slate-500">
-                        Logged by {log.author_name} ·{" "}
+                      <p className="text-xs font-semibold text-slate-500">
+                        Logged by <span className="text-base font-semibold text-slate-900">{log.author_name}</span> ·{" "}
                         {new Date(log.created_at).toLocaleDateString()} at{" "}
                         {new Date(log.created_at).toLocaleTimeString([], {
                           hour: "2-digit",
@@ -1067,10 +982,10 @@ export function DailyWorkView({
                   </div>
 
                   <div className="flex items-center gap-2 self-start sm:self-auto">
-                    <span className="rounded-md bg-white border border-slate-200 px-2.5 py-1 text-[10px] font-bold text-slate-700">
+                    <span className="rounded-md bg-white border border-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-700">
                       {log.hoursSpent}h logged
                     </span>
-                    <span className="rounded-md bg-red-50 border border-red-200 px-2.5 py-1 text-[10px] font-black text-[#e3292f]">
+                    <span className="rounded-md bg-red-50 border border-red-200 px-2.5 py-1 text-xs font-semibold text-primary">
                       {log.completionPct}% Complete
                     </span>
                   </div>
@@ -1081,7 +996,7 @@ export function DailyWorkView({
                 </p>
 
                 {log.blocker && (
-                  <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200/80 p-2.5 text-xs font-bold text-red-700">
+                  <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200/80 p-2.5 text-xs font-semibold text-red-700">
                     <AlertTriangle size={15} className="shrink-0 text-red-600" />
                     <span>Blocker: {log.blocker}</span>
                   </div>
@@ -1101,19 +1016,20 @@ export function DailyWorkView({
 
       {/* MODAL 1: TEAM MEMBER SELF-ADDS TASK */}
       {addingSelfTask && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 overflow-y-auto">
+        <Modal title="Add your daily task" onClose={() => setAddingSelfTask(false)}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">
                   Quick Add Task
                 </p>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900">
                   What Are You Working On Today?
                 </h2>
               </div>
               <button
                 onClick={() => setAddingSelfTask(false)}
+                aria-label="Close daily task"
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
@@ -1121,7 +1037,7 @@ export function DailyWorkView({
             </div>
 
             <form onSubmit={handleAddSelfTask} className="space-y-4">
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Task Title *
                 <input
                   required
@@ -1135,7 +1051,7 @@ export function DailyWorkView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Project{" "}
                 <span className="normal-case font-semibold text-slate-400">(optional)</span>
                 <select
@@ -1155,7 +1071,7 @@ export function DailyWorkView({
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Priority
                   <select
                     value={selfTaskForm.priority}
@@ -1173,7 +1089,7 @@ export function DailyWorkView({
                   </select>
                 </label>
 
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Target Date
                   <input
                     type="date"
@@ -1193,37 +1109,38 @@ export function DailyWorkView({
                 <button
                   type="button"
                   onClick={() => setAddingSelfTask(false)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting}
-                  className="h-10 rounded-xl bg-[#e3292f] px-5 text-xs font-black text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
+                  className="h-10 rounded-xl bg-primary px-5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
                 >
                   {submitting ? "Adding..." : "Add to My Daily Work"}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* MODAL 2: ADMIN / LEADER ASSIGNS TASK TO MEMBER */}
       {assigningMemberTask && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 overflow-y-auto">
+        <Modal title="Assign a daily task" onClose={() => setAssigningMemberTask(false)}>
           <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-red-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">
                   Assign Task
                 </p>
-                <h2 className="text-xl font-black text-slate-900">
+                <h2 className="text-xl font-semibold text-slate-900">
                   Assign Daily Task to Member
                 </h2>
               </div>
               <button
                 onClick={() => setAssigningMemberTask(false)}
+                aria-label="Close task assignment"
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
@@ -1231,7 +1148,7 @@ export function DailyWorkView({
             </div>
 
             <form onSubmit={handleAssignMemberTask} className="space-y-4">
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Team Member *
                 <select
                   required
@@ -1250,7 +1167,7 @@ export function DailyWorkView({
                 </select>
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Task Title *
                 <input
                   required
@@ -1263,7 +1180,7 @@ export function DailyWorkView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Project{" "}
                 <span className="normal-case font-semibold text-slate-400">(optional)</span>
                 <select
@@ -1283,7 +1200,7 @@ export function DailyWorkView({
               </label>
 
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Priority
                   <select
                     value={assignForm.priority}
@@ -1301,7 +1218,7 @@ export function DailyWorkView({
                   </select>
                 </label>
 
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Target Date
                   <input
                     type="date"
@@ -1321,37 +1238,38 @@ export function DailyWorkView({
                 <button
                   type="button"
                   onClick={() => setAssigningMemberTask(false)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting}
-                  className="h-10 rounded-xl bg-slate-900 px-5 text-xs font-bold text-white hover:bg-slate-800 disabled:opacity-60 transition cursor-pointer"
+                  className="h-10 rounded-xl bg-slate-900 px-5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60 transition cursor-pointer"
                 >
                   {submitting ? "Assigning..." : "Assign Task"}
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* MODAL 3: LOG WORK PROGRESS FOR A TASK */}
       {loggingProgressTask && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4 overflow-y-auto">
+        <Modal title="Log daily progress" onClose={() => setLoggingProgressTask(null)}>
           <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-red-600 font-mono">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red-600 font-mono">
                   {loggingProgressTask.project}
                 </p>
-                <h2 className="text-xl font-black text-slate-900 mt-0.5">
+                <h2 className="text-xl font-semibold text-slate-900 mt-0.5">
                   Log Progress: {loggingProgressTask.title}
                 </h2>
               </div>
               <button
                 onClick={() => setLoggingProgressTask(null)}
+                aria-label="Close progress log"
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 cursor-pointer"
               >
                 <X size={18} />
@@ -1360,7 +1278,7 @@ export function DailyWorkView({
 
             <form onSubmit={handleSubmitProgress} className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Task Status Update
                   <select
                     value={progressForm.taskState}
@@ -1377,7 +1295,7 @@ export function DailyWorkView({
                   </select>
                 </label>
 
-                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+                <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Hours Worked Today
                   <input
                     type="number"
@@ -1398,9 +1316,9 @@ export function DailyWorkView({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     Completion Percentage:{" "}
-                    <span className="text-slate-900 font-black">
+                    <span className="text-slate-900 font-semibold">
                       {progressForm.completionPct}%
                     </span>
                   </label>
@@ -1431,7 +1349,7 @@ export function DailyWorkView({
                             completionPct: pct,
                           })
                         }
-                        className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition cursor-pointer ${
+                        className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                           progressForm.completionPct === pct
                             ? "bg-slate-900 text-white"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -1444,7 +1362,7 @@ export function DailyWorkView({
                 </div>
               </div>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Work Accomplished Notes *
                 <textarea
                   required
@@ -1458,7 +1376,7 @@ export function DailyWorkView({
                 />
               </label>
 
-              <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Blockers / Help Needed (Optional)
                 <input
                   placeholder="e.g. Waiting for client STEP file approval..."
@@ -1477,13 +1395,13 @@ export function DailyWorkView({
                 <button
                   type="button"
                   onClick={() => setLoggingProgressTask(null)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer"
+                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting || !progressForm.notes.trim()}
-                  className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-5 py-2.5 text-xs font-black text-white hover:bg-red-700 disabled:opacity-50 transition cursor-pointer"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-50 transition cursor-pointer"
                 >
                   <Send size={14} />
                   {submitting
@@ -1495,7 +1413,7 @@ export function DailyWorkView({
               </div>
             </form>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

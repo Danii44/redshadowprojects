@@ -1,16 +1,13 @@
 import React, { useEffect, useState } from "react";
-import {
-  ArrowUpDown,
-  Grid,
-  List,
-  Plus,
-  Search,
-} from "lucide-react";
+import { ArrowUpDown, Grid, List, Plus, Search } from "lucide-react";
 import type { Project, ProjectStatus, Role, User } from "@/lib/types";
 import { canEdit, normalizeProjectStatus } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { ProjectCreateModal } from "./project-create-modal";
-import { ProjectDetailDrawer, type ProjectEditFormState } from "./project-detail-drawer";
+import {
+  ProjectDetailDrawer,
+  type ProjectEditFormState,
+} from "./project-detail-drawer";
 import { ProjectGridCard } from "./project-grid-card";
 import { ProjectStatusTabs } from "./project-status-tabs";
 import { ProjectTableRow } from "./project-table-row";
@@ -35,6 +32,8 @@ interface ProjectsViewProps {
   notify: (message: string) => void;
   onRefresh?: () => void;
   initialProjectId?: string | null;
+  initialCreate?: boolean;
+  onClearInitialCreate?: () => void;
   onClearInitialProject?: () => void;
 }
 
@@ -46,6 +45,8 @@ export function ProjectsView({
   notify,
   onRefresh,
   initialProjectId,
+  initialCreate = false,
+  onClearInitialCreate,
   onClearInitialProject,
 }: ProjectsViewProps) {
   const dynamicCategories = Array.from(
@@ -83,7 +84,10 @@ export function ProjectsView({
   // Modal / Drawer state
   const [activeProject, setActiveProject] = useState<Project | null>(null);
   const [drawerTab, setDrawerTab] = useState<"overview" | "edit">("overview");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState(initialCreate);
+  useEffect(() => {
+    if (initialCreate) onClearInitialCreate?.();
+  }, [initialCreate, onClearInitialCreate]);
 
   // Form states
   const [projectForm, setProjectForm] = useState({
@@ -117,7 +121,10 @@ export function ProjectsView({
     internal_notes: "",
   });
 
-  const handleOpenDetail = (p: Project, tab: "overview" | "edit" = "overview") => {
+  const handleOpenDetail = (
+    p: Project,
+    tab: "overview" | "edit" = "overview",
+  ) => {
     setActiveProject(p);
     setDrawerTab(tab);
     setIsEditCustomCategory(false);
@@ -312,8 +319,8 @@ export function ProjectsView({
 
     const deadline = projectForm.deadlineDate
       ? new Date(
-        `${projectForm.deadlineDate}T${projectForm.deadlineTime || "17:00"}:00`,
-      ).toISOString()
+          `${projectForm.deadlineDate}T${projectForm.deadlineTime || "17:00"}:00`,
+        ).toISOString()
       : null;
 
     const leaderId = projectForm.leaderId || profileId;
@@ -322,7 +329,10 @@ export function ProjectsView({
       ? customCategoryInput.trim() || "DFM / Sheet Metal"
       : projectForm.type || "DFM / Sheet Metal";
 
-    const payload: Record<string, string | number | boolean | null | undefined> = {
+    const payload: Record<
+      string,
+      string | number | boolean | null | undefined
+    > = {
       name: projectForm.name,
       code,
       client: projectForm.client || null,
@@ -344,7 +354,11 @@ export function ProjectsView({
       .single();
 
     // Fallback: If 'type' or 'created_by' column does not exist in Supabase schema cache, retry without unknown columns
-    if (error && (error.message.includes("'type'") || error.message.includes("schema cache"))) {
+    if (
+      error &&
+      (error.message.includes("'type'") ||
+        error.message.includes("schema cache"))
+    ) {
       delete payload.type;
       delete payload.created_by;
       const res = await supabase
@@ -357,7 +371,10 @@ export function ProjectsView({
     }
 
     setSavingProject(false);
-    if (error || !newProject) return notify(`Failed to create project: ${error?.message || "Unknown error"}`);
+    if (error || !newProject)
+      return notify(
+        `Failed to create project: ${error?.message || "Unknown error"}`,
+      );
 
     // Create default phases
     const defaultPhases = [
@@ -426,7 +443,10 @@ export function ProjectsView({
       ? editCustomCategoryInput.trim() || editForm.type
       : editForm.type;
 
-    const updatePayload: Record<string, string | number | boolean | null | undefined> = {
+    const updatePayload: Record<
+      string,
+      string | number | boolean | null | undefined
+    > = {
       name: editForm.name,
       client: editForm.client || null,
       type: finalType || null,
@@ -445,7 +465,11 @@ export function ProjectsView({
       .eq("id", activeProject.id);
 
     // Fallback: If 'type' column is missing in Supabase schema cache, retry update without 'type'
-    if (error && (error.message.includes("'type'") || error.message.includes("schema cache"))) {
+    if (
+      error &&
+      (error.message.includes("'type'") ||
+        error.message.includes("schema cache"))
+    ) {
       delete updatePayload.type;
       const res = await supabase
         .from("projects")
@@ -490,7 +514,8 @@ export function ProjectsView({
         .eq("project_id", projectId)
         .eq("user_id", userId);
 
-      if (error) return notify(`Failed to remove team member: ${error.message}`);
+      if (error)
+        return notify(`Failed to remove team member: ${error.message}`);
       notify("Team member removed from project");
     } else {
       const { error } = await supabase.from("project_members").insert({
@@ -539,10 +564,10 @@ export function ProjectsView({
       {/* Header & Main Controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-widest text-[#e3292f]">
+          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
             Engineering Portfolio
           </p>
-          <h1 className="mt-0.5 text-2xl sm:text-3xl font-black text-slate-900">
+          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-slate-900">
             Projects
           </h1>
           <p className="mt-0.5 text-xs font-semibold text-slate-500">
@@ -561,6 +586,7 @@ export function ProjectsView({
             />
             <input
               type="text"
+              aria-label="Search projects by code, name or client"
               placeholder="Search code, name, client..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -569,18 +595,23 @@ export function ProjectsView({
           </div>
 
           {/* Sort Control */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-10 text-xs font-bold text-slate-700 shadow-2xs">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-10 text-xs font-semibold text-slate-700 shadow-2xs">
             <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
             <select
+              aria-label="Sort projects"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as ProjectSortMode)}
-              className="bg-transparent text-xs font-bold text-slate-800 outline-none cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer"
             >
-              <option value="status_workflow">Status Workflow (Open → Closed)</option>
+              <option value="status_workflow">
+                Status Workflow (Open → Closed)
+              </option>
               {canEdit(role) && (
                 <>
                   <option value="deadline_asc">Due Date (Soonest First)</option>
-                  <option value="deadline_desc">Due Date (Furthest First)</option>
+                  <option value="deadline_desc">
+                    Due Date (Furthest First)
+                  </option>
                 </>
               )}
               <option value="name_asc">Name (A → Z)</option>
@@ -593,20 +624,26 @@ export function ProjectsView({
           {/* List/Grid View Mode */}
           <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
             <button
+              aria-label="Project list view"
+              aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
-              className={`rounded-lg p-1.5 transition cursor-pointer ${viewMode === "list"
-                ? "bg-slate-900 text-white"
-                : "text-slate-500 hover:text-slate-900"
-                }`}
+              className={`rounded-lg p-1.5 transition cursor-pointer ${
+                viewMode === "list"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
             >
               <List size={16} />
             </button>
             <button
+              aria-label="Project grid view"
+              aria-pressed={viewMode === "grid"}
               onClick={() => setViewMode("grid")}
-              className={`rounded-lg p-1.5 transition cursor-pointer ${viewMode === "grid"
-                ? "bg-slate-900 text-white"
-                : "text-slate-500 hover:text-slate-900"
-                }`}
+              className={`rounded-lg p-1.5 transition cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-slate-900 text-white"
+                  : "text-slate-500 hover:text-slate-900"
+              }`}
             >
               <Grid size={16} />
             </button>
@@ -616,7 +653,7 @@ export function ProjectsView({
           {canEdit(role) && (
             <button
               onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 rounded-xl bg-[#e3292f] px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
             >
               <Plus size={16} />
               New Project
@@ -636,22 +673,27 @@ export function ProjectsView({
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <tr>
                   {canEdit(role) && (
                     <th className="py-3.5 pl-4 pr-2 w-10">
                       <input
                         type="checkbox"
+                        aria-label="Select all visible projects"
                         checked={
                           sortedProjects.length > 0 &&
                           selectedIds.size === sortedProjects.length
                         }
                         onChange={toggleSelectAll}
-                        className="rounded border-slate-300 text-[#e3292f] focus:ring-red-400"
+                        className="rounded border-slate-300 text-primary focus:ring-red-400"
                       />
                     </th>
                   )}
-                  <th className={`py-3.5 ${canEdit(role) ? "px-3" : "pl-4 pr-3"}`}>Project</th>
+                  <th
+                    className={`py-3.5 ${canEdit(role) ? "px-3" : "pl-4 pr-3"}`}
+                  >
+                    Project
+                  </th>
                   <th className="py-3.5 px-3">Status</th>
                   <th className="py-3.5 px-3">Phase</th>
                   <th className="py-3.5 px-3">Leader</th>
@@ -660,10 +702,13 @@ export function ProjectsView({
                   <th className="py-3.5 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 font-semibold text-slate-700">
+              <tbody className="project-list-body divide-y divide-slate-100 font-semibold text-slate-700">
                 {sortedProjects.length === 0 ? (
                   <tr>
-                    <td colSpan={canEdit(role) ? 8 : 6} className="py-12 text-center text-slate-400">
+                    <td
+                      colSpan={canEdit(role) ? 8 : 6}
+                      className="py-12 text-center text-slate-400"
+                    >
                       No projects found matching criteria.
                     </td>
                   </tr>
@@ -688,6 +733,14 @@ export function ProjectsView({
       {/* GRID VIEW */}
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {sortedProjects.length === 0 && (
+            <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+              <h2 className="text-base font-semibold">No projects found</h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Try another search or change your status filter.
+              </p>
+            </div>
+          )}
           {sortedProjects.map((p) => (
             <ProjectGridCard
               key={p.id}
@@ -738,3 +791,4 @@ export function ProjectsView({
     </div>
   );
 }
+import "./project-appearance.css";

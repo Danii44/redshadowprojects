@@ -1,62 +1,148 @@
-import React from "react";
-import { Bell, Menu, Search } from "lucide-react";
-import type { Notification, Role, View } from "@/lib/types";
+import { Bell, Menu as MenuIcon, Moon, Sun, ChevronDown } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { useTheme } from "next-themes";
+import type {
+  Notification,
+  Role,
+  View,
+  Project,
+  Task,
+  User,
+} from "@/lib/types";
+import { Avatar } from "@/components/ui/avatar";
+import { GlobalSearch } from "@/components/global-search";
 
 interface HeaderProps {
   role: Role;
-  query: string;
-  setQuery: (query: string) => void;
+  view: View;
+  menuOpen: boolean;
+  userName: string;
+  currentUser?: User;
+  projects: Project[];
+  tasks: Task[];
+  people: User[];
   setView: (view: View) => void;
+  onProject: (id: string) => void;
+  onTask: (task: Task) => void;
   notifications: Notification[];
   setMenuOpen: (open: boolean) => void;
+  setAccountPanel: (panel: "profile" | "password" | null) => void;
 }
-
 export function Header({
   role,
-  query,
-  setQuery,
+  view,
+  menuOpen,
+  userName,
+  currentUser,
+  projects,
+  tasks,
+  people,
   setView,
+  onProject,
+  onTask,
   notifications,
   setMenuOpen,
+  setAccountPanel,
 }: HeaderProps) {
-  const unreadCount = notifications.filter((item) => !item.read_at).length;
-
+  const unread = notifications.filter(
+    (notification) => !notification.read_at,
+  ).length;
+  const { resolvedTheme, setTheme } = useTheme();
   return (
-    <header className="sticky top-0 z-30 flex h-20 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-xl sm:px-7 lg:px-9">
+    <header className="workspace-toolbar studio-toolbar">
       <button
-        className="rounded-lg p-2 lg:hidden cursor-pointer"
+        className="studio-icon-button studio-mobile-nav"
         onClick={() => setMenuOpen(true)}
+        aria-label="Open navigation"
+        aria-expanded={menuOpen}
+        aria-controls="workspace-navigation"
       >
-        <Menu />
+        <MenuIcon size={21} />
       </button>
-      <div className="relative hidden max-w-xl flex-1 md:block">
-        <Search
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
-          size={18}
-        />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search projects, tasks or people..."
-          className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50/80 pl-10 pr-4 text-sm font-semibold outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-50 text-slate-900"
-        />
-      </div>
-      <div className="ml-auto flex items-center gap-3">
-        <div className="hidden rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-black text-slate-700 sm:block">
-          {role}
-        </div>
-        <button
-          onClick={() => setView("Notifications")}
-          className="relative grid h-11 w-11 place-items-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 transition cursor-pointer"
-          aria-label="Open notifications"
+      <span className="studio-toolbar-title">{view}</span>
+      <GlobalSearch
+        projects={projects}
+        tasks={tasks}
+        people={people}
+        role={role}
+        onProject={onProject}
+        onTask={onTask}
+        onView={setView}
+      />
+      <div className="studio-toolbar-actions">
+        <time
+          className="studio-toolbar-date"
+          dateTime={new Date().toISOString().slice(0, 10)}
         >
-          <Bell size={19} className="text-slate-700" />
-          {unreadCount > 0 && (
-            <span className="absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e3292f] px-1 text-[10px] font-black text-white shadow-md ring-2 ring-white">
-              {unreadCount > 99 ? "99+" : unreadCount}
-            </span>
-          )}
+          {new Date().toLocaleDateString(undefined, {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+          })}
+        </time>
+        <button
+          className="studio-icon-button"
+          aria-label={`Open notifications${unread ? `, ${unread} unread` : ""}`}
+          title="Notifications"
+          onClick={() => setView("Notifications")}
+        >
+          <Bell size={19} />
+          {unread > 0 && <span className="studio-notification-dot" />}
         </button>
+        <button
+          className="studio-icon-button"
+          aria-label={
+            resolvedTheme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          title={
+            resolvedTheme === "dark"
+              ? "Switch to light mode"
+              : "Switch to dark mode"
+          }
+          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+        >
+          {resolvedTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        </button>
+        <Menu.Root>
+          <Menu.Trigger
+            className="studio-profile-trigger"
+            aria-label={`Profile: ${userName}`}
+          >
+            <Avatar name={userName} src={currentUser?.avatar_url} size="sm" />
+            <ChevronDown size={13} />
+          </Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Positioner sideOffset={8} align="end" className="z-50">
+              <Menu.Popup className="studio-menu">
+                <div className="studio-profile-menu-label">
+                  <strong>{userName}</strong>
+                  <span>{role}</span>
+                </div>
+                <Menu.Item
+                  className="studio-menu-item"
+                  onClick={() => setAccountPanel("profile")}
+                >
+                  View profile
+                </Menu.Item>
+                <Menu.Item
+                  className="studio-menu-item"
+                  onClick={() => setAccountPanel("password")}
+                >
+                  Change password
+                </Menu.Item>
+                <Menu.Separator className="studio-menu-separator" />
+                <Menu.Item
+                  className="studio-menu-item"
+                  onClick={() => setTheme("system")}
+                >
+                  Use system appearance
+                </Menu.Item>
+              </Menu.Popup>
+            </Menu.Positioner>
+          </Menu.Portal>
+        </Menu.Root>
       </div>
     </header>
   );

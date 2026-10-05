@@ -76,6 +76,10 @@ function mapProjects(
       normalizedPriority.charAt(0).toUpperCase() + normalizedPriority.slice(1);
 
     return {
+      // Keep the authorized relations used by dashboards and project details.
+      project_members: project.project_members ?? [],
+      project_phases: project.project_phases ?? [],
+      revisions: project.revisions ?? [],
       id: project.id,
       code: project.code ?? "",
       name: project.name,
@@ -337,7 +341,7 @@ export function useWorkspace() {
         .from("projects")
         .select("*, project_phases(*), project_members(user_id), revisions(*)"),
       client.from("tasks").select("*"),
-      client.from("users").select("id,name,email,role,active").eq("active", true),
+      client.from("users").select("id,name,email,role,active,avatar_url").eq("active", true),
       client
         .from("notifications")
         .select("*")
