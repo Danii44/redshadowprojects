@@ -44,5 +44,6 @@ next-env.d.ts
 /.agents/
 /.codex/
 /outputs/
+/artifacts/
 /work/
 

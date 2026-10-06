@@ -188,16 +188,16 @@ export function DailyProgressWidget({
   return (
     <div className="space-y-6">
       {/* Daily Progress Entry Form Card */}
-      <section className="rounded-2xl border border-red-100 bg-white p-5 shadow-xs">
-        <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
-          <div className="grid h-8 w-8 place-items-center rounded-xl bg-red-50 text-primary">
+      <section className="rounded-2xl border border-red-border bg-card p-5 shadow-xs">
+        <div className="flex items-center gap-2.5 border-b border-border pb-3">
+          <div className="grid h-8 w-8 place-items-center rounded-xl bg-red-soft text-red">
             <FileText size={18} />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-base font-semibold text-foreground">
               Log Daily Progress
             </h2>
-            <p className="text-xs font-semibold text-slate-500">
+            <p className="text-xs font-semibold text-muted-foreground">
               Record today&apos;s task work, hours, progress percentage, and roadblocks.
             </p>
           </div>
@@ -207,14 +207,14 @@ export function DailyProgressWidget({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {/* Task Select */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                 Select Task *
               </label>
               <select
                 required
                 value={selectedTaskId}
                 onChange={(e) => setSelectedTaskId(e.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
               >
                 <option value="">Choose an assigned task...</option>
                 {userTasks.map((t) => (
@@ -227,13 +227,13 @@ export function DailyProgressWidget({
 
             {/* Task State */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                 Current Task State
               </label>
               <select
                 value={taskState}
                 onChange={(e) => setTaskState(e.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
               >
                 <option value="In Progress">In Progress</option>
                 <option value="In Review">Submit for Review</option>
@@ -244,7 +244,7 @@ export function DailyProgressWidget({
 
             {/* Hours Spent */}
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
                 Hours Spent Today
               </label>
               <input
@@ -254,7 +254,7 @@ export function DailyProgressWidget({
                 max="24"
                 value={hoursSpent}
                 onChange={(e) => setHoursSpent(e.target.value)}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                className="h-10 w-full rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
               />
             </div>
           </div>
@@ -262,8 +262,8 @@ export function DailyProgressWidget({
           {/* Completion Percentage Selector */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Task Completion: <span className="text-slate-900 font-semibold">{completionPct}%</span>
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Task Completion: <span className="text-foreground font-semibold">{completionPct}%</span>
               </label>
             </div>
             <div className="flex items-center gap-2">
@@ -274,7 +274,7 @@ export function DailyProgressWidget({
                 step="5"
                 value={completionPct}
                 onChange={(e) => setCompletionPct(parseInt(e.target.value))}
-                className="h-2 flex-1 rounded-lg accent-[#e3292f] bg-slate-200 cursor-pointer"
+                className="h-2 flex-1 rounded-lg accent-primary bg-border cursor-pointer"
               />
               <div className="flex gap-1">
                 {[25, 50, 75, 100].map((pct) => (
@@ -284,8 +284,8 @@ export function DailyProgressWidget({
                     onClick={() => setCompletionPct(pct)}
                     className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition cursor-pointer ${
                       completionPct === pct
-                        ? "bg-slate-900 text-white"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        ? "bg-strong text-on-strong"
+                        : "bg-muted text-secondary-foreground hover:bg-border"
                     }`}
                   >
                     {pct}%
@@ -297,7 +297,7 @@ export function DailyProgressWidget({
 
           {/* Progress Notes */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
               Work Accomplished Notes *
             </label>
             <textarea
@@ -306,27 +306,27 @@ export function DailyProgressWidget({
               placeholder="Describe work completed today, technical milestones, CAD progress..."
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-400 focus:ring-4 focus:ring-red-50"
+              className="w-full rounded-xl border border-border bg-card p-3 text-xs font-semibold text-foreground outline-none placeholder:text-muted-foreground focus:border-red focus:ring-4 focus:ring-red-border"
             />
           </div>
 
           {/* Blockers / Roadblocks */}
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+            <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5">
               Blockers or Help Needed (Optional)
             </label>
             <input
               placeholder="e.g. Waiting for STEP files from client, missing hardware specs..."
               value={blocker}
               onChange={(e) => setBlocker(e.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400 focus:border-red-400 focus:ring-4 focus:ring-red-50"
+              className="h-10 w-full rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground outline-none placeholder:text-muted-foreground focus:border-red focus:ring-4 focus:ring-red-border"
             />
           </div>
 
           <div className="flex justify-end pt-1">
             <button
               disabled={submitting || !selectedTaskId || !notes.trim()}
-              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white hover:bg-red-700 transition shadow-xs disabled:opacity-50 cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-on-strong hover:bg-red-strong transition shadow-xs disabled:opacity-50 cursor-pointer"
             >
               <Send size={14} />
               {submitting ? "Submitting..." : "Submit Progress Log"}
@@ -336,12 +336,12 @@ export function DailyProgressWidget({
       </section>
 
       {/* Progress Log History Stream */}
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <h3 className="text-sm font-semibold text-slate-900">
+      <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <h3 className="text-sm font-semibold text-foreground">
             {role === "Team Member" ? "Your Recent Daily Logs" : "Team Daily Activity Stream"}
           </h3>
-          <span className="text-xs font-semibold text-slate-400">
+          <span className="text-xs font-semibold text-muted-foreground">
             {logs.length} logged entries
           </span>
         </div>
@@ -350,18 +350,18 @@ export function DailyProgressWidget({
           {logs.map((log) => (
             <div
               key={log.id}
-              className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-2"
+              className="rounded-xl border border-border bg-subtle p-4 space-y-2"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                  <span className="grid h-6 w-6 place-items-center rounded-full bg-strong text-xs font-semibold text-on-strong">
                     {getInitials(log.author_name || "TM")}
                   </span>
                   <div>
-                    <p className="font-semibold text-slate-900 text-xs">
+                    <p className="font-semibold text-foreground text-xs">
                       {log.task_title}
                     </p>
-                    <p className="text-xs font-semibold text-slate-500">
+                    <p className="text-xs font-semibold text-muted-foreground">
                       Logged by {log.author_name} ·{" "}
                       {new Date(log.created_at).toLocaleDateString()} at{" "}
                       {new Date(log.created_at).toLocaleTimeString([], {
@@ -373,22 +373,22 @@ export function DailyProgressWidget({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="rounded-md bg-white border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700">
+                  <span className="rounded-md bg-card border border-border px-2 py-1 text-xs font-semibold text-foreground">
                     {log.hoursSpent}h logged
                   </span>
-                  <span className="rounded-md bg-red-50 border border-red-200 px-2 py-1 text-xs font-semibold text-primary">
+                  <span className="rounded-md bg-red-soft border border-red-border px-2 py-1 text-xs font-semibold text-red">
                     {log.completionPct}% Complete
                   </span>
                 </div>
               </div>
 
-              <p className="text-xs font-medium text-slate-700 leading-relaxed bg-white rounded-lg p-2.5 border border-slate-100">
+              <p className="text-xs font-medium text-foreground leading-relaxed bg-card rounded-lg p-2.5 border border-border">
                 {log.notes}
               </p>
 
               {log.blocker && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-50 border border-red-200/60 p-2 text-xs font-semibold text-red-700">
-                  <AlertTriangle size={14} className="shrink-0 text-red-600" />
+                <div className="flex items-center gap-2 rounded-lg bg-red-soft border border-red-border p-2 text-xs font-semibold text-red">
+                  <AlertTriangle size={14} className="shrink-0 text-red" />
                   <span>Blocker: {log.blocker}</span>
                 </div>
               )}
@@ -396,7 +396,7 @@ export function DailyProgressWidget({
           ))}
 
           {!logs.length && !loadingLogs && (
-            <div className="p-8 text-center text-xs font-semibold text-slate-400">
+            <div className="p-8 text-center text-xs font-semibold text-muted-foreground">
               No daily progress logs submitted yet. Log your work above!
             </div>
           )}

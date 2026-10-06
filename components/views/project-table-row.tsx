@@ -42,7 +42,7 @@ export function ProjectTableRow({
             aria-label={`Select ${project.name}`}
             checked={selected}
             onChange={() => onToggleSelect(project.id)}
-            className="rounded border-slate-300 text-primary focus:ring-red-400"
+            className="rounded border-border text-red focus:ring-red"
           />
         </td>
       )}
@@ -51,11 +51,11 @@ export function ProjectTableRow({
           onClick={() => onOpenDetail(project, "overview")}
           className="text-left group cursor-pointer"
         >
-          <span className="font-semibold text-slate-900 group-hover:text-red-600 transition text-sm">
+          <span className="font-semibold text-foreground group-hover:text-red transition text-sm">
             {project.name}
           </span>
           {project.client && (
-            <span className="text-xs text-slate-400 block font-medium">
+            <span className="text-xs text-muted-foreground block font-medium">
               {project.client}
             </span>
           )}
@@ -66,15 +66,15 @@ export function ProjectTableRow({
           {projectStatusLabel(project.status)}
         </Pill>
       </td>
-      <td className="py-3.5 px-3 font-semibold text-slate-600">{project.phase}</td>
-      <td className="py-3.5 px-3 font-semibold text-slate-900">{project.leader}</td>
+      <td className="py-3.5 px-3 font-semibold text-secondary-foreground">{project.phase}</td>
+      <td className="py-3.5 px-3 font-semibold text-foreground">{project.leader}</td>
       <td className="py-3.5 px-3">
         <TeamAvatarStack members={project.team ?? []} />
       </td>
       {canEditProject && (
         <td className="py-3.5 px-3">
           <div>
-            <span className="text-slate-900 font-semibold block">{project.due}</span>
+            <span className="text-foreground font-semibold block">{project.due}</span>
             <span className={`text-xs font-semibold ${timeLeft.tone}`}>
               {timeLeft.label}
             </span>
@@ -85,7 +85,7 @@ export function ProjectTableRow({
         <div className="flex items-center justify-end gap-1.5">
           <button
             onClick={() => onOpenDetail(project, "overview")}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition cursor-pointer"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-border hover:text-foreground transition cursor-pointer"
             title="View Project"
           >
             <Eye size={16} />
@@ -93,7 +93,7 @@ export function ProjectTableRow({
           {canEditProject && (
             <button
               onClick={() => onOpenDetail(project, "edit")}
-              className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-200 hover:text-slate-900 transition cursor-pointer"
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-border hover:text-foreground transition cursor-pointer"
               title="Edit Project & Team"
             >
               <Edit2 size={16} />

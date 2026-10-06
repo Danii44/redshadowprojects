@@ -4,16 +4,6 @@ import { PROJECT_STATUSES } from "@/lib/constants";
 import { Panel, EmptyState } from "./panel";
 import { projectCounts } from "./data";
 
-const chartColors: Record<string, string> = {
-  open: "#739bdd",
-  in_progress: "#3298ae",
-  in_review: "#d3a243",
-  revisions: "#9c83d4",
-  delivered: "#52a781",
-  closed: "#7ba795",
-  on_hold: "#c98453",
-  cancelled: "#89919c",
-};
 export function StatusOverview({ projects }: { projects: Project[] }) {
   const counts = projectCounts(projects);
   const data = PROJECT_STATUSES.map(([key, name]) => ({
@@ -46,7 +36,7 @@ export function StatusOverview({ projects }: { projects: Project[] }) {
                   {data
                     .filter((item) => item.value)
                     .map((item) => (
-                      <Cell key={item.key} fill={chartColors[item.key]} />
+                      <Cell key={item.key} className={`studio-chart-tone--${item.key}`} />
                     ))}
                 </Pie>
               </PieChart>
@@ -65,7 +55,7 @@ export function StatusOverview({ projects }: { projects: Project[] }) {
               .map((item) => (
                 <li key={item.key}>
                   <span className="flex items-center gap-2">
-                    <i style={{ background: chartColors[item.key] }} />
+                    <i className={`studio-chart-tone--${item.key}`} />
                     {item.name}
                   </span>
                   <strong>{item.value}</strong>

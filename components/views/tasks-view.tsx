@@ -394,26 +394,26 @@ export function TasksView({
     {
       label: "To Do",
       states: ["Open"],
-      color: "border-t-sky-500",
-      badge: "bg-sky-50 text-sky-700",
+      color: "border-t-blue",
+      badge: "bg-blue-soft text-blue",
     },
     {
       label: "In Progress",
       states: ["In Progress"],
-      color: "border-t-blue-500",
-      badge: "bg-blue-50 text-blue-700",
+      color: "border-t-blue",
+      badge: "bg-blue-soft text-blue",
     },
     {
       label: "In Review",
       states: ["In Review", "In Revision"],
-      color: "border-t-amber-500",
-      badge: "bg-amber-50 text-amber-700",
+      color: "border-t-amber",
+      badge: "bg-amber-soft text-amber",
     },
     {
       label: "Completed",
       states: ["Closed", "Completed", "Cancelled"],
-      color: "border-t-emerald-500",
-      badge: "bg-emerald-50 text-emerald-700",
+      color: "border-t-green",
+      badge: "bg-green-soft text-green",
     },
   ];
 
@@ -423,13 +423,13 @@ export function TasksView({
       {/* Header & Controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+          <p className="text-xs font-semibold uppercase tracking-widest text-red">
             {title === "My Tasks" ? "Your workspace" : "Task Management"}
           </p>
-          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-slate-900">
+          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-foreground">
             {title}
           </h1>
-          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
             {title === "My Tasks" ? "Your assignments, deadlines and progress in one place." : "Track assignments and keep studio work moving."}
           </p>
         </div>
@@ -439,7 +439,7 @@ export function TasksView({
           <div className="relative w-full sm:w-56 sm:flex-none">
             <Search
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               type="text"
@@ -447,7 +447,7 @@ export function TasksView({
               placeholder="Search tasks or projects…"
               value={searchQuery}
               onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+              className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
             />
           </div>
 
@@ -457,7 +457,7 @@ export function TasksView({
               aria-label="Filter tasks by person"
               value={selectedPersonId}
               onChange={(e) => setSelectedPersonId(e.target.value)}
-              className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+              className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
             >
               <option value="all">All People</option>
               {people.map((person) => (
@@ -469,14 +469,14 @@ export function TasksView({
           )}
 
           {/* View Mode Toggle */}
-          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+          <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
             <button
               aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "list"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
+                  ? "bg-strong text-on-strong"
+                  : "text-secondary-foreground hover:bg-muted"
               }`}
             >
               <List size={14} />
@@ -487,8 +487,8 @@ export function TasksView({
               onClick={() => setViewMode("board")}
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
                 viewMode === "board"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-100"
+                  ? "bg-strong text-on-strong"
+                  : "text-secondary-foreground hover:bg-muted"
               }`}
             >
               <Columns3 size={14} />
@@ -500,7 +500,7 @@ export function TasksView({
           {userCanEdit && (
             <button
               onClick={() => setCreating(true)}
-              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-on-strong shadow-xs hover:bg-red-strong transition cursor-pointer"
             >
               <Plus size={16} />
               New Task
@@ -539,12 +539,12 @@ export function TasksView({
       {viewMode === "list" ? (
         <div className={detailOnly ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"}>
           {visibleTasks.length === 0 ? (
-            <div className="col-span-full grid place-items-center rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
-              <Layers className="h-10 w-10 text-slate-300 mb-3" />
-              <h3 className="text-sm font-semibold text-slate-700">
+            <div className="col-span-full grid place-items-center rounded-2xl border border-dashed border-border bg-card p-12 text-center">
+              <Layers className="h-10 w-10 text-muted-foreground mb-3" />
+              <h3 className="text-sm font-semibold text-foreground">
                 No tasks found
               </h3>
-              <p className="mt-1 text-xs text-slate-400 max-w-sm">
+              <p className="mt-1 text-xs text-muted-foreground max-w-sm">
                 {searchQuery || urgency !== "all" || taskStatusFilter !== "all" ? "Try another search or reset the filters." : "New assignments will appear here when work is assigned to you."}
               </p>
               {(searchQuery || urgency !== "all" || taskStatusFilter !== "all") && <button className="studio-button mt-4" onClick={() => { setSearchQuery(""); setUrgency("all"); setTaskStatusFilter("all"); setPage(1); }}>Reset filters</button>}
@@ -594,10 +594,10 @@ export function TasksView({
                     updateTask(taskId, col.states[0]);
                   }
                 }}
-                className={`flex w-[min(18rem,85vw)] min-w-0 shrink-0 snap-start flex-col rounded-2xl border border-slate-200 bg-slate-50/70 p-3 border-t-2 ${col.color} min-h-[280px]`}
+                className={`flex w-[min(18rem,85vw)] min-w-0 shrink-0 snap-start flex-col rounded-2xl border border-border bg-subtle p-3 border-t-2 ${col.color} min-h-[280px]`}
               >
                 <div className="mb-3 flex items-center justify-between px-1">
-                  <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-700">
+                  <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground">
                     {col.label}
                   </h3>
                   <span
@@ -615,25 +615,25 @@ export function TasksView({
                       onDragStart={(e) =>
                         e.dataTransfer.setData("text/plain", String(task.id))
                       }
-                      className="group relative rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs hover:shadow-md transition cursor-grab active:cursor-grabbing"
+                      className="group relative rounded-xl border border-border bg-card p-3.5 shadow-2xs hover:shadow-md transition cursor-grab active:cursor-grabbing"
                     >
                       <div className="mb-1.5 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider truncate max-w-[140px]">
+                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate max-w-[140px]">
                           {task.project || "General"}
                         </span>
                         {task.due && (
-                          <span className="flex items-center gap-1 text-xs font-semibold text-slate-400">
+                          <span className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
                             <Clock size={10} />
                             {task.due}
                           </span>
                         )}
                       </div>
 
-                      <h4 className="text-base font-semibold text-slate-900 break-words">
-                        {onOpenTask ? <button type="button" className="text-left hover:text-primary" aria-label={`Open ${task.title} in ${task.project || "General work"}`} onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}
+                      <h4 className="text-base font-semibold text-foreground break-words">
+                        {onOpenTask ? <button type="button" className="text-left hover:text-red" aria-label={`Open ${task.title} in ${task.project || "General work"}`} onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}
                       </h4>
 
-                      <div className="mt-3 flex flex-col items-start gap-3 border-t border-slate-100 pt-3">
+                      <div className="mt-3 flex flex-col items-start gap-3 border-t border-border pt-3">
                         <PersonIdentity name={task.owner} />
 
                         {/* Status selector */}
@@ -644,7 +644,7 @@ export function TasksView({
                             onChange={(e) =>
                               updateTask(task.id, e.target.value)
                             }
-                            className="h-6 rounded-md border border-slate-200 bg-slate-50 px-1.5 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+                            className="h-6 rounded-md border border-border bg-subtle px-1.5 text-xs font-semibold text-foreground outline-none cursor-pointer"
                           >
                             <option value="Open">Open</option>
                             <option value="In Progress">In Progress</option>
@@ -663,7 +663,7 @@ export function TasksView({
                             type="button"
                             onClick={() => handleQuickCompleteTask(task)}
                             disabled={submitting}
-                            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-emerald-200 px-2 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-green-border px-2 py-1.5 text-xs font-semibold text-green hover:bg-green-soft disabled:opacity-50"
                           >
                             <CheckCircle2 size={12} />
                             Done
@@ -672,7 +672,7 @@ export function TasksView({
                             type="button"
                             onClick={() => startProgressLog(task)}
                             disabled={submitting}
-                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-900 px-2 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+                            className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-strong px-2 py-1.5 text-xs font-semibold text-on-strong hover:bg-strong-hover disabled:opacity-50"
                           >
                             <FileText size={12} />
                             Log Work
@@ -683,8 +683,8 @@ export function TasksView({
                   ))}
 
                   {colTasks.length === 0 && (
-                    <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 text-center">
-                      <p className="text-xs font-semibold text-slate-400">
+                    <div className="flex h-32 flex-col items-center justify-center rounded-xl border border-dashed border-border text-center">
+                      <p className="text-xs font-semibold text-muted-foreground">
                         No tasks
                       </p>
                     </div>
@@ -705,17 +705,17 @@ export function TasksView({
       {/* Create Task Modal */}
       {creating && (
         <Modal title="Create new task" onClose={() => setCreating(false)}>
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-slate-900">
+          <div className="w-full max-w-md rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-foreground">
               Create New Task
             </h2>
-            <p className="mt-1 text-xs font-medium text-slate-500">
+            <p className="mt-1 text-xs font-medium text-muted-foreground">
               Add a new task to your workspace project.
             </p>
 
             <form onSubmit={handleCreateTask} className="mt-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Task Title *
                 </label>
                 <input
@@ -726,12 +726,12 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, title: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Project *
                 </label>
                 <select
@@ -740,7 +740,7 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, projectId: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 >
                   <option value="">Select a project...</option>
                   {projects.map((p) => (
@@ -752,7 +752,7 @@ export function TasksView({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Assignee
                 </label>
                 <select
@@ -760,7 +760,7 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, assigneeId: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 >
                   <option value="">Unassigned</option>
                   {people.map((person) => (
@@ -772,7 +772,7 @@ export function TasksView({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-foreground mb-1">
                   Deadline
                 </label>
                 <input
@@ -781,7 +781,7 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, deadline: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-200 p-2.5 text-xs font-semibold text-slate-900 outline-none focus:border-red-500 focus:ring-4 focus:ring-red-50"
+                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 />
               </div>
 
@@ -789,13 +789,13 @@ export function TasksView({
                 <button
                   type="button"
                   onClick={() => setCreating(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                  className="rounded-xl border border-border px-4 py-2 text-xs font-semibold text-secondary-foreground hover:bg-muted transition cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-white shadow-md shadow-red-950/20 hover:bg-red-700 transition cursor-pointer"
+                  className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-on-strong shadow-xs hover:bg-red-strong transition cursor-pointer"
                 >
                   Create Task
                 </button>
@@ -810,20 +810,20 @@ export function TasksView({
           title="Log task progress"
           onClose={() => setLoggingProgressTask(null)}
         >
-          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="w-full max-w-lg rounded-3xl bg-card p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-red-600">
+                <p className="text-xs font-semibold uppercase tracking-wider text-red">
                   {loggingProgressTask.project}
                 </p>
-                <h2 className="mt-0.5 text-xl font-semibold text-slate-900">
+                <h2 className="mt-0.5 text-xl font-semibold text-foreground">
                   Log Progress: {loggingProgressTask.title}
                 </h2>
               </div>
               <button
                 type="button"
                 onClick={() => setLoggingProgressTask(null)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"
                 aria-label="Close progress log"
               >
                 <X size={18} />
@@ -832,7 +832,7 @@ export function TasksView({
 
             <form onSubmit={handleSubmitProgress} className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Task Status Update
                   <select
                     value={progressForm.taskState}
@@ -842,7 +842,7 @@ export function TasksView({
                         taskState: event.target.value,
                       })
                     }
-                    className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-900"
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3.5 text-xs font-semibold text-foreground"
                   >
                     <option value="In Progress">In Progress</option>
                     <option value="In Review">Submit for Review</option>
@@ -850,7 +850,7 @@ export function TasksView({
                     <option value="Completed">Completed</option>
                   </select>
                 </label>
-                <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Hours Worked Today
                   <input
                     type="number"
@@ -864,12 +864,12 @@ export function TasksView({
                         hoursSpent: event.target.value,
                       })
                     }
-                    className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border px-3.5 text-xs font-semibold text-foreground"
                   />
                 </label>
               </div>
 
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Completion: {progressForm.completionPct}%
                 <input
                   type="range"
@@ -883,11 +883,11 @@ export function TasksView({
                       completionPct: Number.parseInt(event.target.value, 10),
                     })
                   }
-                  className="mt-2 h-2 w-full accent-[#e3292f]"
+                  className="mt-2 h-2 w-full accent-primary"
                 />
               </label>
 
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Work Accomplished Notes *
                 <textarea
                   required
@@ -899,11 +899,11 @@ export function TasksView({
                       notes: event.target.value,
                     })
                   }
-                  className="mt-1.5 w-full rounded-xl border border-slate-200 p-3 text-xs font-semibold text-slate-900"
+                  className="mt-1.5 w-full rounded-xl border border-border p-3 text-xs font-semibold text-foreground"
                 />
               </label>
 
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Blockers / Help Needed (Optional)
                 <input
                   value={progressForm.blocker}
@@ -913,21 +913,21 @@ export function TasksView({
                       blocker: event.target.value,
                     })
                   }
-                  className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3.5 text-xs font-semibold text-slate-900"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border px-3.5 text-xs font-semibold text-foreground"
                 />
               </label>
 
-              <div className="flex justify-end gap-3 border-t border-slate-100 pt-3">
+              <div className="flex justify-end gap-3 border-t border-border pt-3">
                 <button
                   type="button"
                   onClick={() => setLoggingProgressTask(null)}
-                  className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold text-slate-700"
+                  className="h-10 rounded-xl border border-border px-4 text-xs font-semibold text-foreground"
                 >
                   Cancel
                 </button>
                 <button
                   disabled={submitting || !progressForm.notes.trim()}
-                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-xs font-semibold text-on-strong disabled:opacity-50"
                 >
                   <Send size={14} />
                   {submitting ? "Saving..." : "Save Progress Log"}

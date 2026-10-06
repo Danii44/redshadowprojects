@@ -62,21 +62,21 @@ export function projectStatusHighlight(status?: string | null): string {
   const normalized = normalizeProjectStatus(status);
   switch (normalized) {
     case "open":
-      return "border-sky-200 bg-sky-50 text-sky-800";
+      return "border-blue-border bg-blue-soft text-blue";
     case "in_progress":
-      return "border-blue-200 bg-blue-50 text-blue-800";
+      return "border-blue-border bg-blue-soft text-blue";
     case "in_review":
-      return "border-amber-200 bg-amber-50 text-amber-800";
+      return "border-amber-border bg-amber-soft text-amber";
     case "revisions":
-      return "border-violet-200 bg-violet-50 text-violet-800";
+      return "border-purple-border bg-purple-soft text-purple";
     case "on_hold":
-      return "border-orange-200 bg-orange-50 text-orange-800";
+      return "border-orange-border bg-orange-soft text-orange";
     case "delivered":
-      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+      return "border-green-border bg-green-soft text-green";
     case "closed":
-      return "border-slate-300 bg-slate-100 text-slate-800";
+      return "border-border bg-muted text-foreground";
     default:
-      return "border-red-200 bg-red-50 text-red-800";
+      return "border-red-border bg-red-soft text-red";
   }
 }
 
@@ -95,10 +95,10 @@ export function calculateTimeLeft(
   if (projectType === "hourly_ongoing") {
     return {
       label: "Hourly / Retainer",
-      tone: "text-blue-700 font-bold",
-      bgClass: "bg-blue-50/30 hover:bg-blue-50/60",
-      borderClass: "border-l-4 border-l-blue-400",
-      badgeClass: "bg-blue-50 text-blue-800 border border-blue-200 font-bold",
+      tone: "text-blue font-bold",
+      bgClass: "bg-blue-soft hover:bg-blue-soft",
+      borderClass: "border-l-4 border-l-blue",
+      badgeClass: "bg-blue-soft text-blue border border-blue-border font-bold",
       urgencyLevel: "none",
     };
   }
@@ -106,10 +106,10 @@ export function calculateTimeLeft(
   if (!deadline) {
     return {
       label: "No deadline",
-      tone: "text-slate-400 font-medium",
+      tone: "text-muted-foreground font-medium",
       bgClass: "bg-transparent",
       borderClass: "border-l-4 border-l-transparent",
-      badgeClass: "bg-slate-100 text-slate-600 border border-slate-200 font-medium",
+      badgeClass: "bg-muted text-secondary border border-border font-medium",
       urgencyLevel: "none",
     };
   }
@@ -122,10 +122,10 @@ export function calculateTimeLeft(
     const days = Math.abs(diffDays);
     return {
       label: `${days}d overdue`,
-      tone: "text-amber-900 font-bold",
-      bgClass: "bg-amber-50/90 hover:bg-amber-100/80",
-      borderClass: "border-l-4 border-l-amber-500",
-      badgeClass: "bg-amber-100/90 text-amber-900 border border-amber-300 font-bold",
+      tone: "text-amber font-bold",
+      bgClass: "bg-amber-soft hover:bg-amber-soft",
+      borderClass: "border-l-4 border-l-amber",
+      badgeClass: "bg-amber-soft text-amber border border-amber-border font-bold",
       urgencyLevel: "overdue",
     };
   }
@@ -133,10 +133,10 @@ export function calculateTimeLeft(
   if (diffDays === 0) {
     return {
       label: "Due today",
-      tone: "text-red-900 font-bold",
-      bgClass: "bg-red-50/90 hover:bg-red-100/80",
-      borderClass: "border-l-4 border-l-red-500",
-      badgeClass: "bg-red-100/90 text-red-900 border border-red-300 font-bold",
+      tone: "text-red font-bold",
+      bgClass: "bg-red-soft hover:bg-red-soft",
+      borderClass: "border-l-4 border-l-red",
+      badgeClass: "bg-red-soft text-red border border-red-border font-bold",
       urgencyLevel: "today",
     };
   }
@@ -144,20 +144,20 @@ export function calculateTimeLeft(
   if (diffDays <= 3) {
     return {
       label: `${diffDays}d left`,
-      tone: "text-orange-900 font-bold",
-      bgClass: "bg-orange-50/50 hover:bg-orange-100/50",
-      borderClass: "border-l-4 border-l-orange-400",
-      badgeClass: "bg-orange-100/80 text-orange-900 border border-orange-200 font-bold",
+      tone: "text-orange font-bold",
+      bgClass: "bg-orange-soft hover:bg-orange-soft",
+      borderClass: "border-l-4 border-l-orange",
+      badgeClass: "bg-orange-soft text-orange border border-orange-border font-bold",
       urgencyLevel: "soon",
     };
   }
 
   return {
     label: `${diffDays}d left`,
-    tone: "text-slate-600 font-semibold",
-    bgClass: "bg-white hover:bg-slate-50/80",
+    tone: "text-secondary font-semibold",
+    bgClass: "bg-card hover:bg-subtle",
     borderClass: "border-l-4 border-l-transparent",
-    badgeClass: "bg-slate-100 text-slate-700 border border-slate-200 font-semibold",
+    badgeClass: "bg-muted text-foreground border border-border font-semibold",
     urgencyLevel: "normal",
   };
 }
@@ -167,13 +167,13 @@ export function deadlineTone(
   value?: string | null,
   projectType?: string | null,
 ): string {
-  if (projectType === "hourly_ongoing") return "text-blue-600 font-semibold";
-  if (!value) return "text-slate-500";
+  if (projectType === "hourly_ongoing") return "text-blue font-semibold";
+  if (!value) return "text-muted-foreground";
   const hours = (new Date(value).getTime() - Date.now()) / 3600000;
-  if (hours < 0) return "text-red-600 font-semibold";
-  if (hours <= 24) return "text-red-600 font-semibold";
-  if (hours <= 48) return "text-amber-600 font-semibold";
-  return "text-slate-500";
+  if (hours < 0) return "text-red font-semibold";
+  if (hours <= 24) return "text-red font-semibold";
+  if (hours <= 48) return "text-amber font-semibold";
+  return "text-muted-foreground";
 }
 
 /** Parse any role value into the canonical Role type */

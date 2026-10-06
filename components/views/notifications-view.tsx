@@ -129,16 +129,16 @@ export function NotificationsView({
 
   const severityIcon = (severity: string) => {
     if (severity === "critical")
-      return <CircleAlert size={18} className="text-red-500 shrink-0" />;
+      return <CircleAlert size={18} className="text-red shrink-0" />;
     if (severity === "warning")
-      return <TriangleAlert size={18} className="text-amber-500 shrink-0" />;
-    return <Info size={18} className="text-blue-500 shrink-0" />;
+      return <TriangleAlert size={18} className="text-amber shrink-0" />;
+    return <Info size={18} className="text-blue shrink-0" />;
   };
 
   const severityBorder = (severity: string) => {
-    if (severity === "critical") return "border-l-red-400";
-    if (severity === "warning") return "border-l-amber-400";
-    return "border-l-blue-400";
+    if (severity === "critical") return "border-l-red";
+    if (severity === "warning") return "border-l-amber";
+    return "border-l-blue";
   };
 
   return (
@@ -146,25 +146,25 @@ export function NotificationsView({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-            <Bell size={26} className="text-primary" />
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+            <Bell size={26} className="text-red" />
             Notifications
           </h1>
-          <p className="mt-1 text-xs font-semibold text-slate-500">
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
             Your project alerts, task assignments, and required actions.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
           {unread.length > 0 && (
-            <span className="rounded-full bg-red-50 border border-red-200 px-3 py-1 text-xs font-semibold text-red-700">
+            <span className="rounded-full bg-red-soft border border-red-border px-3 py-1 text-xs font-semibold text-red">
               {unread.length} unread
             </span>
           )}
           {unread.length > 0 && (
             <button
               onClick={markAllRead}
-              className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-xs cursor-pointer"
+              className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-subtle transition shadow-xs cursor-pointer"
             >
               <CheckCheck size={15} />
               Mark All Read
@@ -175,14 +175,14 @@ export function NotificationsView({
 
       {/* Desktop notification permission — not yet decided */}
       {permBanner === "pending" && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-blue-border bg-blue-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <BellRing size={20} className="text-blue-600 shrink-0" />
+            <BellRing size={20} className="text-blue shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-blue-900">
+              <p className="text-sm font-semibold text-blue">
                 Enable desktop notifications
               </p>
-              <p className="text-xs font-semibold text-blue-600">
+              <p className="text-xs font-semibold text-blue">
                 Get Windows alerts for tasks, deadlines, and project updates —
                 even when you&apos;re in another tab.
               </p>
@@ -193,14 +193,14 @@ export function NotificationsView({
               type="button"
               disabled={requesting}
               onClick={handleAllowDesktopNotifs}
-              className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white hover:bg-blue-700 transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
+              className="rounded-xl bg-blue-strong px-4 py-2 text-xs font-semibold text-on-strong hover:bg-blue-strong transition cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
               {requesting ? "Waiting for browser…" : "Allow"}
             </button>
             <button
               type="button"
               onClick={() => setPermBanner("hidden")}
-              className="rounded-lg p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-100 transition cursor-pointer"
+              className="rounded-lg p-1.5 text-blue hover:text-blue hover:bg-blue-soft transition cursor-pointer"
               aria-label="Dismiss"
             >
               <X size={14} />
@@ -211,14 +211,14 @@ export function NotificationsView({
 
       {/* Previously blocked — tell user how to re-enable */}
       {permBanner === "denied" && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-border bg-amber-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <TriangleAlert size={20} className="text-amber-600 shrink-0" />
+            <TriangleAlert size={20} className="text-amber shrink-0" />
             <div>
-              <p className="text-sm font-semibold text-amber-900">
+              <p className="text-sm font-semibold text-amber">
                 Desktop notifications are blocked
               </p>
-              <p className="text-xs font-semibold text-amber-700">
+              <p className="text-xs font-semibold text-amber">
                 In Chrome/Edge: click the lock icon left of the URL → Site
                 settings → Notifications → Allow. Then refresh this page.
               </p>
@@ -227,7 +227,7 @@ export function NotificationsView({
           <button
             type="button"
             onClick={() => setPermBanner("hidden")}
-            className="rounded-lg p-1.5 text-amber-500 hover:text-amber-700 hover:bg-amber-100 transition cursor-pointer self-end sm:self-auto"
+            className="rounded-lg p-1.5 text-amber hover:text-amber hover:bg-amber-soft transition cursor-pointer self-end sm:self-auto"
             aria-label="Dismiss"
           >
             <X size={14} />
@@ -237,10 +237,10 @@ export function NotificationsView({
 
       {/* Unsupported / non-HTTPS */}
       {permBanner === "unsupported" && (
-        <div className="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-border bg-subtle px-5 py-4">
           <div className="flex items-center gap-3">
-            <Info size={20} className="text-slate-500 shrink-0" />
-            <p className="text-xs font-semibold text-slate-600">
+            <Info size={20} className="text-muted-foreground shrink-0" />
+            <p className="text-xs font-semibold text-secondary-foreground">
               Desktop notifications need a modern browser over HTTPS (or
               localhost).
             </p>
@@ -248,7 +248,7 @@ export function NotificationsView({
           <button
             type="button"
             onClick={() => setPermBanner("hidden")}
-            className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+            className="rounded-lg p-1.5 text-muted-foreground hover:text-secondary-foreground transition cursor-pointer"
             aria-label="Dismiss"
           >
             <X size={14} />
@@ -261,25 +261,25 @@ export function NotificationsView({
         {notifications.map((item) => (
           <div
             key={item.id}
-            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-white p-5 transition ${
+            className={`flex items-start gap-4 rounded-2xl border border-l-4 bg-card p-5 transition ${
               severityBorder(item.severity)
             } ${
               item.read_at
-                ? "border-slate-200 bg-slate-50/50"
-                : "border-slate-200 shadow-xs"
+                ? "border-border bg-subtle"
+                : "border-border shadow-xs"
             }`}
           >
             <div className="mt-0.5">{severityIcon(item.severity)}</div>
 
             <div className="flex-1 min-w-0">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between sm:gap-3">
-                <p className="font-semibold text-slate-900 text-sm leading-snug">
+                <p className="font-semibold text-foreground text-sm leading-snug">
                   {item.title}
                   {!item.read_at && (
                     <span className="ml-2 inline-block h-1.5 w-1.5 rounded-full bg-primary align-middle" />
                   )}
                 </p>
-                <span className="shrink-0 text-xs font-semibold text-slate-400 whitespace-nowrap">
+                <span className="shrink-0 text-xs font-semibold text-muted-foreground whitespace-nowrap">
                   {new Date(item.created_at).toLocaleDateString()} ·{" "}
                   {new Date(item.created_at).toLocaleTimeString([], {
                     hour: "2-digit",
@@ -289,15 +289,15 @@ export function NotificationsView({
               </div>
 
               {item.body && (
-                <p className="mt-1 text-sm text-slate-500 leading-relaxed">
+                <p className="mt-1 text-sm text-muted-foreground leading-relaxed">
                   {item.body}
                 </p>
               )}
 
               {item.actor?.name && (
                 <div className="mt-2 flex items-center gap-1.5">
-                  <User size={11} className="text-slate-400" />
-                  <span className="text-xs font-semibold text-slate-400">
+                  <User size={11} className="text-muted-foreground" />
+                  <span className="text-xs font-semibold text-muted-foreground">
                     by {item.actor.name}
                   </span>
                 </div>
@@ -307,7 +307,7 @@ export function NotificationsView({
             {!item.read_at && (
               <button
                 onClick={() => markRead(item.id)}
-                className="shrink-0 self-start rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition cursor-pointer"
+                className="shrink-0 self-start rounded-lg border border-border px-3 py-1.5 text-xs font-semibold text-secondary-foreground hover:bg-subtle transition cursor-pointer"
               >
                 Mark read
               </button>
@@ -316,10 +316,10 @@ export function NotificationsView({
         ))}
 
         {!notifications.length && (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-14 text-center">
-            <Bell size={32} className="mx-auto text-slate-300 mb-3" />
-            <h3 className="font-semibold text-slate-800 text-base">All caught up!</h3>
-            <p className="mt-1 text-xs font-semibold text-slate-400">
+          <div className="rounded-2xl border border-dashed border-border bg-card p-14 text-center">
+            <Bell size={32} className="mx-auto text-muted-foreground mb-3" />
+            <h3 className="font-semibold text-foreground text-base">All caught up!</h3>
+            <p className="mt-1 text-xs font-semibold text-muted-foreground">
               No notifications yet. You&apos;ll be notified about project updates,
               task assignments, and deadlines.
             </p>

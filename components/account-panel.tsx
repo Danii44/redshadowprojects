@@ -42,17 +42,17 @@ export function AccountPanel({
 
   return (
     <Modal title={panel === "profile" ? "Your profile" : "Change password"} onClose={close}>
-      <section className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <section className="w-full max-w-md rounded-2xl bg-card p-6 shadow-2xl">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold text-red-600">Account</p>
+            <p className="text-sm font-semibold text-red">Account</p>
             <h2 className="mt-1 text-2xl font-semibold">
               {panel === "profile" ? "Your profile" : "Change password"}
             </h2>
           </div>
           <button
             onClick={close}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-lg p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Close account panel"
           >
             <X size={20} />
@@ -74,7 +74,7 @@ export function AccountPanel({
                 minLength={8}
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
-                className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-red-400"
+                className="mt-2 h-11 w-full rounded-xl border border-border px-3 outline-none focus:border-red"
               />
             </label>
             <label className="block text-sm font-semibold">
@@ -85,17 +85,17 @@ export function AccountPanel({
                 minLength={8}
                 value={confirmation}
                 onChange={(event) => setConfirmation(event.target.value)}
-                className="mt-2 h-11 w-full rounded-xl border border-slate-200 px-3 outline-none focus:border-red-400"
+                className="mt-2 h-11 w-full rounded-xl border border-border px-3 outline-none focus:border-red"
               />
             </label>
             {error && (
-              <p className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">
+              <p className="rounded-xl bg-red-soft p-3 text-sm font-semibold text-red">
                 {error}
               </p>
             )}
             <button
               disabled={busy}
-              className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-white disabled:opacity-60"
+              className="h-11 w-full rounded-xl bg-primary text-sm font-semibold text-on-strong disabled:opacity-60"
             >
               {busy ? "Updating..." : "Update password"}
             </button>
@@ -108,11 +108,11 @@ export function AccountPanel({
 
 export function AccountField({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <div className="rounded-xl border border-border bg-subtle p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
-      <p className="mt-1 font-semibold text-slate-800">{value}</p>
+      <p className="mt-1 font-semibold text-foreground">{value}</p>
     </div>
   );
 }

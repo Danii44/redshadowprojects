@@ -41,10 +41,10 @@ function getDeadlineInfo(due_at?: string | null): {
     return {
       label: "No deadline",
       sublabel: "",
-      bgClass: "bg-slate-50",
-      textClass: "text-slate-400",
-      borderClass: "border-t-slate-200",
-      icon: <Clock size={12} className="text-slate-400" />,
+      bgClass: "bg-subtle",
+      textClass: "text-muted-foreground",
+      borderClass: "border-t-border",
+      icon: <Clock size={12} className="text-muted-foreground" />,
       pulse: false,
     };
   }
@@ -70,10 +70,10 @@ function getDeadlineInfo(due_at?: string | null): {
     return {
       label: days === 0 ? "Overdue today" : `${days}d overdue`,
       sublabel: dateStr,
-      bgClass: "bg-red-50",
-      textClass: "text-red-700",
-      borderClass: "border-t-red-500",
-      icon: <AlertCircle size={12} className="text-red-500" />,
+      bgClass: "bg-red-soft",
+      textClass: "text-red",
+      borderClass: "border-t-red",
+      icon: <AlertCircle size={12} className="text-red" />,
       pulse: true,
     };
   }
@@ -82,10 +82,10 @@ function getDeadlineInfo(due_at?: string | null): {
     return {
       label: "Due today",
       sublabel: timeStr,
-      bgClass: "bg-red-50",
-      textClass: "text-red-700",
-      borderClass: "border-t-red-400",
-      icon: <AlertCircle size={12} className="text-red-500" />,
+      bgClass: "bg-red-soft",
+      textClass: "text-red",
+      borderClass: "border-t-red",
+      icon: <AlertCircle size={12} className="text-red" />,
       pulse: true,
     };
   }
@@ -94,10 +94,10 @@ function getDeadlineInfo(due_at?: string | null): {
     return {
       label: `${diffDays}d left`,
       sublabel: dateStr,
-      bgClass: "bg-orange-50",
-      textClass: "text-orange-700",
-      borderClass: "border-t-orange-400",
-      icon: <Clock size={12} className="text-orange-500" />,
+      bgClass: "bg-orange-soft",
+      textClass: "text-orange",
+      borderClass: "border-t-orange",
+      icon: <Clock size={12} className="text-orange" />,
       pulse: false,
     };
   }
@@ -106,10 +106,10 @@ function getDeadlineInfo(due_at?: string | null): {
     return {
       label: `${diffDays}d left`,
       sublabel: dateStr,
-      bgClass: "bg-amber-50",
-      textClass: "text-amber-700",
-      borderClass: "border-t-amber-400",
-      icon: <Clock size={12} className="text-amber-500" />,
+      bgClass: "bg-amber-soft",
+      textClass: "text-amber",
+      borderClass: "border-t-amber",
+      icon: <Clock size={12} className="text-amber" />,
       pulse: false,
     };
   }
@@ -117,10 +117,10 @@ function getDeadlineInfo(due_at?: string | null): {
   return {
     label: `${diffDays}d left`,
     sublabel: dateStr,
-    bgClass: "bg-emerald-50",
-    textClass: "text-emerald-700",
-    borderClass: "border-t-emerald-400",
-    icon: <CheckCircle size={12} className="text-emerald-500" />,
+    bgClass: "bg-green-soft",
+    textClass: "text-green",
+    borderClass: "border-t-green",
+    icon: <CheckCircle size={12} className="text-green" />,
     pulse: false,
   };
 }
@@ -144,26 +144,26 @@ export function TaskCard({
     ? {
         label: t.state === "Cancelled" ? "Cancelled" : "Completed",
         sublabel: "",
-        bgClass: "bg-slate-50",
-        textClass: "text-slate-600",
-        borderClass: "border-t-slate-200",
-        icon: <CheckCircle size={12} className="text-slate-500" />,
+        bgClass: "bg-subtle",
+        textClass: "text-secondary-foreground",
+        borderClass: "border-t-border",
+        icon: <CheckCircle size={12} className="text-muted-foreground" />,
         pulse: false,
       }
     : getDeadlineInfo(t.due_at);
 
   const priorityStyles =
     t.priority === "critical"
-      ? "bg-red-50 text-red-700 border border-red-200"
+      ? "bg-red-soft text-red border border-red-border"
       : t.priority === "high"
-        ? "bg-amber-50 text-amber-700 border border-amber-200"
-        : "bg-slate-100 text-slate-500";
+        ? "bg-amber-soft text-amber border border-amber-border"
+        : "bg-muted text-muted-foreground";
 
   return (
     <div
       draggable={editable}
       onDragStart={onDragStart}
-      className={`w-full rounded-2xl border border-slate-200 bg-white overflow-hidden shadow-xs transition hover:shadow-md ${
+      className={`w-full rounded-2xl border border-border bg-card overflow-hidden shadow-xs transition hover:shadow-md ${
         editable ? "cursor-grab active:cursor-grabbing" : ""
       }`}
     >
@@ -174,7 +174,7 @@ export function TaskCard({
         } ${dl.borderClass}`}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/70 shadow-sm">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-card shadow-sm">
             {dl.icon}
           </span>
           <div className="min-w-0">
@@ -204,8 +204,8 @@ export function TaskCard({
       <div className="px-4 pt-3 pb-4">
         {/* Title + Priority */}
         <div className="flex items-start justify-between gap-2">
-          <p className="text-base font-semibold leading-snug text-slate-900 break-words">
-            {onOpen ? <button type="button" onClick={onOpen} className="text-left hover:text-primary" aria-label={`Open ${t.title} in ${t.project || "General work"}`}>{t.title}</button> : t.title}
+          <p className="text-base font-semibold leading-snug text-foreground break-words">
+            {onOpen ? <button type="button" onClick={onOpen} className="text-left hover:text-red" aria-label={`Open ${t.title} in ${t.project || "General work"}`}>{t.title}</button> : t.title}
           </p>
           <span
             className={`shrink-0 rounded-lg px-2 py-0.5 text-xs font-semibold uppercase tracking-tight ${priorityStyles}`}
@@ -215,7 +215,7 @@ export function TaskCard({
         </div>
 
         {/* Project name */}
-        <p className="mt-1.5 text-xs font-medium text-slate-500 break-words">
+        <p className="mt-1.5 text-xs font-medium text-muted-foreground break-words">
           {t.project || "General"}
         </p>
 
@@ -228,12 +228,12 @@ export function TaskCard({
         </div>
 
         {canLogWork && (
-          <div className="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
+          <div className="mt-3 flex items-center gap-2 border-t border-border pt-3">
             <button
               type="button"
               onClick={onDone}
               disabled={workSubmitting}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-200 px-2.5 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-green-border px-2.5 py-2 text-xs font-semibold text-green transition hover:bg-green-soft disabled:opacity-50"
             >
               <CheckCircle2 size={14} />
               Done
@@ -242,7 +242,7 @@ export function TaskCard({
               type="button"
               onClick={onLogWork}
               disabled={workSubmitting}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-slate-900 px-2.5 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-50"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-strong px-2.5 py-2 text-xs font-semibold text-on-strong transition hover:bg-strong-hover disabled:opacity-50"
             >
               <FileText size={14} />
               Log Work
@@ -252,13 +252,13 @@ export function TaskCard({
 
         {/* Admin controls */}
         {(editable || statusEditable) && (
-          <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+          <div className="mt-3 space-y-2 border-t border-border pt-3">
             {editable && (
               <select
                 aria-label={`Assign ${t.title}`}
                 value={t.assignee_id ?? ""}
                 onChange={(e) => assignTask(String(t.id), e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
+                className="w-full rounded-xl border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground bg-subtle hover:border-border cursor-pointer"
               >
                 <option value="">Unassigned</option>
                 {people.map((person) => (
@@ -273,7 +273,7 @@ export function TaskCard({
                 aria-label={`Status for ${t.title}`}
                 value={t.state}
                 onChange={(e) => updateTask(t.id, e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-800 bg-slate-50 hover:border-slate-300 cursor-pointer"
+                className="w-full rounded-xl border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground bg-subtle hover:border-border cursor-pointer"
               >
                 {[
                   "Open",
@@ -291,7 +291,7 @@ export function TaskCard({
             {editable && (
               <button
                 onClick={() => deleteTask(t)}
-                className="w-full rounded-xl border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition cursor-pointer"
+                className="w-full rounded-xl border border-red-border px-2.5 py-1.5 text-xs font-semibold text-red hover:bg-red-soft transition cursor-pointer"
               >
                 Delete task
               </button>

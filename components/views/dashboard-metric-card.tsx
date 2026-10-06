@@ -9,15 +9,15 @@ export function DashboardMetricCard({
   label,
   value,
   subtitle,
-  valueClassName = "text-slate-900",
+  valueClassName = "text-foreground",
 }: DashboardMetricCardProps) {
   return (
-    <div className="metric-card rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs  transition">
-      <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">
+    <div className="metric-card rounded-2xl border border-border bg-card p-4 shadow-2xs  transition">
+      <p className="text-xs font-semibold uppercase tracking-wider text-secondary-foreground">
         {label}
       </p>
       <p className={`mt-2 text-3xl font-semibold ${valueClassName}`}>{value}</p>
-      <p className="mt-1 text-xs font-semibold text-slate-600">{subtitle}</p>
+      <p className="mt-1 text-xs font-semibold text-secondary-foreground">{subtitle}</p>
     </div>
   );
 }

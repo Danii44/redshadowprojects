@@ -8,13 +8,13 @@ export function TeamAvatarStack({ members }: TeamAvatarStackProps) {
       {members.slice(0, 3).map((initials, idx) => (
         <span
           key={`${initials}-${idx}`}
-          className="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[8.5px] font-semibold text-white ring-2 ring-white"
+          className="grid h-6 w-6 place-items-center rounded-full bg-strong text-[8.5px] font-semibold text-on-strong ring-2 ring-card"
         >
           {initials}
         </span>
       ))}
       {(members.length ?? 0) > 3 && (
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-slate-200 text-[8.5px] font-semibold text-slate-700 ring-2 ring-white">
+        <span className="grid h-6 w-6 place-items-center rounded-full bg-border text-[8.5px] font-semibold text-foreground ring-2 ring-card">
           +{(members.length ?? 0) - 3}
         </span>
       )}

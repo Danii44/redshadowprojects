@@ -1,0 +1,172 @@
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-padding-top: 6rem;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+}
+
+button, a, input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 180ms var(--ease-out);
+}
+
+button:active:not(:disabled) {
+  transform: scale(0.98);
+  transition-duration: 80ms;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:is(button, a, input, select, textarea):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+
+input:not([type="checkbox"]):not([type="range"]), select, textarea {
+  transition: border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+input[type="checkbox"], input[type="range"] {
+  accent-color: var(--primary);
+}
+
+textarea {
+  resize: vertical;
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--studio-muted);
+  opacity: 1;
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+  letter-spacing: -0.025em;
+}
+
+h1 {
+  line-height: 1.15;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+table {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--studio-red-bg);
+  color: var(--studio-red);
+}
+
+@keyframes view-appear {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes drawer-appear {
+  from {
+    opacity: 0;
+    transform: translateX(2rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  button:active:not(:disabled) {
+    transform: none;
+  }
+  .studio-menu {
+    transition: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .workspace-sidebar {
+    background: var(--sidebar);
+    backdrop-filter: none;
+  }
+
+  .workspace-toolbar {
+    background: var(--background);
+    backdrop-filter: none;
+  }
+
+  .workspace-dialog::backdrop {
+    backdrop-filter: none;
+    background: var(--studio-scrim);
+  }
+}
+
+@media (prefers-contrast: more) {
+  :root {
+    --studio-border: var(--studio-secondary);
+    --studio-muted: var(--studio-text);
+  }
+
+  .workspace-sidebar, .workspace-toolbar {
+    backdrop-filter: none;
+    background: var(--background);
+  }
+
+  button {
+    border-color: currentColor;
+  }
+}

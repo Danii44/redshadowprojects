@@ -178,22 +178,22 @@ export function RevisionsView({
     <div className="space-y-6">
       {/* Title Header */}
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground">
           Revisions & Reviews
         </h1>
-        <p className="mt-1 text-sm font-semibold text-slate-500">
+        <p className="mt-1 text-sm font-semibold text-muted-foreground">
           Review submitted project revisions and task review requests requiring feedback.
         </p>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+      <div className="flex items-center gap-2 border-b border-border pb-3">
         <button
           onClick={() => setActiveTab("all")}
           className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
             activeTab === "all"
-              ? "bg-primary text-white shadow-xs"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              ? "bg-primary text-on-strong shadow-xs"
+              : "bg-card text-secondary-foreground hover:bg-muted border border-border"
           }`}
         >
           All Items ({projectRevisions.length + taskRevisions.length})
@@ -203,8 +203,8 @@ export function RevisionsView({
           onClick={() => setActiveTab("projects")}
           className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
             activeTab === "projects"
-              ? "bg-primary text-white shadow-xs"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              ? "bg-primary text-on-strong shadow-xs"
+              : "bg-card text-secondary-foreground hover:bg-muted border border-border"
           }`}
         >
           Project Revisions ({projectRevisions.length})
@@ -214,8 +214,8 @@ export function RevisionsView({
           onClick={() => setActiveTab("tasks")}
           className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition cursor-pointer ${
             activeTab === "tasks"
-              ? "bg-primary text-white shadow-xs"
-              : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"
+              ? "bg-primary text-on-strong shadow-xs"
+              : "bg-card text-secondary-foreground hover:bg-muted border border-border"
           }`}
         >
           Task Reviews ({taskRevisions.length})
@@ -229,12 +229,12 @@ export function RevisionsView({
           projectRevisions.map((rev) => (
             <div
               key={`proj-rev-${rev.id}`}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between"
+              className="rounded-2xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-                    <FileClock size={15} className="text-violet-500" />
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <FileClock size={15} className="text-purple" />
                     Project Revision
                   </span>
                   <Pill color={projectStatusColor(rev.status)}>
@@ -242,26 +242,26 @@ export function RevisionsView({
                   </Pill>
                 </div>
 
-                <h3 className="mt-3 text-lg font-semibold text-slate-900">
+                <h3 className="mt-3 text-lg font-semibold text-foreground">
                   {rev.projectName}
                 </h3>
-                <p className="mt-1 text-xs font-semibold text-slate-500">
+                <p className="mt-1 text-xs font-semibold text-muted-foreground">
                   Phase: {rev.projectPhase} · Submitted{" "}
                   {rev.submitted_at
                     ? new Date(rev.submitted_at).toLocaleDateString()
                     : "Recently"}
                 </p>
 
-                <div className="my-4 rounded-xl bg-slate-50 p-3.5 border border-slate-100 text-xs text-slate-700 leading-relaxed font-medium">
+                <div className="my-4 rounded-xl bg-subtle p-3.5 border border-border text-xs text-foreground leading-relaxed font-medium">
                   {rev.notes || "No revision notes provided for this submission."}
                 </div>
               </div>
 
               {role !== "Team Member" && (
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 pt-2 border-t border-border">
                   <button
                     onClick={() => updateProjectRevision(rev, "approved")}
-                    className="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white hover:bg-slate-800 transition text-center shadow-xs cursor-pointer"
+                    className="flex-1 rounded-xl bg-strong px-4 py-2.5 text-xs font-semibold text-on-strong hover:bg-strong-hover transition text-center shadow-xs cursor-pointer"
                   >
                     Approve Revision
                   </button>
@@ -269,7 +269,7 @@ export function RevisionsView({
                     onClick={() =>
                       updateProjectRevision(rev, "changes_requested")
                     }
-                    className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-center cursor-pointer"
+                    className="flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-subtle transition text-center cursor-pointer"
                   >
                     Request Changes
                   </button>
@@ -283,12 +283,12 @@ export function RevisionsView({
           taskRevisions.map((t) => (
             <div
               key={`task-rev-${t.id}`}
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between"
+              className="rounded-2xl border border-border bg-card p-5 shadow-xs flex flex-col justify-between"
             >
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-                    <RefreshCw size={15} className="text-amber-500" />
+                  <span className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <RefreshCw size={15} className="text-amber" />
                     Task Review · {t.project}
                   </span>
                   <Pill
@@ -304,36 +304,36 @@ export function RevisionsView({
                   </Pill>
                 </div>
 
-                <h3 className="mt-3 text-lg font-semibold text-slate-900">
+                <h3 className="mt-3 text-lg font-semibold text-foreground">
                   {t.title}
                 </h3>
                 <div className="mt-3"><PersonIdentity name={t.owner} /></div>
-                <p className="mt-2 text-sm font-semibold text-slate-500">
+                <p className="mt-2 text-sm font-semibold text-muted-foreground">
                   Priority:{" "}
-                  <span className="font-semibold capitalize text-slate-800">
+                  <span className="font-semibold capitalize text-foreground">
                     {t.priority}
                   </span>
                 </p>
 
-                <div className="my-4 rounded-xl bg-slate-50 p-3.5 border border-slate-100 text-xs text-slate-700 leading-relaxed font-medium flex items-center justify-between">
+                <div className="my-4 rounded-xl bg-subtle p-3.5 border border-border text-xs text-foreground leading-relaxed font-medium flex items-center justify-between">
                   <span>Target Due: {t.due}</span>
-                  <span className="font-semibold text-slate-500">
+                  <span className="font-semibold text-muted-foreground">
                     Checklist: {t.checklist}
                   </span>
                 </div>
               </div>
 
               {role !== "Team Member" && (
-                <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-2 pt-2 border-t border-border">
                   <button
                     onClick={() => updateTaskRevision(t.id, "completed")}
-                    className="flex-1 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-emerald-700 transition text-center shadow-xs cursor-pointer"
+                    className="flex-1 rounded-xl bg-green-strong px-4 py-2.5 text-xs font-semibold text-on-strong hover:bg-green-strong transition text-center shadow-xs cursor-pointer"
                   >
                     Approve & Complete
                   </button>
                   <button
                     onClick={() => updateTaskRevision(t.id, "in_progress")}
-                    className="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-center cursor-pointer"
+                    className="flex-1 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-semibold text-foreground hover:bg-subtle transition text-center cursor-pointer"
                   >
                     Request Further Work
                   </button>
@@ -344,7 +344,7 @@ export function RevisionsView({
       </div>
 
       {projectRevisions.length === 0 && taskRevisions.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center text-xs font-semibold text-slate-400">
+        <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center text-xs font-semibold text-muted-foreground">
           No project revisions or task reviews are pending at this time.
         </div>
       )}

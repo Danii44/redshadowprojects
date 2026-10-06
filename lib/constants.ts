@@ -85,13 +85,13 @@ export const VISIBLE_VIEWS_BY_ROLE: Record<Role, View[]> = {
 
 /** Pill/badge color classes keyed by color name */
 export const PILL_TONES: Record<string, string> = {
-  red: "bg-red-50 text-red-700 ring-red-200",
-  amber: "bg-amber-50 text-amber-700 ring-amber-200",
-  blue: "bg-blue-50 text-blue-700 ring-blue-200",
-  green: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-  slate: "bg-slate-100 text-slate-600 ring-slate-200",
-  purple: "bg-violet-50 text-violet-700 ring-violet-200",
-  orange: "bg-orange-50 text-orange-700 ring-orange-200",
+  red: "bg-red-soft text-red ring-red-border",
+  amber: "bg-amber-soft text-amber ring-amber-border",
+  blue: "bg-blue-soft text-blue ring-blue-border",
+  green: "bg-green-soft text-green ring-green-border",
+  slate: "bg-muted text-secondary ring-border",
+  purple: "bg-purple-soft text-purple ring-purple-border",
+  orange: "bg-orange-soft text-orange ring-orange-border",
 };
 
 // Aliases for compatibility

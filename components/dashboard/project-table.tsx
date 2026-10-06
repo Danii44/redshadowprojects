@@ -287,15 +287,11 @@ export function ProjectTable({
                     ) : (
                       <div className="studio-progress">
                         <span>{progress}%</span>
-                        <div
-                          role="progressbar"
+                        <progress
                           aria-label={`${project.name} completion`}
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={progress}
-                        >
-                          <i style={{ width: `${progress}%` }} />
-                        </div>
+                          max={100}
+                          value={progress}
+                        />
                       </div>
                     )}
                   </td>

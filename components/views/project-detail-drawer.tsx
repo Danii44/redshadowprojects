@@ -59,14 +59,14 @@ export function ProjectDetailDrawer({
 }: ProjectDetailDrawerProps) {
   return (
     <Modal title={project.name} onClose={onClose} drawer>
-      <div className="w-full max-w-xl h-full bg-white shadow-2xl flex flex-col ">
-        <div className="p-6 border-b border-slate-200 bg-slate-50/50">
+      <div className="w-full max-w-xl h-full bg-card shadow-2xl flex flex-col ">
+        <div className="p-6 border-b border-border bg-subtle">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-2xl font-semibold text-slate-900 mt-1">
+              <h2 className="text-2xl font-semibold text-foreground mt-1">
                 {project.name}
               </h2>
-              <p className="text-xs font-semibold text-slate-500 mt-1">
+              <p className="text-xs font-semibold text-muted-foreground mt-1">
                 Led by {project.leader || "Unassigned"} · {project.client || "Internal"}
               </p>
             </div>
@@ -74,20 +74,20 @@ export function ProjectDetailDrawer({
               type="button"
               onClick={onClose}
               aria-label="Close project details"
-              className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+              className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
             >
               <X size={20} />
             </button>
           </div>
 
-          <div className="mt-5 flex items-center gap-1 rounded-xl bg-slate-200/60 p-1">
+          <div className="mt-5 flex items-center gap-1 rounded-xl bg-border p-1">
             <button
               type="button"
               aria-pressed={drawerTab === "overview"}
               onClick={() => setDrawerTab("overview")}
               className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${drawerTab === "overview"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+                ? "bg-card text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <Eye size={14} />
@@ -99,8 +99,8 @@ export function ProjectDetailDrawer({
                 aria-pressed={drawerTab === "edit"}
                 onClick={() => setDrawerTab("edit")}
                 className={`flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition cursor-pointer ${drawerTab === "edit"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
                   }`}
               >
                 <Edit2 size={14} />
@@ -114,25 +114,25 @@ export function ProjectDetailDrawer({
           {drawerTab === "overview" && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-3 text-xs">
-                <div className="rounded-xl border border-slate-200 p-3.5">
-                  <p className="text-xs font-semibold uppercase text-slate-400">
+                <div className="rounded-xl border border-border p-3.5">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
                     Priority
                   </p>
                   <p className={`mt-1 font-semibold ${project.priority?.toLowerCase() === "critical"
-                    ? "text-red-600"
+                    ? "text-red"
                     : project.priority?.toLowerCase() === "high"
-                      ? "text-amber-600"
-                      : "text-slate-900"
+                      ? "text-amber"
+                      : "text-foreground"
                     }`}>
                     {project.priority || "Normal"}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 p-3.5">
-                  <p className="text-xs font-semibold uppercase text-slate-400">
+                <div className="rounded-xl border border-border p-3.5">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
                     Start Date
                   </p>
-                  <p className="mt-1 font-semibold text-slate-900">
+                  <p className="mt-1 font-semibold text-foreground">
                     {project.start_date
                       ? new Date(project.start_date).toLocaleDateString()
                       : "—"}
@@ -140,30 +140,30 @@ export function ProjectDetailDrawer({
                 </div>
 
                 {canEdit(role) && (
-                  <div className="rounded-xl border border-slate-200 p-3.5">
-                    <p className="text-xs font-semibold uppercase text-slate-400">
+                  <div className="rounded-xl border border-border p-3.5">
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
                       Deadline
                     </p>
-                    <p className="mt-1 font-semibold text-slate-900">
+                    <p className="mt-1 font-semibold text-foreground">
                       {project.due || "No deadline"}
                     </p>
                   </div>
                 )}
 
-                <div className="rounded-xl border border-slate-200 p-3.5">
-                  <p className="text-xs font-semibold uppercase text-slate-400">
+                <div className="rounded-xl border border-border p-3.5">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
                     Project Leader
                   </p>
-                  <p className="mt-1 font-semibold text-slate-900">
+                  <p className="mt-1 font-semibold text-foreground">
                     {project.leader || "Unassigned"}
                   </p>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3.5 flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3.5 flex items-center justify-between">
                   <span>Assigned Team Members</span>
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     {(project.project_members?.length ?? 0)} members
                   </span>
                 </h4>
@@ -171,7 +171,7 @@ export function ProjectDetailDrawer({
                 {people.filter((person) =>
                   (project.project_members ?? []).some((m) => m.user_id === person.id) || project.leader_id === person.id,
                 ).length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+                  <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">
                     No team members assigned yet.
                   </div>
                 ) : (
@@ -185,16 +185,16 @@ export function ProjectDetailDrawer({
                         return (
                           <div
                             key={member.id}
-                            className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3"
+                            className="flex items-center gap-3 rounded-xl border border-border bg-subtle p-3"
                           >
-                            <span className="grid h-8 w-8 place-items-center rounded-full bg-slate-900 text-xs font-semibold text-white shrink-0">
+                            <span className="grid h-8 w-8 place-items-center rounded-full bg-strong text-xs font-semibold text-on-strong shrink-0">
                               {getInitials(member.name)}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <p className="text-base font-semibold text-slate-900 break-words">
+                              <p className="text-base font-semibold text-foreground break-words">
                                 {member.name}
                               </p>
-                              <p className="text-xs text-slate-500 font-semibold">
+                              <p className="text-xs text-muted-foreground font-semibold">
                                 {isLeader ? "Project Leader" : member.role || "Member"}
                               </p>
                             </div>
@@ -207,10 +207,10 @@ export function ProjectDetailDrawer({
 
               {project.description && (
                 <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Description
                   </h4>
-                  <p className="text-sm leading-6 text-slate-700 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-sm leading-6 text-foreground bg-subtle rounded-xl p-3 border border-border">
                     {project.description}
                   </p>
                 </div>
@@ -218,10 +218,10 @@ export function ProjectDetailDrawer({
 
               {project.requirements && (
                 <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Requirements & Specifications
                   </h4>
-                  <p className="text-sm leading-6 text-slate-700 bg-slate-50 rounded-xl p-3 border border-slate-100">
+                  <p className="text-sm leading-6 text-foreground bg-subtle rounded-xl p-3 border border-border">
                     {project.requirements}
                   </p>
                 </div>
@@ -229,10 +229,10 @@ export function ProjectDetailDrawer({
 
               {canEdit(role) && project.internal_notes && (
                 <div>
-                  <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+                  <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                     Internal Notes
                   </h4>
-                  <p className="text-sm leading-6 text-slate-700 bg-amber-50/60 rounded-xl p-3 border border-amber-200/60">
+                  <p className="text-sm leading-6 text-foreground bg-amber-soft rounded-xl p-3 border border-amber-border">
                     {project.internal_notes}
                   </p>
                 </div>
@@ -242,20 +242,20 @@ export function ProjectDetailDrawer({
 
           {drawerTab === "edit" && canEdit(role) && (
             <div className="space-y-6">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
+              <div className="rounded-2xl border border-border bg-subtle p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Users size={16} className="text-primary" />
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-800">
+                    <Users size={16} className="text-red" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground">
                       Assigned Team Members
                     </h4>
                   </div>
-                  <span className="text-xs font-semibold text-slate-400">
+                  <span className="text-xs font-semibold text-muted-foreground">
                     Auto-syncs to database
                   </span>
                 </div>
 
-                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto rounded-xl border border-slate-200 p-2.5 bg-white">
+                <div className="grid gap-2 sm:grid-cols-2 max-h-56 overflow-y-auto rounded-xl border border-border p-2.5 bg-card">
                   {people.map((person) => {
                     const isLeader = project.leader_id === person.id;
                     const isAssigned =
@@ -265,8 +265,8 @@ export function ProjectDetailDrawer({
                       <label
                         key={person.id}
                         className={`flex items-center gap-2.5 rounded-lg border p-2.5 text-xs font-semibold cursor-pointer transition ${isAssigned
-                          ? "border-red-200 bg-red-50/50 text-slate-900"
-                          : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                          ? "border-red-border bg-red-soft text-foreground"
+                          : "border-border bg-card text-secondary-foreground hover:bg-muted"
                           }`}
                       >
                         <input
@@ -276,13 +276,13 @@ export function ProjectDetailDrawer({
                           onChange={() =>
                             onMemberToggle(project.id, person.id, isAssigned)
                           }
-                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-red-400 cursor-pointer disabled:opacity-50"
+                          className="h-4 w-4 rounded border-border text-red focus:ring-red cursor-pointer disabled:opacity-50"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="break-words text-base font-semibold text-slate-900">
+                          <p className="break-words text-base font-semibold text-foreground">
                             {person.name}
                           </p>
-                          <p className="text-xs text-slate-400 font-semibold">
+                          <p className="text-xs text-muted-foreground font-semibold">
                             {isLeader ? "Project Leader" : person.role || "Team Member"}
                           </p>
                         </div>
@@ -294,14 +294,14 @@ export function ProjectDetailDrawer({
 
               <form onSubmit={onSubmit} className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Project Status
                     <select
                       value={editForm.status}
                       onChange={(e) =>
                         setEditForm((current) => ({ ...current, status: e.target.value }))
                       }
-                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+                      className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
                     >
                       {PROJECT_STATUSES.map(([val, label]) => (
                         <option key={val} value={val}>
@@ -311,7 +311,7 @@ export function ProjectDetailDrawer({
                     </select>
                   </label>
 
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Project Name
                     <input
                       required
@@ -319,22 +319,22 @@ export function ProjectDetailDrawer({
                       onChange={(e) =>
                         setEditForm((current) => ({ ...current, name: e.target.value }))
                       }
-                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                      className="mt-1 h-10 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                     />
                   </label>
 
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Client
                     <input
                       value={editForm.client}
                       onChange={(e) =>
                         setEditForm((current) => ({ ...current, client: e.target.value }))
                       }
-                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                      className="mt-1 h-10 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                     />
                   </label>
 
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Type / Category
                     {isEditCustomCategory ? (
                       <div className="mt-1 flex items-center gap-2">
@@ -344,14 +344,14 @@ export function ProjectDetailDrawer({
                           placeholder="Enter custom category..."
                           value={editCustomCategoryInput}
                           onChange={(e) => setEditCustomCategoryInput(e.target.value)}
-                          className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                          className="h-10 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                         />
                         <button
                           type="button"
                           onClick={() => {
                             setIsEditCustomCategory(false);
                           }}
-                          className="h-10 px-2.5 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer shrink-0"
+                          className="h-10 px-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-xl border border-border bg-subtle hover:bg-muted cursor-pointer shrink-0"
                         >
                           Cancel
                         </button>
@@ -368,7 +368,7 @@ export function ProjectDetailDrawer({
                             setEditForm((current) => ({ ...current, type: e.target.value }));
                           }
                         }}
-                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+                        className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
                       >
                         {dynamicCategories.map((cat) => (
                           <option key={cat} value={cat}>
@@ -380,7 +380,7 @@ export function ProjectDetailDrawer({
                     )}
                   </label>
 
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Project Mode
                     <select
                       value={editForm.project_type}
@@ -392,7 +392,7 @@ export function ProjectDetailDrawer({
                           deadline: val === "hourly_ongoing" ? "" : current.deadline,
                         }));
                       }}
-                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+                      className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
                     >
                       <option value="fixed_deadline">Fixed Deadline</option>
                       <option value="hourly_ongoing">Hourly / Ongoing</option>
@@ -400,7 +400,7 @@ export function ProjectDetailDrawer({
                   </label>
 
                   {editForm.project_type === "fixed_deadline" && (
-                    <label className="text-xs font-semibold text-slate-500">
+                    <label className="text-xs font-semibold text-muted-foreground">
                       <span className="flex items-center justify-between">
                         <span>Deadline</span>
                         {editForm.deadline && (
@@ -409,7 +409,7 @@ export function ProjectDetailDrawer({
                             onClick={() =>
                               setEditForm((current) => ({ ...current, deadline: "" }))
                             }
-                            className="text-xs font-semibold text-red-600 hover:underline cursor-pointer"
+                            className="text-xs font-semibold text-red hover:underline cursor-pointer"
                           >
                             Clear Deadline
                           </button>
@@ -421,19 +421,19 @@ export function ProjectDetailDrawer({
                         onChange={(e) =>
                           setEditForm((current) => ({ ...current, deadline: e.target.value }))
                         }
-                        className="mt-1 h-10 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                        className="mt-1 h-10 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                       />
                     </label>
                   )}
 
-                  <label className="text-xs font-semibold text-slate-500">
+                  <label className="text-xs font-semibold text-muted-foreground">
                     Priority
                     <select
                       value={editForm.priority}
                       onChange={(e) =>
                         setEditForm((current) => ({ ...current, priority: e.target.value }))
                       }
-                      className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 cursor-pointer"
+                      className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
                     >
                       <option value="normal">Normal</option>
                       <option value="high">High</option>
@@ -442,7 +442,7 @@ export function ProjectDetailDrawer({
                   </label>
                 </div>
 
-                <label className="block text-xs font-semibold text-slate-500">
+                <label className="block text-xs font-semibold text-muted-foreground">
                   Description
                   <textarea
                     rows={3}
@@ -450,11 +450,11 @@ export function ProjectDetailDrawer({
                     onChange={(e) =>
                       setEditForm((current) => ({ ...current, description: e.target.value }))
                     }
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                    className="mt-1 w-full rounded-xl border border-border p-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                   />
                 </label>
 
-                <label className="block text-xs font-semibold text-slate-500">
+                <label className="block text-xs font-semibold text-muted-foreground">
                   Requirements
                   <textarea
                     rows={3}
@@ -462,11 +462,11 @@ export function ProjectDetailDrawer({
                     onChange={(e) =>
                       setEditForm((current) => ({ ...current, requirements: e.target.value }))
                     }
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                    className="mt-1 w-full rounded-xl border border-border p-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                   />
                 </label>
 
-                <label className="block text-xs font-semibold text-slate-500">
+                <label className="block text-xs font-semibold text-muted-foreground">
                   Internal Notes
                   <textarea
                     rows={3}
@@ -474,7 +474,7 @@ export function ProjectDetailDrawer({
                     onChange={(e) =>
                       setEditForm((current) => ({ ...current, internal_notes: e.target.value }))
                     }
-                    className="mt-1 w-full rounded-xl border border-slate-200 p-3 text-sm font-semibold text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+                    className="mt-1 w-full rounded-xl border border-border p-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                   />
                 </label>
 
@@ -482,14 +482,14 @@ export function ProjectDetailDrawer({
                   <button
                     type="button"
                     onClick={() => setDrawerTab("overview")}
-                    className="h-10 rounded-xl border border-slate-200 px-4 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
+                    className="h-10 rounded-xl border border-border px-4 text-xs font-semibold hover:bg-subtle cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={savingDetails}
-                    className="h-10 rounded-xl bg-primary px-5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
+                    className="h-10 rounded-xl bg-primary px-5 text-xs font-semibold text-on-strong hover:bg-red-strong disabled:opacity-60 transition cursor-pointer"
                   >
                     {savingDetails ? "Saving..." : "Save Changes"}
                   </button>
@@ -500,11 +500,11 @@ export function ProjectDetailDrawer({
         </div>
 
         {role === "Admin" && (
-          <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center">
+          <div className="p-4 border-t border-border bg-subtle flex items-center">
             <button
               type="button"
               onClick={() => onDelete(project)}
-              className="text-xs font-semibold text-red-600 hover:underline flex items-center gap-1 cursor-pointer"
+              className="text-xs font-semibold text-red hover:underline flex items-center gap-1 cursor-pointer"
             >
               <Trash2 size={14} />
               Delete Project

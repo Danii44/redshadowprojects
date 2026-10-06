@@ -122,13 +122,13 @@ export function Sidebar({
         <CompanyLogo />
         <div>
           <div className="text-sm font-semibold tracking-tight">RED SHADOW</div>
-          <div className="mt-0.5 text-xs font-medium tracking-[.18em] text-slate-500">
+          <div className="mt-0.5 text-xs font-medium tracking-[.18em] text-muted-foreground">
             DESIGNS
           </div>
         </div>
         <button
           aria-label="Close navigation"
-          className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-slate-500 hover:bg-white lg:hidden"
+          className="ml-auto grid h-11 w-11 place-items-center rounded-xl text-muted-foreground hover:bg-card lg:hidden"
           onClick={() => setMenuOpen(false)}
         >
           <X size={20} />
@@ -136,14 +136,14 @@ export function Sidebar({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">
+        <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-[.16em] text-muted-foreground">
           Workspace
         </p>
         <nav aria-label="Main navigation" className="space-y-1">
           {visibleNavItems.map((n) => (
             <div key={n.label}>
               {n.group && (
-                <p className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">
+                <p className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-[.16em] text-muted-foreground">
                   Company
                 </p>
               )}
@@ -156,19 +156,19 @@ export function Sidebar({
                 className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
                   view === n.label
                     ? "studio-nav-active"
-                    : "text-slate-600 hover:bg-white/60 hover:text-foreground"
+                    : "text-secondary-foreground hover:bg-card hover:text-foreground"
                 }`}
               >
                 <span
                   className={
-                    view === n.label ? "text-primary" : "text-slate-500"
+                    view === n.label ? "text-red" : "text-muted-foreground"
                   }
                 >
                   <n.icon size={18} />
                 </span>
                 {n.label}
                 {n.label === "My Tasks" && myTaskCount > 0 && (
-                  <span className="ml-auto rounded-md bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600" aria-label={`${myTaskCount} active assignments`}>
+                  <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs text-secondary-foreground" aria-label={`${myTaskCount} active assignments`}>
                     {myTaskCount}
                   </span>
                 )}
@@ -176,8 +176,8 @@ export function Sidebar({
                   <span
                     className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold transition ${
                       view === n.label
-                        ? "bg-white text-primary"
-                        : "bg-primary text-white"
+                        ? "bg-card text-red"
+                        : "bg-primary text-on-strong"
                     }`}
                   >
                     {unreadCount > 99 ? "99+" : unreadCount}
@@ -191,13 +191,13 @@ export function Sidebar({
 
       <div ref={accountRef} className="relative mx-4 mb-5 mt-4 shrink-0">
         {accountMenu && (
-          <div className="absolute bottom-full mb-2 w-full overflow-hidden rounded-2xl border border-border bg-white p-1.5 shadow-lg">
+          <div className="absolute bottom-full mb-2 w-full overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-lg">
             <button
               onClick={() => {
                 setAccountPanel("profile");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-foreground cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-foreground hover:bg-muted hover:text-foreground cursor-pointer"
             >
               View profile
             </button>
@@ -206,7 +206,7 @@ export function Sidebar({
                 setAccountPanel("password");
                 setAccountMenu(false);
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 hover:text-foreground cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-foreground hover:bg-muted hover:text-foreground cursor-pointer"
             >
               Change password
             </button>
@@ -215,7 +215,7 @@ export function Sidebar({
                 await supabase?.auth.signOut();
                 router.push("/login");
               }}
-              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red-700 hover:bg-red-50 cursor-pointer"
+              className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-red hover:bg-red-soft cursor-pointer"
             >
               Sign out
             </button>
@@ -226,15 +226,15 @@ export function Sidebar({
           aria-expanded={accountMenu}
           aria-label={`Account: ${userName}`}
           onClick={() => setAccountMenu((open) => !open)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-white/60 p-3 text-left hover:bg-white cursor-pointer"
+          className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card p-3 text-left hover:bg-card cursor-pointer"
         >
           <Avatar name={userName} src={avatarUrl} />
           <div className="min-w-0">
             <p className="break-words text-base font-semibold">{userName}</p>
-            <p className="text-xs text-slate-500">{role}</p>
+            <p className="text-xs text-muted-foreground">{role}</p>
           </div>
           <ChevronDown
-            className={`ml-auto text-slate-500 transition ${
+            className={`ml-auto text-muted-foreground transition ${
               accountMenu ? "rotate-180" : ""
             }`}
             size={16}

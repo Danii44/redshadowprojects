@@ -262,8 +262,8 @@ export default function Home() {
     return (
       <main className="grid min-h-screen place-items-center bg-background text-foreground">
         <div className="flex items-center gap-3">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
-          <span className="text-sm font-semibold tracking-wide text-slate-600">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-red border-t-transparent" />
+          <span className="text-sm font-semibold tracking-wide text-secondary-foreground">
             Loading Red Shadow workspace...
           </span>
         </div>
@@ -274,9 +274,9 @@ export default function Home() {
   if (connectionError) {
     return (
       <main className="grid min-h-screen place-items-center bg-background p-5 text-foreground">
-        <section className="max-w-lg rounded-3xl border border-red-500/30 bg-red-500/10 p-8">
+        <section className="max-w-lg rounded-3xl border border-red bg-red-strong p-8">
           <h1 className="text-xl font-semibold">Account setup incomplete</h1>
-          <p className="mt-3 leading-7 text-slate-600">{connectionError}</p>
+          <p className="mt-3 leading-7 text-secondary-foreground">{connectionError}</p>
         </section>
       </main>
     );
@@ -286,7 +286,7 @@ export default function Home() {
     <div className="min-h-screen bg-background text-foreground">
       <a
         href="#workspace-main"
-        className="skip-link rounded-xl bg-white px-4 py-3 font-medium shadow-lg"
+        className="skip-link rounded-xl bg-card px-4 py-3 font-medium shadow-lg"
       >
         Skip to content
       </a>

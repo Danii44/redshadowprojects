@@ -1,0 +1,60 @@
+/* Reusable identity and chart presentation; theme values live in light/dark.css. */
+
+.company-logo {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  background: var(--studio-surface);
+}
+
+.company-logo--40 {
+  width: 40px;
+  height: 40px;
+}
+
+.company-logo--44 {
+  width: 44px;
+  height: 44px;
+}
+
+.person-identity-name {
+  overflow-wrap: anywhere;
+}
+
+.studio-chart-tone--open {
+  --chart-color: var(--studio-blue);
+}
+
+.studio-chart-tone--in_progress {
+  --chart-color: var(--studio-cyan);
+}
+
+.studio-chart-tone--in_review {
+  --chart-color: var(--studio-amber);
+}
+
+.studio-chart-tone--revisions {
+  --chart-color: var(--studio-purple);
+}
+
+.studio-chart-tone--delivered, .studio-chart-tone--closed {
+  --chart-color: var(--studio-green);
+}
+
+.studio-chart-tone--on_hold {
+  --chart-color: var(--studio-orange);
+}
+
+.studio-chart-tone--cancelled {
+  --chart-color: var(--studio-muted);
+}
+
+[class*="studio-chart-tone--"] {
+  fill: var(--chart-color);
+  background: var(--chart-color);
+}

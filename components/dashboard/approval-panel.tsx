@@ -68,7 +68,7 @@ export function ApprovalPanel({
               <div className="flex items-start gap-3">
                 <Avatar name={task.owner} src={person?.avatar_url} />
                 <div className="min-w-0 flex-1">
-                  <p className="studio-row-title">{onOpenTask ? <button className="text-left hover:text-primary" onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}</p>
+                  <p className="studio-row-title">{onOpenTask ? <button className="text-left hover:text-red" onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}</p>
                   <p className="studio-person-name">{task.owner}</p>
                   <p className="studio-meta">
                     {task.project} ·{" "}

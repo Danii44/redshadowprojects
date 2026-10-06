@@ -564,13 +564,13 @@ export function ProjectsView({
       {/* Header & Main Controls */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest text-primary">
+          <p className="text-xs font-semibold uppercase tracking-widest text-red">
             Engineering Portfolio
           </p>
-          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-slate-900">
+          <h1 className="mt-0.5 text-2xl sm:text-3xl font-semibold text-foreground">
             Projects
           </h1>
-          <p className="mt-0.5 text-xs font-semibold text-slate-500">
+          <p className="mt-0.5 text-xs font-semibold text-muted-foreground">
             {canEdit(role)
               ? `Showing ${sortedProjects.length} of ${projects.length} workspace projects`
               : `Showing ${sortedProjects.length} of ${projects.length} assigned projects`}
@@ -582,7 +582,7 @@ export function ProjectsView({
           <div className="relative flex-1 sm:w-56 sm:flex-none">
             <Search
               size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               type="text"
@@ -590,18 +590,18 @@ export function ProjectsView({
               placeholder="Search code, name, client..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50"
+              className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
             />
           </div>
 
           {/* Sort Control */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 h-10 text-xs font-semibold text-slate-700 shadow-2xs">
-            <ArrowUpDown size={14} className="text-slate-400 shrink-0" />
+          <div className="flex items-center gap-2 rounded-xl border border-border bg-card px-3 h-10 text-xs font-semibold text-foreground shadow-2xs">
+            <ArrowUpDown size={14} className="text-muted-foreground shrink-0" />
             <select
               aria-label="Sort projects"
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as ProjectSortMode)}
-              className="bg-transparent text-xs font-semibold text-slate-800 outline-none cursor-pointer"
+              className="bg-transparent text-xs font-semibold text-foreground outline-none cursor-pointer"
             >
               <option value="status_workflow">
                 Status Workflow (Open → Closed)
@@ -622,15 +622,15 @@ export function ProjectsView({
           </div>
 
           {/* List/Grid View Mode */}
-          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs">
+          <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
             <button
               aria-label="Project list view"
               aria-pressed={viewMode === "list"}
               onClick={() => setViewMode("list")}
               className={`rounded-lg p-1.5 transition cursor-pointer ${
                 viewMode === "list"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-strong text-on-strong"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <List size={16} />
@@ -641,8 +641,8 @@ export function ProjectsView({
               onClick={() => setViewMode("grid")}
               className={`rounded-lg p-1.5 transition cursor-pointer ${
                 viewMode === "grid"
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-500 hover:text-slate-900"
+                  ? "bg-strong text-on-strong"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               <Grid size={16} />
@@ -653,7 +653,7 @@ export function ProjectsView({
           {canEdit(role) && (
             <button
               onClick={handleOpenCreateModal}
-              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-white shadow-md shadow-red-900/20 hover:bg-red-700 transition cursor-pointer"
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-on-strong shadow-xs hover:bg-red-strong transition cursor-pointer"
             >
               <Plus size={16} />
               New Project
@@ -670,10 +670,10 @@ export function ProjectsView({
 
       {/* LIST VIEW */}
       {viewMode === "list" && (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xs">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-2xs">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="border-b border-slate-200 bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <thead className="border-b border-border bg-subtle text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 <tr>
                   {canEdit(role) && (
                     <th className="py-3.5 pl-4 pr-2 w-10">
@@ -685,7 +685,7 @@ export function ProjectsView({
                           selectedIds.size === sortedProjects.length
                         }
                         onChange={toggleSelectAll}
-                        className="rounded border-slate-300 text-primary focus:ring-red-400"
+                        className="rounded border-border text-red focus:ring-red"
                       />
                     </th>
                   )}
@@ -702,12 +702,12 @@ export function ProjectsView({
                   <th className="py-3.5 pr-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="project-list-body divide-y divide-slate-100 font-semibold text-slate-700">
+              <tbody className="project-list-body divide-y divide-border font-semibold text-foreground">
                 {sortedProjects.length === 0 ? (
                   <tr>
                     <td
                       colSpan={canEdit(role) ? 8 : 6}
-                      className="py-12 text-center text-slate-400"
+                      className="py-12 text-center text-muted-foreground"
                     >
                       No projects found matching criteria.
                     </td>
@@ -734,9 +734,9 @@ export function ProjectsView({
       {viewMode === "grid" && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sortedProjects.length === 0 && (
-            <div className="col-span-full rounded-2xl border border-dashed border-slate-300 bg-white p-12 text-center">
+            <div className="col-span-full rounded-2xl border border-dashed border-border bg-card p-12 text-center">
               <h2 className="text-base font-semibold">No projects found</h2>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-muted-foreground">
                 Try another search or change your status filter.
               </p>
             </div>

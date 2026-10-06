@@ -1,0 +1,129 @@
+.task-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 12px;
+}
+
+.task-summary {
+  padding: 18px 20px;
+}
+
+.task-summary .studio-metric-value {
+  margin: 12px 0 6px;
+}
+
+.task-focus-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 4px 0;
+  color: var(--studio-secondary);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.task-focus-note svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.task-filter-panel {
+  padding: 0 16px;
+}
+
+.task-status-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--studio-border);
+}
+
+.task-status-tabs button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: var(--studio-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.task-status-tabs button:hover {
+  background: var(--studio-subtle);
+}
+
+.task-status-tabs button[aria-pressed="true"] {
+  background: var(--studio-red-bg);
+  color: var(--studio-red);
+}
+
+.task-status-tabs span {
+  font-size: 12px;
+  opacity: .8;
+}
+
+.task-secondary-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 0;
+}
+
+.task-secondary-filters>span {
+  margin-right: auto;
+}
+
+.task-secondary-filters select {
+  border: 1px solid var(--studio-border);
+  border-radius: 8px;
+  background: var(--studio-surface);
+  color: var(--studio-text);
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.task-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-pagination>div {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.task-pagination button:disabled {
+  opacity: .4;
+  cursor: default;
+}
+
+.task-workspace .metric-card {
+  box-shadow: none;
+}
+
+@media (max-width:767px) {
+  .task-summary-grid {
+    grid-template-columns: repeat(2,minmax(0,1fr));
+  }
+
+  .task-summary {
+    padding: 16px;
+  }
+
+  .task-secondary-filters>span {
+    width: 100%;
+  }
+
+  .task-pagination {
+    padding-bottom: 8px;
+  }
+}

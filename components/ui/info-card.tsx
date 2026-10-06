@@ -11,12 +11,12 @@ interface InfoCardProps {
 }
 
 const toneStyles = {
-  blue: "bg-blue-50 text-blue-700 border-blue-100",
-  emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  amber: "bg-amber-50 text-amber-700 border-amber-100",
-  violet: "bg-violet-50 text-violet-700 border-violet-100",
-  slate: "bg-slate-50 text-slate-700 border-slate-100",
-  red: "bg-red-50 text-red-700 border-red-100",
+  blue: "bg-blue-soft text-blue border-blue-border",
+  emerald: "bg-green-soft text-green border-green-border",
+  amber: "bg-amber-soft text-amber border-amber-border",
+  violet: "bg-purple-soft text-purple border-purple-border",
+  slate: "bg-subtle text-foreground border-border",
+  red: "bg-red-soft text-red border-red-border",
 };
 
 export function InfoCard({
@@ -28,9 +28,9 @@ export function InfoCard({
   tone = "slate",
 }: InfoCardProps) {
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs transition-shadow hover:shadow-md">
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-xs transition-shadow hover:shadow-md">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
           {title}
         </span>
         {Icon && (
@@ -40,17 +40,17 @@ export function InfoCard({
         )}
       </div>
       <div className="mt-3 flex items-baseline gap-2">
-        <span className="text-3xl font-semibold text-slate-900 tracking-tight">
+        <span className="text-3xl font-semibold text-foreground tracking-tight">
           {value}
         </span>
         {trend && (
-          <span className="text-xs font-medium text-emerald-600">
+          <span className="text-xs font-medium text-green">
             {trend}
           </span>
         )}
       </div>
       {subtitle && (
-        <p className="mt-1 text-xs font-medium text-slate-500">{subtitle}</p>
+        <p className="mt-1 text-xs font-medium text-muted-foreground">{subtitle}</p>
       )}
     </div>
   );

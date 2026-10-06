@@ -52,13 +52,13 @@ export function ProjectCreateModal({
 
   return (
     <Modal title="Create new project" onClose={onClose}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-border pb-4">
           <div>
-            <h2 className="text-xl font-semibold text-slate-900">
+            <h2 className="text-xl font-semibold text-foreground">
               Create New Project
             </h2>
-            <p className="text-xs font-semibold text-slate-500">
+            <p className="text-xs font-semibold text-muted-foreground">
               Add a new project to your engineering portfolio.
             </p>
           </div>
@@ -66,7 +66,7 @@ export function ProjectCreateModal({
             type="button"
             onClick={onClose}
             aria-label="Close new project"
-            className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700 cursor-pointer"
+            className="rounded-xl p-2 text-muted-foreground hover:bg-muted hover:text-foreground cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -74,7 +74,7 @@ export function ProjectCreateModal({
 
         <form onSubmit={onSubmit} className="mt-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Project Category *
               {isCustomCategory ? (
                 <div className="mt-1.5 flex items-center gap-2">
@@ -85,7 +85,7 @@ export function ProjectCreateModal({
                     placeholder="Enter custom category..."
                     value={customCategoryInput}
                     onChange={(e) => setCustomCategoryInput(e.target.value)}
-                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
+                    className="h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground"
                   />
                   <button
                     type="button"
@@ -96,7 +96,7 @@ export function ProjectCreateModal({
                         type: dynamicCategories[0] || "DFM / Sheet Metal",
                       }));
                     }}
-                    className="h-11 px-3 text-xs font-semibold text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 cursor-pointer shrink-0"
+                    className="h-11 px-3 text-xs font-semibold text-muted-foreground hover:text-foreground rounded-xl border border-border bg-subtle hover:bg-muted cursor-pointer shrink-0"
                   >
                     Cancel
                   </button>
@@ -113,7 +113,7 @@ export function ProjectCreateModal({
                       setProjectForm((current) => ({ ...current, type: e.target.value }));
                     }
                   }}
-                  className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900 cursor-pointer"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground cursor-pointer"
                 >
                   {dynamicCategories.map((cat) => (
                     <option key={cat} value={cat}>
@@ -125,7 +125,7 @@ export function ProjectCreateModal({
               )}
             </label>
 
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Project Name *
               <input
                 type="text"
@@ -135,11 +135,11 @@ export function ProjectCreateModal({
                 onChange={(e) =>
                   setProjectForm((current) => ({ ...current, name: e.target.value }))
                 }
-                className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
+                className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground"
               />
             </label>
 
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Client Name
               <input
                 type="text"
@@ -148,11 +148,11 @@ export function ProjectCreateModal({
                 onChange={(e) =>
                   setProjectForm((current) => ({ ...current, client: e.target.value }))
                 }
-                className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
+                className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground"
               />
             </label>
 
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Project Leader
               <select
                 value={projectForm.leaderId}
@@ -162,7 +162,7 @@ export function ProjectCreateModal({
                     leaderId: e.target.value,
                   }))
                 }
-                className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900 cursor-pointer"
+                className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground cursor-pointer"
               >
                 <option value="">Select Leader...</option>
                 {people
@@ -175,7 +175,7 @@ export function ProjectCreateModal({
               </select>
             </label>
 
-            <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Priority
               <select
                 value={projectForm.priority}
@@ -185,7 +185,7 @@ export function ProjectCreateModal({
                     priority: e.target.value,
                   }))
                 }
-                className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900 cursor-pointer"
+                className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground cursor-pointer"
               >
                 <option value="normal">Normal</option>
                 <option value="high">High</option>
@@ -194,7 +194,7 @@ export function ProjectCreateModal({
             </label>
 
             <div className="col-span-full">
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500 block mb-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground block mb-1.5">
                 Project Mode / Delivery Type *
               </label>
               <div className="grid grid-cols-2 gap-2.5">
@@ -207,12 +207,12 @@ export function ProjectCreateModal({
                     }))
                   }
                   className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left cursor-pointer transition ${projectForm.projectType === "fixed_deadline"
-                    ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "border-red bg-red-soft text-foreground ring-2 ring-red-border"
+                    : "border-border bg-card text-secondary-foreground hover:bg-subtle"
                     }`}
                 >
                   <span className="text-xs font-semibold">Fixed Deadline</span>
-                  <span className="text-xs text-slate-500 font-semibold">Strict target delivery date required</span>
+                  <span className="text-xs text-muted-foreground font-semibold">Strict target delivery date required</span>
                 </button>
 
                 <button
@@ -225,18 +225,18 @@ export function ProjectCreateModal({
                     }))
                   }
                   className={`flex flex-col items-start gap-1 p-3 rounded-xl border text-left cursor-pointer transition ${projectForm.projectType === "hourly_ongoing"
-                    ? "border-red-500 bg-red-50/60 text-slate-900 ring-2 ring-red-200"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    ? "border-red bg-red-soft text-foreground ring-2 ring-red-border"
+                    : "border-border bg-card text-secondary-foreground hover:bg-subtle"
                     }`}
                 >
                   <span className="text-xs font-semibold">Hourly / Ongoing</span>
-                  <span className="text-xs text-slate-500 font-semibold">Continuous retainer, no fixed deadline</span>
+                  <span className="text-xs text-muted-foreground font-semibold">Continuous retainer, no fixed deadline</span>
                 </button>
               </div>
             </div>
 
             {projectForm.projectType === "fixed_deadline" && (
-              <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Deadline Date *
                 <input
                   type="date"
@@ -248,25 +248,25 @@ export function ProjectCreateModal({
                       deadlineDate: e.target.value,
                     }))
                   }
-                  className="mt-1.5 h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold outline-none focus:border-red-400 focus:ring-4 focus:ring-red-50 text-slate-900"
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground"
                 />
               </label>
             )}
           </div>
 
           <div className="space-y-2 pt-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            <label className="block text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Assigned Team Members
             </label>
-            <div className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto rounded-xl border border-slate-200 p-3 bg-slate-50">
+            <div className="grid gap-2 sm:grid-cols-2 max-h-40 overflow-y-auto rounded-xl border border-border p-3 bg-subtle">
               {people.map((person) => {
                 const checked = projectForm.selectedMembers.includes(person.id);
                 return (
                   <label
                     key={person.id}
                     className={`flex items-center gap-2.5 rounded-lg border p-2 text-xs font-semibold cursor-pointer transition ${checked
-                      ? "border-red-200 bg-red-50/60 text-slate-900"
-                      : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                      ? "border-red-border bg-red-soft text-foreground"
+                      : "border-border bg-card text-secondary-foreground hover:bg-muted"
                       }`}
                   >
                     <input
@@ -281,11 +281,11 @@ export function ProjectCreateModal({
                           selectedMembers: next,
                         }));
                       }}
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-red-400 cursor-pointer"
+                      className="h-4 w-4 rounded border-border text-red focus:ring-red cursor-pointer"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="break-words text-base font-semibold text-slate-900">{person.name}</p>
-                      <p className="text-xs text-slate-400 capitalize">{person.role}</p>
+                      <p className="break-words text-base font-semibold text-foreground">{person.name}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{person.role}</p>
                     </div>
                   </label>
                 );
@@ -293,18 +293,18 @@ export function ProjectCreateModal({
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
+          <div className="mt-6 flex justify-end gap-3 border-t border-border pt-4">
             <button
               type="button"
               onClick={onClose}
-              className="h-11 rounded-xl border border-slate-200 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+              className="h-11 rounded-xl border border-border px-5 text-sm font-semibold text-foreground hover:bg-subtle cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={savingProject}
-              className="h-11 rounded-xl bg-primary px-6 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 transition cursor-pointer"
+              className="h-11 rounded-xl bg-primary px-6 text-sm font-semibold text-on-strong hover:bg-red-strong disabled:opacity-60 transition cursor-pointer"
             >
               {savingProject ? "Saving..." : "Save Project"}
             </button>

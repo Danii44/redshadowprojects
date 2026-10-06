@@ -1,4 +1,4 @@
-import { Bell, Menu as MenuIcon, Moon, Sun, ChevronDown } from "lucide-react";
+import { Bell, Menu as MenuIcon, ChevronDown } from "lucide-react";
 import { Menu } from "@base-ui/react/menu";
 import { useTheme } from "next-themes";
 import type {
@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { Avatar } from "@/components/ui/avatar";
 import { GlobalSearch } from "@/components/global-search";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 interface HeaderProps {
   role: Role;
@@ -47,7 +48,7 @@ export function Header({
   const unread = notifications.filter(
     (notification) => !notification.read_at,
   ).length;
-  const { resolvedTheme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   return (
     <header className="workspace-toolbar studio-toolbar">
       <button
@@ -89,22 +90,7 @@ export function Header({
           <Bell size={19} />
           {unread > 0 && <span className="studio-notification-dot" />}
         </button>
-        <button
-          className="studio-icon-button"
-          aria-label={
-            resolvedTheme === "dark"
-              ? "Switch to light mode"
-              : "Switch to dark mode"
-          }
-          title={
-            resolvedTheme === "dark"
-              ? "Switch to light mode"
-              : "Switch to dark mode"
-          }
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-        >
-          {resolvedTheme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-        </button>
+        <ThemeToggle />
         <Menu.Root>
           <Menu.Trigger
             className="studio-profile-trigger"

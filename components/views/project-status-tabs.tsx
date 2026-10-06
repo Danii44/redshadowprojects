@@ -20,8 +20,8 @@ export function ProjectStatusTabs({
         onClick={() => onChange("active")}
         className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
           statusFilter === "active"
-            ? "bg-slate-900 text-white"
-            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+            ? "bg-strong text-on-strong"
+            : "bg-card text-secondary-foreground border border-border hover:bg-subtle"
         }`}
       >
         Active ({statusCounts.active})
@@ -32,14 +32,14 @@ export function ProjectStatusTabs({
         onClick={() => onChange("all")}
         className={`shrink-0 rounded-xl px-3.5 py-2 text-xs font-semibold transition cursor-pointer ${
           statusFilter === "all"
-            ? "bg-slate-900 text-white"
-            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+            ? "bg-strong text-on-strong"
+            : "bg-card text-secondary-foreground border border-border hover:bg-subtle"
         }`}
       >
         All ({statusCounts.all})
       </button>
 
-      <div className="h-4 w-px bg-slate-300 mx-1 shrink-0" />
+      <div className="h-4 w-px bg-hover mx-1 shrink-0" />
 
       {PROJECT_STATUSES.map(([val, label]) => {
         const count = statusCounts[val as keyof typeof statusCounts] ?? 0;
@@ -51,8 +51,8 @@ export function ProjectStatusTabs({
             onClick={() => onChange(val as ProjectStatus)}
             className={`shrink-0 flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition cursor-pointer ${
               active
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                ? "bg-strong text-on-strong"
+                : "bg-card text-secondary-foreground border border-border hover:bg-subtle"
             }`}
           >
             <span className={`h-2 w-2 rounded-full ${projectStatusHighlight(val)}`} />
