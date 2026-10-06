@@ -20,6 +20,16 @@ button, input, select, textarea {
   font-family: inherit;
 }
 
+select {
+  background-color: var(--studio-surface);
+  color: var(--studio-text);
+}
+
+select option {
+  background-color: var(--studio-surface);
+  color: var(--studio-text);
+}
+
 button, a, input, select, textarea {
   -webkit-tap-highlight-color: transparent;
 }

@@ -740,7 +740,7 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, projectId: e.target.value })
                   }
-                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
+                  className="w-full rounded-xl border border-border bg-card p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 >
                   <option value="">Select a project...</option>
                   {projects.map((p) => (
@@ -760,7 +760,7 @@ export function TasksView({
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, assigneeId: e.target.value })
                   }
-                  className="w-full rounded-xl border border-border p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
+                  className="w-full rounded-xl border border-border bg-card p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 >
                   <option value="">Unassigned</option>
                   {people.map((person) => (
