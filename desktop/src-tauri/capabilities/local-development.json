@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "local-development",
+  "description": "Allow the local development app to use native notifications.",
+  "windows": [
+    "main"
+  ],
+  "remote": {
+    "urls": [
+      "http://127.0.0.1:3000/**",
+      "http://localhost:3000/**"
+    ]
+  },
+  "local": false,
+  "permissions": [
+    "notification:default"
+  ]
+}

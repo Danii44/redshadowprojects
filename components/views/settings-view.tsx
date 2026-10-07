@@ -100,6 +100,7 @@ export function SettingsView({
 
   const [editForm, setEditForm] = useState({
     name: "",
+    email: "",
     role: "team_member",
     active: true,
   });
@@ -200,20 +201,36 @@ export function SettingsView({
     e.preventDefault();
     if (!supabase || !editingMember) return;
 
-    const { error } = await supabase
-      .from("users")
-      .update({
-        name: editForm.name,
-        role: editForm.role,
-        active: editForm.active,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", editingMember.id);
+    setSubmitting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionData.session?.access_token ?? ""}`,
+        },
+        body: JSON.stringify({
+          action: "update-member",
+          profileId: editingMember.id,
+          ...editForm,
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
 
-    if (error) return notify(error.message);
-    setEditingMember(null);
-    notify("Member updated");
-    refresh();
+      if (!response.ok)
+        return notify(result.error || "Could not update member");
+
+      setEditingMember(null);
+      notify("Member updated");
+      refresh();
+    } catch (error) {
+      notify(
+        error instanceof Error ? error.message : "Could not update member",
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const removeMember = async (member: User) => {
@@ -505,6 +522,7 @@ export function SettingsView({
                               setEditingMember(m);
                               setEditForm({
                                 name: m.name,
+                                email: m.email ?? "",
                                 role: m.role,
                                 active: m.active,
                               });
@@ -807,6 +825,22 @@ export function SettingsView({
               </label>
 
               <label className="block text-xs font-semibold uppercase text-muted-foreground">
+                Email Address
+                <input
+                  required
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, email: e.target.value })
+                  }
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold outline-none focus:border-red text-foreground"
+                />
+                <span className="mt-1 block text-[11px] font-medium normal-case text-muted-foreground">
+                  This also changes the login email for linked accounts.
+                </span>
+              </label>
+
+              <label className="block text-xs font-semibold uppercase text-muted-foreground">
                 Access Level
                 <select
                   value={editForm.role}
@@ -839,12 +873,16 @@ export function SettingsView({
                 <button
                   type="button"
                   onClick={() => setEditingMember(null)}
+                  disabled={submitting}
                   className="h-10 rounded-xl border border-border px-4 text-xs font-semibold text-foreground"
                 >
                   Cancel
                 </button>
-                <button className="h-10 rounded-xl bg-strong px-5 text-xs font-semibold text-on-strong hover:bg-strong-hover transition">
-                  Save Changes
+                <button
+                  disabled={submitting}
+                  className="h-10 rounded-xl bg-strong px-5 text-xs font-semibold text-on-strong hover:bg-strong-hover transition disabled:opacity-60"
+                >
+                  {submitting ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>

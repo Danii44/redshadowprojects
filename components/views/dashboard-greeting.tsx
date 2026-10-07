@@ -2,6 +2,22 @@ import { Sparkles } from "lucide-react";
 import type { Project, Role, Task } from "@/lib/types";
 import { normalizeProjectStatus } from "@/lib/utils";
 
+export function DashboardMascot() {
+  return (
+    <span className="studio-greeting-mascot" role="img" aria-label="A friendly mascot waving hello">
+      <span className="studio-mascot-body" aria-hidden="true" />
+      <span className="studio-mascot-head" aria-hidden="true">
+        <span className="studio-mascot-eyes" />
+        <span className="studio-mascot-smile" />
+      </span>
+      <span className="studio-mascot-wave" aria-hidden="true">
+        <span className="studio-mascot-arm" />
+      </span>
+      {/* Add the greeting/update bubble here if we want to use it again. */}
+    </span>
+  );
+}
+
 export function dashboardGreeting(now: number) {
   const hour = new Date(now).getHours();
   return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";

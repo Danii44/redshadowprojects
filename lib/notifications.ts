@@ -1,5 +1,7 @@
+import { isTauri } from "@tauri-apps/api/core";
+
 /**
- * Helper utilities for browser Web Notifications API
+ * Helper utilities for browser and Windows desktop notifications.
  */
 
 export type NotifPermissionResult =
@@ -10,6 +12,7 @@ export type NotifPermissionResult =
 /** True when the page can use the Notifications API (HTTPS or localhost). */
 export function canUseNotifications(): boolean {
   if (typeof window === "undefined") return false;
+  if (isTauri()) return true;
   if (!("Notification" in window)) return false;
   // Notifications require a secure context (https / localhost)
   if (!window.isSecureContext) return false;
@@ -17,6 +20,9 @@ export function canUseNotifications(): boolean {
 }
 
 export function getNotificationPermission(): NotifPermissionResult {
+  if (typeof window !== "undefined" && isTauri()) {
+    return "Notification" in window ? Notification.permission : "default";
+  }
   if (typeof window === "undefined" || !("Notification" in window)) {
     return "unsupported";
   }
@@ -29,6 +35,19 @@ export function getNotificationPermission(): NotifPermissionResult {
  * Do NOT call this on page load — browsers will ignore or auto-deny it.
  */
 export async function requestBrowserNotificationPermission(): Promise<NotifPermissionResult> {
+  if (typeof window !== "undefined" && isTauri()) {
+    if (!("Notification" in window)) return "unsupported";
+    if (Notification.permission === "granted" || Notification.permission === "denied") {
+      return Notification.permission;
+    }
+    try {
+      const { requestPermission } = await import("@tauri-apps/plugin-notification");
+      return await requestPermission();
+    } catch (error) {
+      console.error("Failed to request Windows notification permission:", error);
+      return "denied";
+    }
+  }
   if (typeof window === "undefined" || !("Notification" in window)) {
     return "unsupported";
   }
@@ -107,6 +126,22 @@ export function sendBrowserNotification(
     url?: string;
   },
 ) {
+  if (typeof window !== "undefined" && isTauri()) {
+    void import("@tauri-apps/plugin-notification")
+      .then(async ({ isPermissionGranted, sendNotification }) => {
+        if (!(await isPermissionGranted())) return;
+        sendNotification({
+          title,
+          body: options?.body,
+          icon: options?.icon || "/logo.webp",
+        });
+      })
+      .catch((error: unknown) => {
+        console.error("Could not send Windows notification:", error);
+      });
+    return null;
+  }
+
   if (typeof window === "undefined" || !("Notification" in window)) {
     return null;
   }

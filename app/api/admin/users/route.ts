@@ -3,11 +3,12 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 
 type CreateUserBody = {
-  action?: "reset-password";
+  action?: "reset-password" | "update-member";
   profileId?: string;
   name: string;
   email: string;
   role: "admin" | "project_leader" | "team_member";
+  active?: boolean;
 };
 
 type DeleteUserBody = { profileId: string };
@@ -60,6 +61,127 @@ export async function POST(request: Request) {
     );
 
   const body = (await request.json()) as Partial<CreateUserBody>;
+
+  if (body.action === "update-member") {
+    const profileId = body.profileId?.trim();
+    const name = body.name?.trim();
+    const email = body.email?.trim().toLowerCase();
+    const role = body.role;
+
+    if (
+      !profileId ||
+      !name ||
+      !email ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) ||
+      !role ||
+      !["admin", "project_leader", "team_member"].includes(role) ||
+      typeof body.active !== "boolean"
+    ) {
+      return NextResponse.json(
+        { error: "A valid name, email, role, account status, and profile are required." },
+        { status: 400 },
+      );
+    }
+
+    const { data: member, error: memberError } = await adminClient
+      .from("users")
+      .select("id, name, email, role, active, auth_user_id")
+      .eq("id", profileId)
+      .single();
+
+    if (memberError || !member)
+      return NextResponse.json({ error: "Member not found." }, { status: 404 });
+
+    const { data: matchingProfile, error: duplicateLookupError } =
+      await adminClient
+        .from("users")
+        .select("id")
+        .eq("email", email)
+        .neq("id", profileId)
+        .maybeSingle();
+
+    if (duplicateLookupError)
+      return NextResponse.json(
+        { error: duplicateLookupError.message },
+        { status: 500 },
+      );
+    if (matchingProfile)
+      return NextResponse.json(
+        { error: "Another member already uses this email address." },
+        { status: 409 },
+      );
+
+    const { error: profileError } = await adminClient
+      .from("users")
+      .update({
+        name,
+        email,
+        role,
+        active: body.active,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", profileId);
+
+    if (profileError)
+      return NextResponse.json({ error: profileError.message }, { status: 400 });
+
+    if (member.auth_user_id) {
+      const { data: authMember, error: authLookupError } =
+        await adminClient.auth.admin.getUserById(member.auth_user_id);
+
+      if (authLookupError || !authMember.user) {
+        const { error: rollbackError } = await adminClient
+          .from("users")
+          .update({
+            name: member.name,
+            email: member.email,
+            role: member.role,
+            active: member.active,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", profileId);
+        return NextResponse.json(
+          {
+            error: rollbackError
+              ? `Could not find the member login (${authLookupError?.message || "Member login not found."}); profile rollback also failed (${rollbackError.message}).`
+              : authLookupError?.message || "Member login not found.",
+          },
+          { status: 400 },
+        );
+      }
+
+      const { error: authUpdateError } =
+        await adminClient.auth.admin.updateUserById(member.auth_user_id, {
+          email,
+          email_confirm: true,
+          user_metadata: { ...authMember.user.user_metadata, name },
+        });
+
+      if (authUpdateError) {
+        const { error: rollbackError } = await adminClient
+          .from("users")
+          .update({
+            name: member.name,
+            email: member.email,
+            role: member.role,
+            active: member.active,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", profileId);
+
+        return NextResponse.json(
+          {
+            error: rollbackError
+              ? `Could not update the login email (${authUpdateError.message}); profile rollback also failed (${rollbackError.message}).`
+              : authUpdateError.message,
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    return NextResponse.json({ success: true });
+  }
 
   if (body.action === "reset-password") {
     if (!body.profileId)

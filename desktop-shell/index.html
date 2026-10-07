@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'self'"
+    />
+    <title>Red Shadow Projects — Offline</title>
+    <link rel="stylesheet" href="offline.css" />
+  </head>
+  <body>
+    <main class="offline-card">
+      <div class="brand-mark" aria-hidden="true">RS</div>
+      <p class="eyebrow">RED SHADOW PROJECTS</p>
+      <h1>You’re offline</h1>
+      <p class="message">
+        We can't reach your workspace right now. Check your internet connection.
+        Your account and project data have not been changed.
+      </p>
+      <p class="status" role="status">We'll reconnect automatically.</p>
+      <button id="retry" type="button">Try again</button>
+    </main>
+    <script src="offline.js" defer></script>
+  </body>
+</html>

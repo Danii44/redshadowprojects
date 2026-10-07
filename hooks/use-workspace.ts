@@ -3,6 +3,7 @@ import type { Notification, Project, Role, Task, User } from "@/lib/types";
 import { deadlineTone, getAppRole } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { sendBrowserNotification } from "@/lib/notifications";
+import { isTauri } from "@tauri-apps/api/core";
 
 type ProjectMemberRow = { user_id: string };
 type ProjectPhaseRow = { state?: string; name?: string; position: number };
@@ -238,11 +239,14 @@ export function useWorkspace() {
 
   // Refs so realtime handlers always see latest values without re-subscribing
   const peopleMapRef = useRef<Map<string, string>>(new Map());
+  const projectSnapshotRef = useRef<Map<string, ProjectRow>>(new Map());
+  const taskDeadlineRef = useRef<Map<string, string | null | undefined>>(new Map());
   const profileIdRef = useRef("");
   const roleRef = useRef<Role>("Admin");
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Ids already shown as browser desktop notifications this session */
   const pushedNotifIdsRef = useRef<Set<string>>(new Set());
+  const overdueNotifIdsRef = useRef<Set<string>>(new Set());
 
   const applyData = useCallback(
     (
@@ -265,6 +269,9 @@ export function useWorkspace() {
         pid,
         currentRole,
       );
+      projectSnapshotRef.current = new Map(
+        projectRows.map((project) => [project.id, project]),
+      );
       const visibleProjectIds = new Set(mappedProjects.map((p) => p.id));
       const projectById = new Map(
         mappedProjects.map((p) => [p.id, p.name]),
@@ -272,16 +279,18 @@ export function useWorkspace() {
 
       setPeople(peopleRows ?? []);
       setProjects(mappedProjects);
-      setTasks(
-        mapTasks(
+      const mappedTasks = mapTasks(
           taskRows as TaskRowData[],
           projectById,
           peopleMap,
           visibleProjectIds,
           pid,
           currentRole,
-        ),
+        );
+      taskDeadlineRef.current = new Map(
+        (taskRows ?? []).map((task) => [String(task.id), task.due_at]),
       );
+      setTasks(mappedTasks);
       if (notificationRows) {
         const dedupedRows = dedupeNotifications(notificationRows);
         setNotifications(dedupedRows);
@@ -388,11 +397,85 @@ export function useWorkspace() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "projects" },
-        () => scheduleRefresh(),
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            const next = payload.new as ProjectRow;
+            const previous = projectSnapshotRef.current.get(next.id);
+            const updated = {
+              ...next,
+              project_members: previous?.project_members,
+            };
+            projectSnapshotRef.current.set(updated.id, updated);
+            const deadlineChanged = previous?.deadline !== updated.deadline;
+            const changed =
+              previous &&
+              (previous.name !== updated.name ||
+                previous.status !== updated.status ||
+                previous.priority !== updated.priority ||
+                deadlineChanged);
+            const memberCanSee =
+              roleRef.current !== "Team Member" ||
+              updated.leader_id === profileIdRef.current ||
+              updated.project_members?.some(
+                (member) => member.user_id === profileIdRef.current,
+              );
+            if (isTauri() && changed && memberCanSee) {
+              sendBrowserNotification("Project updated", {
+                body: `${updated.name}${updated.deadline !== previous.deadline ? " deadline changed" : " details changed"}.`,
+                tag: `project-update-${updated.id}-${updated.updated_at ?? Date.now()}`,
+              });
+            }
+          }
+          scheduleRefresh();
+        },
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "tasks" },
+        { event: "INSERT", schema: "public", table: "tasks" },
+        (payload) => {
+          const task = payload.new as TaskRowData;
+          taskDeadlineRef.current.set(String(task.id), task.due_at);
+          if (
+            isTauri() &&
+            roleRef.current !== "Team Member" &&
+            !task.assignee_id
+          ) {
+            sendBrowserNotification("New task created", {
+              body: task.title,
+              tag: `task-created-${task.id}`,
+            });
+          }
+          scheduleRefresh();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "tasks" },
+        (payload) => {
+          const updated = payload.new as TaskRowData;
+          const taskId = String(updated.id);
+          const previousDeadline = taskDeadlineRef.current.get(taskId);
+          taskDeadlineRef.current.set(taskId, updated.due_at);
+          const memberCanSee =
+            roleRef.current !== "Team Member" ||
+            updated.assignee_id === profileIdRef.current;
+          if (
+            isTauri() &&
+            memberCanSee &&
+            previousDeadline !== undefined &&
+            previousDeadline !== updated.due_at
+          ) {
+            sendBrowserNotification("Task deadline changed", {
+              body: `${updated.title}: ${updated.due_at ? new Date(updated.due_at).toLocaleString() : "deadline removed"}.`,
+              tag: `task-deadline-${updated.id}-${updated.updated_at ?? Date.now()}`,
+            });
+          }
+          scheduleRefresh();
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "tasks" },
         () => scheduleRefresh(),
       )
       .on(
@@ -475,6 +558,35 @@ export function useWorkspace() {
       if (supabase) supabase.removeChannel(channel);
     };
   }, [profileId, scheduleRefresh]);
+
+  useEffect(() => {
+    if (!isTauri() || !ready || !profileId) return;
+
+    const checkOverdueTasks = () => {
+      const now = Date.now();
+      for (const task of tasks) {
+        if (
+          !task.due_at ||
+          new Date(task.due_at).getTime() >= now ||
+          ["Completed", "Closed", "Cancelled"].includes(task.state)
+        ) {
+          continue;
+        }
+
+        const notificationKey = `${profileId}:${task.id}:${task.due_at}`;
+        if (overdueNotifIdsRef.current.has(notificationKey)) continue;
+        overdueNotifIdsRef.current.add(notificationKey);
+        sendBrowserNotification("Task overdue", {
+          body: task.title,
+          tag: `task-overdue-${task.id}`,
+        });
+      }
+    };
+
+    checkOverdueTasks();
+    const timer = window.setInterval(checkOverdueTasks, 60_000);
+    return () => window.clearInterval(timer);
+  }, [profileId, ready, tasks]);
 
   return {
     ready,

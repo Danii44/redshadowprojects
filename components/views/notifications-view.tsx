@@ -17,6 +17,7 @@ import {
   requestBrowserNotificationPermission,
   sendBrowserNotification,
 } from "@/lib/notifications";
+import { isTauri } from "@tauri-apps/api/core";
 
 interface NotificationsViewProps {
   notifications: Notification[];
@@ -53,6 +54,23 @@ export function NotificationsView({
   >(getInitialPermitState);
   const [requesting, setRequesting] = useState(false);
 
+  React.useEffect(() => {
+    if (!isTauri()) return;
+    let cancelled = false;
+    void import("@tauri-apps/plugin-notification")
+      .then(({ isPermissionGranted }) => isPermissionGranted())
+      .then((granted) => {
+        if (!cancelled) setPermBanner(granted ? "hidden" : "pending");
+      })
+      .catch((error: unknown) => {
+        console.error("Could not check Windows notification permission:", error);
+        if (!cancelled) setPermBanner("unsupported");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const handleAllowDesktopNotifs = async () => {
     if (requesting) return;
     setRequesting(true);
@@ -71,7 +89,9 @@ export function NotificationsView({
         setPermBanner("hidden");
       } else if (status === "denied") {
         notify(
-          "Notifications were blocked. Click the lock icon in the address bar → Site settings → Notifications → Allow, then refresh.",
+          isTauri()
+            ? "Windows notifications are blocked for Red Shadow Projects. Enable them in Windows Settings → System → Notifications."
+            : "Notifications were blocked. Click the lock icon in the address bar → Site settings → Notifications → Allow, then refresh.",
         );
         setPermBanner("denied");
       } else if (status === "insecure") {
@@ -219,8 +239,9 @@ export function NotificationsView({
                 Desktop notifications are blocked
               </p>
               <p className="text-xs font-semibold text-amber">
-                In Chrome/Edge: click the lock icon left of the URL → Site
-                settings → Notifications → Allow. Then refresh this page.
+                {isTauri()
+                  ? "Enable notifications for Red Shadow Projects in Windows Settings → System → Notifications."
+                  : "In Chrome/Edge: click the lock icon left of the URL → Site settings → Notifications → Allow. Then refresh this page."}
               </p>
             </div>
           </div>

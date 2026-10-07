@@ -27,7 +27,11 @@ import {
   isActiveTask,
   projectCounts,
 } from "@/components/dashboard/data";
-import { DashboardGreeting, dashboardGreeting } from "./dashboard-greeting";
+import {
+  DashboardGreeting,
+  DashboardMascot,
+  dashboardGreeting,
+} from "./dashboard-greeting";
 
 interface DashboardProps {
   role: Role;
@@ -182,7 +186,10 @@ export function Dashboard({
         <header className="studio-page-heading">
           <div>
             <p className="studio-eyebrow">Red Shadow Designs / Studio Dashboard</p>
-            <h1>{dashboardGreeting(now)}, {userName}.</h1>
+            <div className="studio-greeting-title">
+              <h1>{dashboardGreeting(now)}, {userName}.</h1>
+              <DashboardMascot />
+            </div>
             <p>Here&apos;s what&apos;s happening with your projects today.</p>
           </div>
           <div className="studio-page-actions">

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Sidebar } from "@/components/sidebar";
 import { Header } from "@/components/header";
 import { Toast } from "@/components/ui/toast";
@@ -26,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { updateTaskWithFallback } from "@/lib/utils";
 
 export default function Home() {
+  const router = useRouter();
   const {
     ready,
     role,
@@ -59,12 +61,42 @@ export default function Home() {
   >(null);
   const loginNotificationSentRef = useRef(false);
 
-  const navigateToView = (next: View) => {
+  const navigateToView = useCallback((next: View) => {
     setTaskSearch("");
     setSelectedTaskId(null);
     setView(next);
     window.scrollTo({ top: 0, behavior: "auto" });
-  };
+  }, []);
+
+  useEffect(() => {
+    const openNotifications = () => navigateToView("Notifications");
+    const logout = () => {
+      void (async () => {
+        if (!supabase) {
+          notify("Could not sign out: Supabase is not configured.");
+          return;
+        }
+        try {
+          const { error } = await supabase.auth.signOut();
+          if (error) {
+            notify(`Could not sign out: ${error.message}`);
+            return;
+          }
+          router.replace("/login");
+        } catch (error) {
+          console.error("Desktop tray sign-out failed:", error);
+          notify("Could not sign out. Check your connection and try again.");
+        }
+      })();
+    };
+
+    window.addEventListener("redshadow:open-notifications", openNotifications);
+    window.addEventListener("redshadow:logout", logout);
+    return () => {
+      window.removeEventListener("redshadow:open-notifications", openNotifications);
+      window.removeEventListener("redshadow:logout", logout);
+    };
+  }, [navigateToView, notify, router]);
 
   // Notify user upon login / initial load if unread notifications exist
   useEffect(() => {
