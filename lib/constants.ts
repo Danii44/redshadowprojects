@@ -89,7 +89,7 @@ export const PILL_TONES: Record<string, string> = {
   amber: "bg-amber-soft text-amber ring-amber-border",
   blue: "bg-blue-soft text-blue ring-blue-border",
   green: "bg-green-soft text-green ring-green-border",
-  slate: "bg-muted text-secondary ring-border",
+  slate: "bg-muted text-secondary-foreground ring-border",
   purple: "bg-purple-soft text-purple ring-purple-border",
   orange: "bg-orange-soft text-orange ring-orange-border",
 };

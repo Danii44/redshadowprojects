@@ -1,14 +1,12 @@
 import type { Project, ProjectStatus, Task } from "@/lib/types";
+import { isTaskActive } from "@/lib/task-focus";
 import { normalizeProjectStatus } from "@/lib/utils";
 
 export const isActiveProject = (project: Project) =>
   !["delivered", "closed", "cancelled"].includes(
     normalizeProjectStatus(project.status),
   );
-export const isActiveTask = (task: Task) =>
-  !["completed", "closed", "cancelled"].includes(
-    task.status.toLowerCase().replaceAll(" ", "_"),
-  );
+export const isActiveTask = isTaskActive;
 export function projectCounts(projects: Project[]) {
   const counts: Record<ProjectStatus, number> = {
     open: 0,
@@ -111,4 +109,20 @@ export function upcomingProjects(projects: Project[], now: number) {
       (a, b) =>
         new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime(),
     );
+}
+
+/** Reasons use available data, rather than guessing project health. */
+export function projectAttentionReasons(project: Project, tasks: Task[], now: number) {
+  const reasons: string[] = [];
+  if (!isActiveProject(project)) return reasons;
+  const due = daysLeft(project, now);
+  if (due.days !== null && due.days < 0) reasons.push("Delivery overdue");
+  else if (due.days !== null && due.days <= 2) reasons.push(due.days === 0 ? "Delivery due today" : `Delivery due in ${due.days} ${due.days === 1 ? "day" : "days"}`);
+  const active = tasks.filter(task => task.project_id === project.id && isActiveTask(task));
+  const blocked = active.filter(task => task.blocked_reason?.trim()).length;
+  if (blocked) reasons.push(`${blocked} blocked ${blocked === 1 ? "task" : "tasks"}`);
+  const overdue = active.filter(task => task.due_at && new Date(task.due_at).getTime() < now).length;
+  if (overdue) reasons.push(`${overdue} overdue ${overdue === 1 ? "task" : "tasks"}`);
+  if (!project.leader_id) reasons.push("No project leader");
+  return reasons;
 }

@@ -1,4 +1,3 @@
-import { TaskOverview } from "@/components/tasks/task-overview";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { PersonIdentity } from "@/components/ui/person-identity";
 import { Modal } from "@/components/ui/modal";
@@ -15,12 +14,20 @@ import {
   Send,
   X,
 } from "lucide-react";
+import { matchesTaskFocus, TASK_FOCUS_LABELS, type TaskFocus } from "@/lib/task-focus";
+import { scopeWorkspaceToTeam } from "@/lib/team-scope";
+import { TaskDeadlineEditor } from "@/components/tasks/task-deadline-editor";
 import { TaskCard } from "@/components/task-card";
-import type { Project, Role, Task, User } from "@/lib/types";
+import type { Project, Role, Task, User, Team, TeamMember } from "@/lib/types";
 import { canEdit, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
 interface TasksViewProps {
+  initialFocus?: TaskFocus;
+  teams?: Team[];
+  teamMembers?: TeamMember[];
+  selectedTeamId?: string;
+  onTeamChange?: (id: string) => void;
   tasks: Task[];
   projects: Project[];
   people: User[];
@@ -37,7 +44,12 @@ interface TasksViewProps {
 }
 
 export function TasksView({
-  tasks,
+  tasks: allTasks,
+  initialFocus = "active",
+  teams = [],
+  teamMembers = [],
+  selectedTeamId = "all",
+  onTeamChange,
   projects,
   people,
   profileId,
@@ -51,8 +63,11 @@ export function TasksView({
   detailOnly = false,
   onOpenTask,
 }: TasksViewProps) {
+  const teamScope = scopeWorkspaceToTeam(teams.find(team => team.id === selectedTeamId), teamMembers, allTasks, projects, people);
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
+  const [focus, setFocus] = useState<TaskFocus>(initialFocus);
+  const tasks = teamScope.tasks.filter(task => detailOnly || matchesTaskFocus(task, focus, now));
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loggingProgressTask, setLoggingProgressTask] = useState<Task | null>(
@@ -73,6 +88,7 @@ export function TasksView({
   const [urgency, setUrgency] = useState("all");
   const [sort, setSort] = useState("deadline");
   const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [taskForm, setTaskForm] = useState({
     title: "",
@@ -103,7 +119,7 @@ export function TasksView({
       notes: "",
       completionPct: task.completion_percentage ?? 25,
       hoursSpent: "4",
-      blocker: "",
+      blocker: task.blocked_reason ?? "",
       taskState: task.state || "In Progress",
     });
   };
@@ -209,6 +225,10 @@ export function TasksView({
   const currentPage = Math.min(page, pageCount);
   const pageTasks = visibleTasks.slice((currentPage - 1) * 12, currentPage * 12);
 
+  const resetFilters = () => {
+    setFocus("active"); setSearchQuery(""); setSelectedPersonId("all"); setUrgency("all"); setTaskStatusFilter("all"); setSort("deadline"); setPage(1); onTeamChange?.("all");
+  };
+
   const refresh = () => {
     onRefresh?.();
   };
@@ -218,7 +238,8 @@ export function TasksView({
     if (!taskForm.title.trim()) return notify("Please enter a task title");
     if (!taskForm.projectId) return notify("Please select a project");
 
-    if (supabase) {
+    if (!supabase) return notify("Database connection is unavailable.");
+    {
       const { error } = await supabase.from("tasks").insert([
         {
           title: taskForm.title.trim(),
@@ -365,6 +386,8 @@ export function TasksView({
       loggingProgressTask.id,
       {
         completion_percentage: progressForm.completionPct,
+        blocked_reason: progressForm.blocker.trim() || null,
+        blocked_at: progressForm.blocker.trim() ? (loggingProgressTask.blocked_at || new Date().toISOString()) : null,
         status: databaseState,
         submitted_at:
           databaseState === "in_review" ? new Date().toISOString() : null,
@@ -435,39 +458,6 @@ export function TasksView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          {/* Search */}
-          <div className="relative w-full sm:w-56 sm:flex-none">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-            />
-            <input
-              type="text"
-              aria-label="Search tasks"
-              placeholder="Search tasks or projects…"
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-              className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
-            />
-          </div>
-
-          {/* Team member view: no people filter */}
-          {isManagerRole && title !== "My Tasks" && (
-            <select
-              aria-label="Filter tasks by person"
-              value={selectedPersonId}
-              onChange={(e) => setSelectedPersonId(e.target.value)}
-              className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
-            >
-              <option value="all">All People</option>
-              {people.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.name}
-                </option>
-              ))}
-            </select>
-          )}
-
           {/* View Mode Toggle */}
           <div className="flex items-center rounded-xl border border-border bg-card p-1 shadow-2xs">
             <button
@@ -509,8 +499,37 @@ export function TasksView({
         </div>
       </div>
 
-      <TaskOverview now={now} tasks={scopedTasks} personal={title === "My Tasks"} />
       <section className="studio-panel task-filter-panel" aria-label="Task filters">
+        <div className="task-primary-filters">
+          {/* Search */}
+          <div className="relative w-full sm:w-56 sm:flex-none">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <input
+              type="text"
+              aria-label="Search tasks"
+              placeholder="Search tasks or projects…"
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+              className="h-10 w-full rounded-xl border border-border bg-card pl-9 pr-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
+            />
+          </div>
+
+          {onTeamChange && <label className="task-team-filter">
+            <span className="sr-only">Department team</span>
+            <select aria-label="Filter tasks by department team" value={selectedTeamId}
+              onChange={event => { onTeamChange(event.target.value); setSelectedPersonId("all"); setPage(1); }}
+              className="h-11 max-w-full rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground">
+              <option value="all">{role === "Admin" ? "All department teams" : "My department teams"}</option>
+              {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+            </select>
+          </label>}
+          <button type="button" className="studio-button" aria-expanded={filtersOpen} aria-controls="task-extra-filters" onClick={() => setFiltersOpen(!filtersOpen)}>
+            More filters{(focus !== "active" || selectedPersonId !== "all" || urgency !== "all" || sort !== "deadline") ? " (active)" : ""}
+          </button>
+        </div>
         <div className="task-status-tabs" role="group" aria-label="Filter tasks by status">
           {([
             ["all", "Active", scopedTasks.filter(t => !isCompletedTask(t)).length],
@@ -519,12 +538,36 @@ export function TasksView({
             ["in_review", "Review / Revision", scopedTasks.filter(t => ["In Review", "In Revision"].includes(t.state)).length],
             ["completed", "Finished", scopedTasks.filter(isCompletedTask).length],
           ] as const).map(([key, label, count]) => <button key={key} type="button"
-            aria-pressed={taskStatusFilter === key} onClick={() => { setTaskStatusFilter(key); setPage(1); }}>
+            aria-pressed={taskStatusFilter === key} onClick={() => { setTaskStatusFilter(key); if (key === "completed") setFocus("active"); setPage(1); }}>
             {label}<span>{count}</span>
           </button>)}
         </div>
         <div className="task-secondary-filters">
           <span className="studio-meta" aria-live="polite">{visibleTasks.length} matching {visibleTasks.length === 1 ? "task" : "tasks"}</span>
+          {(searchQuery || selectedTeamId !== "all" || focus !== "active" || selectedPersonId !== "all" || urgency !== "all" || taskStatusFilter !== "all" || sort !== "deadline") && <button type="button" className="studio-button" onClick={resetFilters}>Clear filters</button>}
+        </div>
+        {focus !== "active" && <div className="task-secondary-filters"><span className="studio-meta">{TASK_FOCUS_LABELS[focus]}</span><button type="button" className="studio-button" onClick={() => { setFocus("active"); setPage(1); }}>Clear work queue</button></div>}
+        <div id="task-extra-filters" className="task-extra-filters" hidden={!filtersOpen}>
+          <select aria-label="Filter work queue" value={focus} onChange={event => { setFocus(event.target.value as TaskFocus); setTaskStatusFilter("all"); setPage(1); }}>
+            {Object.entries(TASK_FOCUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          {/* Team member view: no people filter */}
+          {isManagerRole && title !== "My Tasks" && (
+            <select
+              aria-label="Filter tasks by person"
+              value={selectedPersonId}
+              onChange={(e) => { setSelectedPersonId(e.target.value); setPage(1); }}
+              className="h-10 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
+            >
+              <option value="all">All People</option>
+              {teamScope.people.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.name}
+                </option>
+              ))}
+            </select>
+          )}
+
           <select aria-label="Filter task deadlines" value={urgency} onChange={e => { setUrgency(e.target.value); setPage(1); }}>
             <option value="all">All deadlines</option><option value="overdue">Overdue</option><option value="soon">Due in 7 days</option>
           </select>
@@ -537,7 +580,7 @@ export function TasksView({
       </>}
       {/* Main View: List or Board */}
       {viewMode === "list" ? (
-        <div className={detailOnly ? "grid grid-cols-1 gap-3" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3"}>
+        <div className={detailOnly ? "grid grid-cols-1 gap-3" : "task-list"}>
           {visibleTasks.length === 0 ? (
             <div className="col-span-full grid place-items-center rounded-2xl border border-dashed border-border bg-card p-12 text-center">
               <Layers className="h-10 w-10 text-muted-foreground mb-3" />
@@ -545,13 +588,20 @@ export function TasksView({
                 No tasks found
               </h3>
               <p className="mt-1 text-xs text-muted-foreground max-w-sm">
-                {searchQuery || urgency !== "all" || taskStatusFilter !== "all" ? "Try another search or reset the filters." : "New assignments will appear here when work is assigned to you."}
+                {searchQuery || selectedTeamId !== "all" || focus !== "active" || selectedPersonId !== "all" || urgency !== "all" || taskStatusFilter !== "all" ? "Try another search or reset the filters." : "New assignments will appear here when work is assigned to you."}
               </p>
-              {(searchQuery || urgency !== "all" || taskStatusFilter !== "all") && <button className="studio-button mt-4" onClick={() => { setSearchQuery(""); setUrgency("all"); setTaskStatusFilter("all"); setPage(1); }}>Reset filters</button>}
+              {(searchQuery || selectedTeamId !== "all" || focus !== "active" || selectedPersonId !== "all" || urgency !== "all" || taskStatusFilter !== "all") && <button className="studio-button mt-4" onClick={resetFilters}>Reset filters</button>}
             </div>
           ) : (
-            pageTasks.map((task) => (
-              <TaskCard
+            pageTasks.map((task) => (!detailOnly && onOpenTask ?
+              <button type="button" key={task.id} className="task-list-row" onClick={() => onOpenTask(task)} aria-label={`Open ${task.title}`}>
+                <div className="task-list-title"><strong>{task.title}</strong><span>{task.project || "General work"}</span></div>
+                <div className="task-list-owner"><PersonIdentity name={task.owner} /></div>
+                <StatusBadge status={task.state} task />
+                <span className={`task-list-deadline ${task.due_at && new Date(task.due_at).getTime() < now && !isCompletedTask(task) ? "text-red" : "text-muted-foreground"}`}>
+                  <Clock size={14}/>{task.due_at ? new Date(task.due_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "No deadline"}
+                </span>
+              </button> : <TaskCard
                 key={task.id}
                 t={task}
                 onOpen={onOpenTask ? () => onOpenTask(task) : undefined}
@@ -565,6 +615,7 @@ export function TasksView({
                 workSubmitting={submitting}
                 onLogWork={() => startProgressLog(task)}
                 onDone={() => handleQuickCompleteTask(task)}
+                deadlineEditor={role === "Admin" ? <TaskDeadlineEditor task={task} role={role} notify={notify} onRefresh={refresh} /> : undefined}
                 onDragStart={() => {}}
               />
             ))
@@ -637,7 +688,7 @@ export function TasksView({
                         <PersonIdentity name={task.owner} />
 
                         {/* Status selector */}
-                        {isManagerRole ? (
+                        {isManagerRole && !onOpenTask ? (
                           <select
                             aria-label={`Status for ${task.title}`}
                             value={task.state}
@@ -657,7 +708,8 @@ export function TasksView({
                         )}
                       </div>
 
-                      {canMemberLogWork(task) && (
+                      {role === "Admin" && !onOpenTask && <TaskDeadlineEditor task={task} role={role} notify={notify} onRefresh={refresh} />}
+                      {!onOpenTask && canMemberLogWork(task) && (
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
@@ -666,7 +718,7 @@ export function TasksView({
                             className="flex flex-1 items-center justify-center gap-1 rounded-lg border border-green-border px-2 py-1.5 text-xs font-semibold text-green hover:bg-green-soft disabled:opacity-50"
                           >
                             <CheckCircle2 size={12} />
-                            Done
+                            Submit for review
                           </button>
                           <button
                             type="button"

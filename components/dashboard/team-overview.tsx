@@ -8,10 +8,12 @@ export function TeamOverview({
   projects,
   people,
   onViewTeam,
+  partial = false,
 }: {
   projects: Project[];
   people: User[];
   onViewTeam?: () => void;
+  partial?: boolean;
 }) {
   const workload = people
     .filter((person) => person.active)
@@ -32,7 +34,7 @@ export function TeamOverview({
   return (
     <Panel
       title="Team overview"
-      subtitle="Active project assignments"
+      subtitle={partial ? "Active assignments in your visible projects" : "Active project assignments"}
       action={
         onViewTeam && (
           <button className="studio-link" onClick={onViewTeam}>
@@ -42,8 +44,8 @@ export function TeamOverview({
       }
     >
       {!workload.length && <EmptyState>No team profiles available.</EmptyState>}
-      <div className="studio-team-list">
-        {workload.slice(0, 5).map(({ person, count }) => (
+      <div className="studio-team-list studio-panel-scroll">
+        {workload.map(({ person, count }) => (
           <div className="studio-list-row" key={person.id}>
             <Avatar name={person.name} src={person.avatar_url} />
             <div className="min-w-0 flex-1">

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useTheme } from "next-themes";
 import { useRouter } from "next/navigation";
 import { ChevronDown, X } from "lucide-react";
 import { nav, visibleViewsByRole } from "@/lib/constants";
@@ -26,13 +27,13 @@ export function Sidebar({
   setView,
   userName,
   avatarUrl,
-  notifications,
   myTaskCount = 0,
   menuOpen,
   setMenuOpen,
   setAccountPanel,
 }: SidebarProps) {
   const router = useRouter();
+  const { setTheme } = useTheme();
   const [accountMenu, setAccountMenu] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
   const accountButtonRef = useRef<HTMLButtonElement>(null);
@@ -97,9 +98,20 @@ export function Sidebar({
     };
   }, [accountMenu]);
 
-  const unreadCount = notifications.filter((item) => !item.read_at).length;
-  const visibleNavItems = nav.filter((n) =>
-    visibleViewsByRole[role]?.includes(n.label),
+  const visibleNavItems = nav.filter(n => visibleViewsByRole[role]?.includes(n.label));
+  const primaryLabels: View[] = role === "Team Member"
+    ? ["Dashboard", "My Tasks", "Projects", "Daily Work", "Calendar"]
+    : ["Dashboard", "Projects", "Tasks", "My Tasks", "Calendar", "Team"];
+  const primaryNav = visibleNavItems.filter(n => primaryLabels.includes(n.label));
+  const secondaryNav = visibleNavItems.filter(n => !primaryLabels.includes(n.label) && n.label !== "Notifications");
+  const renderNavItem = (n: (typeof nav)[number]) => (
+    <button key={n.label} aria-current={view === n.label ? "page" : undefined}
+      onClick={() => { setView(n.label); setMenuOpen(false); }}
+      className={`flex min-h-11 w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium ${view === n.label ? "studio-nav-active" : "text-secondary-foreground hover:bg-card hover:text-foreground"}`}>
+      <span className={view === n.label ? "text-red" : "text-muted-foreground"}><n.icon size={18}/></span>
+      {n.label}
+      {n.label === "My Tasks" && myTaskCount > 0 && <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs" aria-label={`${myTaskCount} active assignments`}>{myTaskCount}</span>}
+    </button>
   );
 
   return (
@@ -140,52 +152,11 @@ export function Sidebar({
           Workspace
         </p>
         <nav aria-label="Main navigation" className="space-y-1">
-          {visibleNavItems.map((n) => (
-            <div key={n.label}>
-              {n.group && (
-                <p className="mb-2 mt-6 px-3 text-xs font-semibold uppercase tracking-[.16em] text-muted-foreground">
-                  Company
-                </p>
-              )}
-              <button
-                aria-current={view === n.label ? "page" : undefined}
-                onClick={() => {
-                  setView(n.label);
-                  setMenuOpen(false);
-                }}
-                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition cursor-pointer ${
-                  view === n.label
-                    ? "studio-nav-active"
-                    : "text-secondary-foreground hover:bg-card hover:text-foreground"
-                }`}
-              >
-                <span
-                  className={
-                    view === n.label ? "text-red" : "text-muted-foreground"
-                  }
-                >
-                  <n.icon size={18} />
-                </span>
-                {n.label}
-                {n.label === "My Tasks" && myTaskCount > 0 && (
-                  <span className="ml-auto rounded-md bg-muted px-1.5 py-0.5 text-xs text-secondary-foreground" aria-label={`${myTaskCount} active assignments`}>
-                    {myTaskCount}
-                  </span>
-                )}
-                {n.label === "Notifications" && unreadCount > 0 && (
-                  <span
-                    className={`ml-auto flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold transition ${
-                      view === n.label
-                        ? "bg-card text-red"
-                        : "bg-primary text-on-strong"
-                    }`}
-                  >
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </button>
-            </div>
-          ))}
+          {primaryNav.map(renderNavItem)}
+          {secondaryNav.length > 0 && <details key={secondaryNav.some(n => n.label === view) ? "active" : "idle"} open={secondaryNav.some(n => n.label === view)} className="mt-5 border-t border-border pt-3">
+            <summary className="min-h-11 cursor-pointer px-3 py-3 text-xs font-semibold text-muted-foreground">Management & reports</summary>
+            <div className="space-y-1">{secondaryNav.map(renderNavItem)}</div>
+          </details>}
         </nav>
       </div>
 
@@ -210,6 +181,7 @@ export function Sidebar({
             >
               Change password
             </button>
+            <button onClick={() => { setTheme("system"); setAccountMenu(false); }} className="w-full rounded-xl px-3 py-2.5 text-left text-sm font-medium hover:bg-muted">Use system appearance</button>
             <button
               onClick={async () => {
                 await supabase?.auth.signOut();

@@ -127,3 +127,45 @@
     padding-bottom: 8px;
   }
 }
+
+/* Keep discovery controls together; task editing lives in the details panel. */
+.task-primary-filters, .task-extra-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 0;
+}
+.task-extra-filters[hidden] { display: none; }
+.task-extra-filters { border-top: 1px solid var(--studio-border); }
+.task-primary-filters > :first-child { flex: 1; min-width: 180px; }
+.task-primary-filters select, .task-extra-filters select { min-height: 44px; max-width: 100%; }
+.task-status-tabs { flex-wrap: wrap; }
+.task-list { overflow: hidden; border: 1px solid var(--studio-border); border-radius: 16px; background: var(--studio-surface); }
+.task-list-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 170px 140px 110px;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 18px 20px;
+  text-align: left;
+  cursor: pointer;
+}
+.task-list-row + .task-list-row { border-top: 1px solid var(--studio-border); }
+.task-list-row:hover { background: var(--studio-subtle); }
+.task-list-title { min-width: 0; overflow-wrap: anywhere; }
+.task-list-title strong { display: block; color: var(--studio-text); font-size: 14px; font-weight: 600; }
+.task-list-title > span { display: block; margin-top: 5px; color: var(--studio-muted); font-size: 13px; }
+.task-list-owner { min-width: 0; }
+.task-list-deadline { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+@media (max-width: 900px) {
+  .task-list-row { grid-template-columns: minmax(0, 1fr) 140px; gap: 12px; }
+  .task-list-owner { grid-row: 2; }
+  .task-list-deadline { grid-column: 2; grid-row: 2; }
+}
+@media (max-width: 480px) {
+  .task-list-row { padding: 16px; grid-template-columns: minmax(0, 1fr) 110px; }
+  .task-team-filter { width: 100%; }
+  .task-team-filter select { width: 100%; }
+}

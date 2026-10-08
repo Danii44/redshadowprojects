@@ -1207,3 +1207,19 @@ button.studio-list-row:hover {
     width: 100%;
   }
 }
+/* Approval cards move only in response to navigation or a drag gesture. */
+.approval-carousel-panel { min-width:0; }
+.approval-carousel-viewport { overflow:hidden; margin:16px 16px 0; touch-action:pan-y pinch-zoom; border-radius:12px; }
+.approval-carousel-track { display:flex; gap:12px; }
+.approval-carousel-track .approval-review-card { flex:0 0 100%; min-width:0; border:1px solid var(--studio-border); border-radius:12px; padding:18px; background:var(--studio-surface); }
+.approval-review-card .studio-row-title { font-size:15px; line-height:1.5; overflow-wrap:anywhere; }
+.approval-review-card .studio-person-name { margin-top:4px; }
+.approval-review-card .studio-meta { overflow-wrap:anywhere; }
+.approval-review-card .studio-action { min-height:44px; flex:1; }
+.approval-carousel-footer { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px 16px; }
+.approval-carousel-controls { display:flex; gap:6px; }
+.approval-carousel-controls button { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--studio-border); border-radius:9px; background:var(--studio-surface); color:var(--studio-text); cursor:pointer; transition:opacity 150ms var(--ease-out); }
+.approval-carousel-controls button:disabled { opacity:.35; cursor:default; }
+.approval-carousel :is(button,.approval-carousel-viewport):focus-visible { outline:2px solid var(--studio-text); outline-offset:-3px; }
+@media (hover:hover) and (pointer:fine) { .approval-carousel-controls button:not(:disabled):hover { background:var(--studio-subtle); } }
+@media (prefers-reduced-motion:reduce) { .approval-carousel-controls button { transition:none; } }

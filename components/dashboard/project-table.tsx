@@ -28,12 +28,14 @@ export function ProjectTable({
   now,
   onSelect,
   onCalendar,
+  personal = false,
 }: {
   projects: Project[];
   people: User[];
   now: number;
   onSelect: (id: string) => void;
   onCalendar: () => void;
+  personal?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -72,12 +74,12 @@ export function ProjectTable({
   return (
     <section
       className="studio-panel studio-project-table"
-      aria-label="All projects"
+      aria-label={personal ? "My projects" : "All projects"}
     >
       <div className="studio-panel-heading flex-wrap gap-3">
         <div>
-          <h2>All Projects</h2>
-          <p>Manage and track all studio projects, phases and deadlines.</p>
+          <h2>{personal ? "My Projects" : "All Projects"}</h2>
+          <p>{personal ? "Your assigned projects, phases and deadlines." : "Projects, phases and deadlines in this workspace view."}</p>
         </div>
         <div className="studio-table-controls"><select aria-label="Filter project tracking" value={track} onChange={event => { setTrack(event.target.value); setPage(1); }}><option value="all">All tracks</option><option value="fixed">Fixed deadline</option><option value="ongoing">Hourly / Ongoing</option></select><div className="studio-table-search">
           <Search size={16} />

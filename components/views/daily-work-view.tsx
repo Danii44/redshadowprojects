@@ -567,14 +567,17 @@ export function DailyWorkView({
 
     // Update task status and completion percentage
     const databaseState = progressForm.taskState.toLowerCase().replaceAll(" ", "_");
-    await updateTaskWithFallback(supabase, loggingProgressTask.id, {
+    const { error: taskError } = await updateTaskWithFallback(supabase, loggingProgressTask.id, {
       completion_percentage: progressForm.completionPct,
+      blocked_reason: progressForm.blocker.trim() || null,
+      blocked_at: progressForm.blocker.trim() ? (loggingProgressTask.blocked_at || new Date().toISOString()) : null,
       status: databaseState,
       submitted_at: databaseState === "in_review" ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     });
 
     setSubmitting(false);
+    if (taskError) { notify(`Work log recorded, but task update failed: ${taskError.message}`); refresh(); return; }
     setLoggingProgressTask(null);
     setProgressForm({
       notes: "",
@@ -719,7 +722,7 @@ export function DailyWorkView({
                               notes: "",
                               completionPct: task.completion_percentage ?? 0,
                               hoursSpent: "4",
-                              blocker: "",
+                              blocker: task.blocked_reason ?? "",
                               taskState:
                                 task.state === "In Progress" ? task.state : "In Progress",
                             });

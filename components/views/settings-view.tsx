@@ -85,6 +85,7 @@ export function SettingsView({
   onRefresh,
 }: SettingsViewProps) {
   const members = people;
+  const [teamTab, setTeamTab] = useState<"people" | "departments">("people");
   const [teams, setTeams] = useState<TeamRecord[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
 
@@ -316,6 +317,7 @@ export function SettingsView({
     setTeams((items) => [...items, data]);
     setTeamForm({ name: "", leaderId: "" });
     notify("Team created");
+    onRefresh?.();
   };
 
   const addTeamMember = async (event: React.FormEvent) => {
@@ -335,6 +337,7 @@ export function SettingsView({
 
     setTeamMembers((items) => [...items, data]);
     notify("Member added to team");
+    onRefresh?.();
   };
 
   const removeFromTeam = async (membership: { id: string }) => {
@@ -349,6 +352,7 @@ export function SettingsView({
 
     setTeamMembers((items) => items.filter((item) => item.id !== membership.id));
     notify("Member removed from team");
+    onRefresh?.();
   };
 
   const deleteTeam = async (team: { id: string; name: string }) => {
@@ -360,6 +364,7 @@ export function SettingsView({
     setTeams((items) => items.filter((item) => item.id !== team.id));
     setTeamMembers((items) => items.filter((item) => item.team_id !== team.id));
     notify("Team deleted");
+    onRefresh?.();
   };
 
   return (
@@ -371,13 +376,13 @@ export function SettingsView({
             {section}
           </h1>
           <p className="mt-1 text-sm font-semibold text-muted-foreground">
-            {section === "Team" ? `${members.length} team members` : "Manage departments, team assignments, and workspace access."}
+            {section === "Team" ? `${members.length} team members` : "Workspace access and administration."}
           </p>
         </div>
 
         {section === "Settings" ? (
           <button onClick={onOpenTeam} className="flex items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-sm font-medium text-foreground"><Users size={16} />Manage people</button>
-        ) : currentUserRole === "Admin" && (
+        ) : currentUserRole === "Admin" && teamTab === "people" && (
           <button
             onClick={() => setCreatingMember(true)}
             className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-on-strong hover:bg-red-strong transition shadow-xs self-start sm:self-auto"
@@ -438,8 +443,13 @@ export function SettingsView({
           ))}
         </div>
       )}
+      {section === "Team" && <div className="task-status-tabs" role="group" aria-label="Team directory view">
+        <button type="button" aria-pressed={teamTab === "people"} onClick={() => setTeamTab("people")}>People <span>{members.length}</span></button>
+        <button type="button" aria-pressed={teamTab === "departments"} onClick={() => setTeamTab("departments")}>Department teams <span>{teams.length}</span></button>
+      </div>}
+      {section === "Settings" && <section className="studio-panel p-6"><h2 className="text-lg font-semibold">People & departments</h2><p className="mt-2 text-sm text-muted-foreground">Manage staff and department membership from the Team directory.</p><button type="button" className="studio-button mt-4" onClick={onOpenTeam}>Open Team directory</button></section>}
       {/* TEAM MEMBERS TABLE */}
-      {section === "Team" && <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
+      {section === "Team" && teamTab === "people" && <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -564,7 +574,7 @@ export function SettingsView({
 
       {section === "Settings" && currentUserRole !== "Admin" && <section className="rounded-2xl border border-border bg-card p-6"><h2 className="text-lg font-semibold">Workspace access</h2><p className="mt-2 text-sm text-muted-foreground">Your role is Project Leader. Department configuration and account access are managed by your workspace administrator.</p><button onClick={onOpenTeam} className="mt-4 rounded-xl border border-border px-4 text-sm">View your team</button></section>}
       {/* GROUPS / TEAMS MANAGEMENT SECTION */}
-      {section === "Settings" && currentUserRole === "Admin" && (
+      {section === "Team" && teamTab === "departments" && (
         <section className="rounded-2xl border border-border bg-card p-5 shadow-xs space-y-5">
           <div className="flex items-center gap-2 border-b border-border pb-3">
             <Users size={18} className="text-foreground" />
@@ -573,7 +583,7 @@ export function SettingsView({
             </h2>
           </div>
 
-          <div className="grid gap-5 md:grid-cols-2">
+          {currentUserRole === "Admin" && <div className="grid gap-5 md:grid-cols-2">
             {/* Create Team Form */}
             <form onSubmit={createTeam} className="space-y-3">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -588,7 +598,7 @@ export function SettingsView({
                   onChange={(e) =>
                     setTeamForm({ ...teamForm, name: e.target.value })
                   }
-                  className="rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground outline-none focus:border-red"
+                  className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground outline-none focus:border-red"
                 />
                 <select
                   aria-label="Department team leader"
@@ -656,7 +666,9 @@ export function SettingsView({
             </form>
           </div>
 
+          }
           {/* Teams List */}
+          {teams.length === 0 && <p className="text-sm text-muted-foreground">No department teams yet. An administrator can create a team and add its members here.</p>}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 pt-3">
             {teams.map((team) => (
               <div
@@ -667,14 +679,14 @@ export function SettingsView({
                   <p className="font-semibold text-foreground text-base">
                     {team.name}
                   </p>
-                  <button
+                  {currentUserRole === "Admin" && <button
                     onClick={() => deleteTeam(team)}
                     className="text-xs font-semibold text-red hover:underline"
                   >
                     Delete
-                  </button>
+                  </button>}
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-xs text-secondary-foreground">
                   Leader:{" "}
                   {members.find((m) => m.id === team.leader_id)?.name ||
                     "Unassigned"}
@@ -685,8 +697,9 @@ export function SettingsView({
                     .map((item) => (
                       <button
                         key={item.id}
+                        disabled={currentUserRole !== "Admin"}
                         onClick={() => removeFromTeam(item)}
-                        title="Remove from team"
+                        title={currentUserRole === "Admin" ? "Remove from team" : "Team member"}
                       >
                         <Pill>
                           {members.find((m) => m.id === item.user_id)?.name ||

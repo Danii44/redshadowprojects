@@ -33,13 +33,19 @@ import {
   dashboardGreeting,
 } from "./dashboard-greeting";
 
+import { taskStatus } from "@/lib/task-focus";
+import type { TaskFocus } from "@/lib/task-focus";
+
 interface DashboardProps {
   role: Role;
   projects: Project[];
   tasks: Task[];
   people?: User[];
+  teamPeople?: User[];
   profileId?: string;
   userName?: string;
+  teamName?: string;
+  onTaskQueue?: (focus: TaskFocus) => void;
   setView: (view: View) => void;
   notify: (message: string) => void;
   onRefresh?: () => void;
@@ -57,12 +63,15 @@ export function Dashboard({
   projects,
   tasks,
   people = [],
+  teamPeople = people,
   profileId = "",
   userName = "Team Member",
   setView,
   onSelectProject,
   onCreateProject,
   onOpenTask,
+  onTaskQueue,
+  teamName = "All departments",
   onReviewDecision,
 }: DashboardProps) {
   const [now, setNow] = React.useState(() => Date.now());
@@ -75,10 +84,9 @@ export function Dashboard({
     () =>
       tasks.filter(
         (task) =>
-          task.assignee_id === profileId ||
-          task.owner?.toLowerCase() === userName.toLowerCase(),
+          task.assignee_id === profileId,
       ),
-    [tasks, profileId, userName],
+    [tasks, profileId],
   );
   const visibleTasks = member ? myTasks : tasks;
   const counts = useMemo(() => projectCounts(projects), [projects]);
@@ -156,7 +164,7 @@ export function Dashboard({
     },
     {
       label: "In Progress",
-      value: myTasks.filter((task) => task.state === "In Progress").length,
+      value: myTasks.filter((task) => taskStatus(task) === "in_progress").length,
       detail: "Work underway",
       icon: Activity,
       tone: "cyan",
@@ -164,7 +172,7 @@ export function Dashboard({
     {
       label: "In Review / Revision",
       value: myTasks.filter((task) =>
-        ["In Review", "In Revision"].includes(task.state),
+        ["in_review", "in_revision"].includes(taskStatus(task)),
       ).length,
       detail: "Awaiting feedback",
       icon: MessageSquare,
@@ -173,7 +181,7 @@ export function Dashboard({
     {
       label: "Completed",
       value: myTasks.filter((task) =>
-        ["Completed", "Closed"].includes(task.state),
+        ["completed", "closed"].includes(taskStatus(task)),
       ).length,
       detail: "Finished tasks",
       icon: CheckCircle2,
@@ -185,7 +193,7 @@ export function Dashboard({
       <div className="studio-dashboard">
         <header className="studio-page-heading">
           <div>
-            <p className="studio-eyebrow">Red Shadow Designs / Studio Dashboard</p>
+            <p className="studio-eyebrow">Red Shadow Designs / Studio Dashboard{teamName !== "All departments" && ` / ${teamName}`}</p>
             <div className="studio-greeting-title">
               <h1>{dashboardGreeting(now)}, {userName}.</h1>
               <DashboardMascot />
@@ -239,17 +247,19 @@ export function Dashboard({
           ) : (
             <ApprovalPanel
               onOpenTask={onOpenTask}
+              now={now}
               tasks={tasks}
               projects={projects}
               people={people}
               onReviewDecision={onReviewDecision}
-              onViewAll={() => setView("Revisions")}
+              onViewAll={() => onTaskQueue ? onTaskQueue("review") : setView("Tasks")}
             />
           )}
           <StatusOverview projects={projects} />
           <TeamOverview
+            partial={member}
             projects={projects}
-            people={people}
+            people={teamPeople}
             onViewTeam={!member ? () => setView("Team") : undefined}
           />
         </div>
@@ -261,6 +271,8 @@ export function Dashboard({
             onSelect={select}
           />
           <DeadlineList
+            tasks={visibleTasks}
+            onOpenTask={onOpenTask}
             projects={projects}
             people={people}
             now={now}
@@ -269,6 +281,7 @@ export function Dashboard({
           />
         </div>
         <ProjectTable
+          personal={role !== "Admin"}
           projects={projects}
           people={people}
           now={now}

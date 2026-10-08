@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Notification, Project, Role, Task, User } from "@/lib/types";
+import type { Notification, Project, Role, Task, User, Team, TeamMember } from "@/lib/types";
 import { deadlineTone, getAppRole } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { sendBrowserNotification } from "@/lib/notifications";
+import { loadWorkspaceRows } from "@/lib/workspace-data";
+import { accessibleTeamDirectory } from "@/lib/team-scope";
 import { isTauri } from "@tauri-apps/api/core";
 
 type ProjectMemberRow = { user_id: string };
@@ -54,11 +56,13 @@ function mapProjects(
   peopleMap: Map<string, string>,
   profileId: string,
   currentRole: Role,
+  assignedProjectIds: Set<string> = new Set(),
 ): Project[] {
   const visibleProjectRows = (projectRows ?? []).filter(
     (project: ProjectRow) =>
       currentRole === "Admin" ||
       project.leader_id === profileId ||
+      assignedProjectIds.has(project.id) ||
       project.project_members?.some(
         (member: ProjectMemberRow) => member.user_id === profileId,
       ),
@@ -233,6 +237,9 @@ export function useWorkspace() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [people, setPeople] = useState<User[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamError, setTeamError] = useState("");
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [ready, setReady] = useState(false);
   const [connectionError, setConnectionError] = useState("");
@@ -254,6 +261,7 @@ export function useWorkspace() {
       taskRows: TaskRowData[],
       peopleRows: User[],
       notificationRows?: Notification[],
+      directoryPersonIds?: Set<string>,
     ) => {
       const peopleMap = new Map<string, string>(
         (peopleRows ?? []).map((person: User) => [person.id, person.name]),
@@ -268,6 +276,7 @@ export function useWorkspace() {
         peopleMap,
         pid,
         currentRole,
+        new Set(taskRows.filter(task => task.assignee_id === pid && task.project_id).map(task => task.project_id!)),
       );
       projectSnapshotRef.current = new Map(
         projectRows.map((project) => [project.id, project]),
@@ -277,7 +286,15 @@ export function useWorkspace() {
         mappedProjects.map((p) => [p.id, p.name]),
       );
 
-      setPeople(peopleRows ?? []);
+      const relatedPersonIds = new Set(directoryPersonIds ?? [pid]);
+      for (const project of mappedProjects) {
+        if (project.leader_id) relatedPersonIds.add(project.leader_id);
+        for (const member of project.project_members ?? []) relatedPersonIds.add(member.user_id);
+      }
+      for (const task of taskRows) if (task.assignee_id && (!task.project_id || visibleProjectIds.has(task.project_id))) {
+        if (currentRole !== "Team Member" || task.assignee_id === pid) relatedPersonIds.add(task.assignee_id);
+      }
+      setPeople(currentRole === "Admin" ? peopleRows : peopleRows.filter(person => relatedPersonIds.has(person.id)));
       setProjects(mappedProjects);
       const mappedTasks = mapTasks(
           taskRows as TaskRowData[],
@@ -323,6 +340,7 @@ export function useWorkspace() {
       .from("users")
       .select("id,role,name")
       .eq("auth_user_id", sessionData.session.user.id)
+      .eq("active", true)
       .single();
 
     if (!profile) {
@@ -341,29 +359,45 @@ export function useWorkspace() {
     roleRef.current = currentRole;
 
     const [
-      { data: projectRows },
-      { data: taskRows },
-      { data: peopleRows },
+      projectResult,
+      taskResult,
+      peopleResult,
       { data: notificationRows },
+      teamResult,
+      membershipResult,
     ] = await Promise.all([
-      client
+      loadWorkspaceRows(client
         .from("projects")
-        .select("*, project_phases(*), project_members(user_id), revisions(*)"),
-      client.from("tasks").select("*"),
-      client.from("users").select("id,name,email,role,active,avatar_url").eq("active", true),
+        .select("*, project_phases(*), project_members(user_id), revisions(*)", { count: "exact" }).order("id")),
+      loadWorkspaceRows(client.from("tasks").select("*", { count: "exact" }).order("id")),
+      loadWorkspaceRows(client.from("users").select("id,name,email,role,active,avatar_url", { count: "exact" }).eq("active", true).order("id")),
       client
         .from("notifications")
         .select("*")
         .eq("user_id", profile.id)
         .order("created_at", { ascending: false })
         .limit(100),
+      loadWorkspaceRows(client.from("teams").select("*", { count: "exact" }).order("id")),
+      loadWorkspaceRows(client.from("team_members").select("*", { count: "exact" }).order("id")),
     ]);
 
+    if (projectResult.error || taskResult.error || peopleResult.error) {
+      setConnectionError("Could not load workspace data. Refresh to retry; dashboard totals are unavailable.");
+      setReady(true);
+      return;
+    }
+    setConnectionError("");
+    const directory = accessibleTeamDirectory(currentRole, profile.id, teamResult.data ?? [], membershipResult.data ?? []);
+    setTeams([...directory.teams].sort((a,b) => a.name.localeCompare(b.name)));
+    setTeamMembers(directory.memberships);
+    setTeamError(teamResult.error || membershipResult.error ? "Could not load teams. Refresh to try again." : "");
+
     applyData(
-      projectRows ?? [],
-      taskRows ?? [],
-      peopleRows ?? [],
+      projectResult.data ?? [],
+      taskResult.data ?? [],
+      peopleResult.data ?? [],
       notificationRows ?? [],
+      directory.personIds,
     );
     setReady(true);
   }, [applyData]);
@@ -552,6 +586,8 @@ export function useWorkspace() {
           scheduleRefresh();
         },
       )
+      .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "team_members" }, scheduleRefresh)
       .subscribe();
 
     return () => {
@@ -598,6 +634,9 @@ export function useWorkspace() {
     tasks,
     people,
     notifications,
+    teams,
+    teamMembers,
+    teamError,
     connectionError,
     setTasks,
     setNotifications,

@@ -1,8 +1,9 @@
 import { ArrowUpRight, AlertCircle, CalendarDays } from "lucide-react";
-import type { Project, User } from "@/lib/types";
+import type { Project, Task, User } from "@/lib/types";
 import { AvatarGroup } from "@/components/ui/avatar";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Panel, EmptyState } from "./panel";
+import { isTaskActive } from "@/lib/task-focus";
 import { attentionProjects, daysLeft, upcomingProjects } from "./data";
 
 export function AttentionList({
@@ -31,7 +32,7 @@ export function AttentionList({
             <span>Your upcoming work is on track.</span>
           </EmptyState>
         )}
-        {urgent.slice(0, 6).map((project) => {
+        {urgent.map((project) => {
           const due = daysLeft(project, now);
           return (
             <button
@@ -62,63 +63,25 @@ export function AttentionList({
   );
 }
 
-export function DeadlineList({
-  projects,
-  people,
-  now,
-  onSelect,
-  onCalendar,
-}: {
-  projects: Project[];
-  people: User[];
-  now: number;
-  onSelect: (id: string) => void;
-  onCalendar: () => void;
+export function DeadlineList({ projects, tasks = [], now, onSelect, onCalendar, onOpenTask }: {
+  projects: Project[]; tasks?: Task[]; people: User[]; now: number;
+  onSelect: (id: string) => void; onCalendar: () => void; onOpenTask?: (task: Task) => void;
 }) {
-  const upcoming = upcomingProjects(projects, now);
-  return (
-    <Panel
-      title="Upcoming deadlines"
-      subtitle="Due in next 7 days"
-      action={
-        <button className="studio-link" onClick={onCalendar}>
-          Calendar <ArrowUpRight size={14} />
-        </button>
-      }
-    >
-      <div className="studio-panel-scroll">
-        {!upcoming.length && (
-          <EmptyState>
-            <CalendarDays size={24} />
-            <strong>A clear week ahead</strong>
-            <span>No project deadlines in the next 7 days.</span>
-          </EmptyState>
-        )}
-        {upcoming.slice(0, 6).map((project) => {
-          const date = new Date(project.deadline!);
-          return (
-            <button
-              key={project.id}
-              className="studio-list-row studio-deadline-row w-full text-left"
-              onClick={() => onSelect(project.id)}
-            >
-              <span className="studio-date-block">
-                <strong>{date.getDate()}</strong>
-                <span>
-                  {date.toLocaleDateString(undefined, { month: "short" })}
-                </span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="studio-row-title">{project.name}</p>
-                <p className="studio-meta">
-                  {project.phase} · {daysLeft(project, now).label}
-                </p>
-              </div>
-              <AvatarGroup project={project} people={people} limit={2} />
-            </button>
-          );
-        })}
-      </div>
-    </Panel>
-  );
+  const upcoming = [
+    ...upcomingProjects(projects, now).map(project => ({ id: `project-${project.id}`, title: project.name, owner: project.leader || "No project leader", kind: "Project delivery", date: project.deadline!, open: () => onSelect(project.id) })),
+    ...tasks.filter(task => isTaskActive(task) && task.due_at && new Date(task.due_at).getTime() >= now && new Date(task.due_at).getTime() <= now + 7 * 86400000)
+      .map(task => ({ id: `task-${task.id}`, title: task.title, owner: task.owner || "Unassigned", kind: "Task deadline", date: task.due_at!, open: () => onOpenTask ? onOpenTask(task) : onCalendar() })),
+  ].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime() || a.title.localeCompare(b.title));
+  return <Panel title="Upcoming deadlines" subtitle="Tasks and project deliveries in the next 7 days"
+    action={<button className="studio-link" onClick={onCalendar}>Calendar <ArrowUpRight size={14}/></button>}>
+    {!upcoming.length && <EmptyState><CalendarDays size={24}/><strong>A clear week ahead</strong><span>No upcoming task or project deadlines in the next 7 days.</span></EmptyState>}
+    {upcoming.slice(0,6).map(item => {
+      const date = new Date(item.date);
+      return <button key={item.id} type="button" className="studio-list-row studio-deadline-row w-full text-left" onClick={item.open}>
+        <span className="studio-date-block"><strong>{date.getDate()}</strong><span>{date.toLocaleDateString([], {month:"short"})}</span></span>
+        <div className="min-w-0 flex-1"><p className="studio-row-title">{item.title}</p><p className="studio-meta">{item.kind} / {item.owner}</p></div>
+      </button>;
+    })}
+    {upcoming.length > 6 && <p className="studio-meta px-5 py-3">Showing the next 6 deadlines. Open Calendar for all scheduled work.</p>}
+  </Panel>;
 }

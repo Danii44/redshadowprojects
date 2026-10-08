@@ -1,6 +1,7 @@
 import { Sparkles } from "lucide-react";
 import type { Project, Role, Task } from "@/lib/types";
-import { normalizeProjectStatus } from "@/lib/utils";
+import { isActiveProject, daysLeft } from "@/components/dashboard/data";
+import { isTaskActive, matchesTaskFocus } from "@/lib/task-focus";
 
 export function DashboardMascot() {
   return (
@@ -34,32 +35,12 @@ export function DashboardGreeting({
   tasks: Task[];
   projects: Project[];
 }) {
-  const today = new Date(now);
-  const activeTasks = tasks.filter(
-    (task) => !["Completed", "Closed", "Cancelled"].includes(task.state),
-  );
-  const overdue = activeTasks.filter(
-    (task) => task.due_at && new Date(task.due_at).getTime() < now,
-  ).length;
-  const dueToday = activeTasks.filter(
-    (task) =>
-      task.due_at &&
-      new Date(task.due_at).toDateString() === today.toDateString() &&
-      new Date(task.due_at).getTime() >= now,
-  ).length;
-  const reviews = tasks.filter((task) => task.state === "In Review").length;
-  const ongoingProjects = projects.filter(
-    (project) =>
-      !["delivered", "closed", "cancelled"].includes(
-        normalizeProjectStatus(project.status),
-      ),
-  );
-  const overdueProjects = ongoingProjects.filter(
-    (project) =>
-      project.project_type !== "hourly_ongoing" &&
-      project.deadline &&
-      new Date(project.deadline).getTime() < now,
-  ).length;
+  const activeTasks = tasks.filter(isTaskActive);
+  const overdue = tasks.filter(task => matchesTaskFocus(task, "overdue", now)).length;
+  const dueToday = tasks.filter(task => matchesTaskFocus(task, "today", now)).length;
+  const reviews = tasks.filter(task => matchesTaskFocus(task, "review", now)).length;
+  const ongoingProjects = projects.filter(isActiveProject);
+  const overdueProjects = ongoingProjects.filter(project => daysLeft(project, now).urgent).length;
   const count = (value: number, noun: string) =>
     `${value} ${noun}${value === 1 ? "" : "s"}`;
   const updates = [

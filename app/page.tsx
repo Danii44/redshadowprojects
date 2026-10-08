@@ -23,6 +23,8 @@ import { SettingsView } from "@/components/views/settings-view";
 import { useWorkspace } from "@/hooks/use-workspace";
 import { useToast } from "@/hooks/use-toast";
 import type { View, Task } from "@/lib/types";
+import type { TaskFocus } from "@/lib/task-focus";
+import { accessibleTeamDirectory, scopeWorkspaceToTeam } from "@/lib/team-scope";
 import { supabase } from "@/lib/supabase";
 import { updateTaskWithFallback } from "@/lib/utils";
 
@@ -37,6 +39,9 @@ export default function Home() {
     projects,
     tasks,
     people,
+    teams,
+    teamMembers,
+    teamError,
     notifications,
     connectionError,
     setTasks,
@@ -47,11 +52,18 @@ export default function Home() {
 
   const { toast, notify } = useToast();
 
+  const [selectedTeamId, setSelectedTeamId] = useState("all");
+  const selectedTeam = teams.find(team => team.id === selectedTeamId);
+  const teamScope = scopeWorkspaceToTeam(selectedTeam, teamMembers, tasks, projects, people);
+  const relatedTeamPersonIds = accessibleTeamDirectory(role, profileId, teams, teamMembers).personIds;
+  const dashboardTeamPeople = role === "Admin" ? teamScope.teamPeople : teamScope.teamPeople.filter(person => relatedTeamPersonIds.has(person.id));
+
   const [view, setView] = useState<View>("Dashboard");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     null,
   );
   const [initialCreate, setInitialCreate] = useState(false);
+  const [taskFocus, setTaskFocus] = useState<TaskFocus>("active");
   const [taskSearch, setTaskSearch] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [drawerTaskId, setDrawerTaskId] = useState<string | null>(null);
@@ -63,6 +75,7 @@ export default function Home() {
 
   const navigateToView = useCallback((next: View) => {
     setTaskSearch("");
+    setTaskFocus("active");
     setSelectedTaskId(null);
     setView(next);
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -122,6 +135,7 @@ export default function Home() {
 
   const openProject = (id: string) => {
     setSelectedProjectId(id);
+    setSelectedTeamId("all");
     navigateToView("Projects");
   };
   const openTask = (task: Task) => {
@@ -307,8 +321,9 @@ export default function Home() {
     return (
       <main className="grid min-h-screen place-items-center bg-background p-5 text-foreground">
         <section className="max-w-lg rounded-3xl border border-red bg-red-strong p-8">
-          <h1 className="text-xl font-semibold">Account setup incomplete</h1>
+          <h1 className="text-xl font-semibold">Workspace unavailable</h1>
           <p className="mt-3 leading-7 text-secondary-foreground">{connectionError}</p>
+          <button className="mt-4 rounded-lg bg-card px-4 py-2 text-foreground" onClick={() => void refreshData()}>Retry loading workspace</button>
         </section>
       </main>
     );
@@ -358,14 +373,33 @@ export default function Home() {
           tabIndex={-1}
           className="workspace-content mx-auto max-w-[1600px] p-4 pb-10 sm:p-6 lg:px-7 lg:py-7"
         >
+          {!["Settings", "Team", "Notifications", "Tasks", "My Tasks"].includes(view) && (
+            <section className="mb-4 flex flex-wrap items-center justify-between gap-3" aria-label="Team workspace filter">
+              <div className="min-w-0">
+                <label htmlFor="workspace-team" className="text-sm font-semibold text-foreground">Department team</label>
+                <p className="mt-1 text-xs text-muted-foreground" aria-live="polite">
+                  {teamError || (selectedTeam ? `Viewing ${selectedTeam.name}` : role === "Admin" ? "All departments" : "Your teams and assigned projects")}
+                </p>
+              </div>
+              <select id="workspace-team" value={selectedTeam?.id ?? "all"}
+                onChange={event => { setSelectedTeamId(event.target.value); setSelectedProjectId(null); setSelectedTaskId(null); setTaskSearch(""); }}
+                className="h-11 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground sm:w-auto sm:max-w-xs">
+                <option value="all">{role === "Admin" ? "All teams" : "My teams and projects"}</option>
+                {teams.map(team => <option key={team.id} value={team.id}>{team.name}</option>)}
+              </select>
+            </section>
+          )}
           <div key={view} className="workspace-view">
             {view === "Dashboard" && (
               <Dashboard
+                teamName={selectedTeam?.name ?? "All departments"}
+                teamPeople={dashboardTeamPeople}
+                onTaskQueue={focus => { navigateToView(role === "Team Member" ? "My Tasks" : "Tasks"); setTaskFocus(focus); }}
                 onOpenTask={openTask}
                 role={role}
-                projects={projects}
-                tasks={tasks}
-                people={people}
+                projects={teamScope.projects}
+                tasks={teamScope.tasks}
+                people={teamScope.people}
                 onCreateProject={() => {
                   setInitialCreate(true);
                   navigateToView("Projects");
@@ -385,9 +419,9 @@ export default function Home() {
 
             {view === "Projects" && (
               <ProjectsView
-                projects={projects}
+                projects={teamScope.projects}
                 role={role}
-                people={people}
+                people={teamScope.people}
                 profileId={profileId}
                 notify={notify}
                 onRefresh={onRefresh}
@@ -401,9 +435,9 @@ export default function Home() {
             {view === "Daily Work" && (
               <DailyWorkView
                 onOpenTask={openTask}
-                tasks={tasks}
-                projects={projects}
-                people={people}
+                tasks={teamScope.tasks}
+                projects={teamScope.projects}
+                people={teamScope.people}
                 profileId={profileId}
                 userName={userName}
                 role={role}
@@ -415,13 +449,18 @@ export default function Home() {
             {(view === "Tasks" || view === "My Tasks") && (
               <TasksView
                 onOpenTask={openTask}
-                key={`${view}-${selectedTaskId ?? "all"}`}
+                key={`${view}-${selectedTeam?.id ?? "all"}-${selectedTaskId ?? "all"}-${taskFocus}`}
                 initialTaskId={view === "Tasks" ? selectedTaskId : null}
                 title={view}
+                initialFocus={taskFocus}
                 initialSearch={view === "Tasks" ? taskSearch : ""}
                 tasks={view === "My Tasks" ? ownTasks : tasks}
-                projects={projects}
-                people={people}
+                teams={teams}
+                teamMembers={teamMembers}
+                selectedTeamId={selectedTeam?.id ?? "all"}
+                onTeamChange={setSelectedTeamId}
+                projects={teamScope.projects}
+                people={teamScope.people}
                 profileId={profileId}
                 role={role}
                 updateTask={updateTaskStatus}
@@ -433,17 +472,17 @@ export default function Home() {
             {view === "Calendar" && (
               <CalendarView
                 onOpenTask={openTask}
-                projects={projects}
-                tasks={tasks}
+                projects={teamScope.projects}
+                tasks={teamScope.tasks}
                 onSelectProject={openProject}
                 onTasks={() => navigateToView("Tasks")}
               />
             )}
             {view === "Reports" && (
               <ReportsView
-                projects={projects}
-                tasks={tasks}
-                people={people}
+                projects={teamScope.projects}
+                tasks={teamScope.tasks}
+                people={teamScope.people}
                 onTeam={
                   role !== "Team Member"
                     ? () => navigateToView("Team")
@@ -454,8 +493,8 @@ export default function Home() {
 
             {view === "Revisions" && (
               <RevisionsView
-                projects={projects}
-                tasks={tasks}
+                projects={teamScope.projects}
+                tasks={teamScope.tasks}
                 profileId={profileId}
                 role={role}
                 notify={notify}

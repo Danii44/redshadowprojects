@@ -12,6 +12,7 @@ import {
 import type { Task, User } from "@/lib/types";
 
 interface TaskCardProps {
+  deadlineEditor?: React.ReactNode;
   onOpen?: () => void;
   t: Task;
   people: User[];
@@ -127,6 +128,7 @@ function getDeadlineInfo(due_at?: string | null): {
 
 export function TaskCard({
   onOpen,
+  deadlineEditor,
   t,
   people,
   updateTask,
@@ -161,12 +163,13 @@ export function TaskCard({
 
   return (
     <div
-      draggable={editable}
+      draggable={false}
       onDragStart={onDragStart}
       className={`w-full rounded-2xl border border-border bg-card overflow-hidden shadow-xs transition hover:shadow-md ${
-        editable ? "cursor-grab active:cursor-grabbing" : ""
+        ""
       }`}
     >
+      {deadlineEditor && <div className="border-b border-border px-3.5 py-2">{deadlineEditor}</div>}
       {/* â”€â”€ Deadline Banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div
         className={`flex items-center justify-between gap-3 border-t-2 px-3.5 py-3 shadow-sm ring-1 ring-inset ring-black/5 ${
@@ -236,7 +239,7 @@ export function TaskCard({
               className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-green-border px-2.5 py-2 text-xs font-semibold text-green transition hover:bg-green-soft disabled:opacity-50"
             >
               <CheckCircle2 size={14} />
-              Done
+              Submit for review
             </button>
             <button
               type="button"
@@ -288,14 +291,10 @@ export function TaskCard({
                 ))}
               </select>
             )}
-            {editable && (
-              <button
-                onClick={() => deleteTask(t)}
-                className="w-full rounded-xl border border-red-border px-2.5 py-1.5 text-xs font-semibold text-red hover:bg-red-soft transition cursor-pointer"
-              >
-                Delete task
-              </button>
-            )}
+            {editable && <details className="task-danger-actions">
+              <summary className="text-xs text-muted-foreground cursor-pointer">More actions</summary>
+              <button type="button" onClick={() => deleteTask(t)} className="mt-2 h-11 rounded-xl border border-red-border px-3 text-xs font-semibold text-red hover:bg-red-soft">Delete task</button>
+            </details>}
           </div>
         )}
       </div>
