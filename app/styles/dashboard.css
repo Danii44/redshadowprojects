@@ -334,7 +334,7 @@
 
 .studio-deadlines {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 20px;
 }
 
@@ -1223,3 +1223,96 @@ button.studio-list-row:hover {
 .approval-carousel :is(button,.approval-carousel-viewport):focus-visible { outline:2px solid var(--studio-text); outline-offset:-3px; }
 @media (hover:hover) and (pointer:fine) { .approval-carousel-controls button:not(:disabled):hover { background:var(--studio-subtle); } }
 @media (prefers-reduced-motion:reduce) { .approval-carousel-controls button { transition:none; } }
+@media (max-width: 1200px) and (min-width: 768px) {
+  .studio-deadlines {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Live studio activity feed */
+.dashboard-update-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 12px;
+}
+
+.dashboard-update-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: transparent;
+  border: none;
+  color: var(--studio-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.dashboard-update-marker {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--studio-accent);
+  flex-shrink: 0;
+}
+
+.dashboard-update-row > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.dashboard-update-type {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--studio-muted);
+}
+
+.dashboard-update-row strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--studio-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-update-row p {
+  font-size: 11px;
+  color: var(--studio-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+
+.dashboard-update-row time {
+  font-size: 11px;
+  color: var(--studio-muted);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.dashboard-update-row time span {
+  display: block;
+  color: var(--studio-muted);
+  font-size: 10px;
+}
+
+.dashboard-update-row svg {
+  color: var(--studio-muted);
+  flex-shrink: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-update-row:hover {
+    background: var(--studio-hover);
+  }
+}
+

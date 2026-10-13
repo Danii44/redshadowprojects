@@ -29,6 +29,8 @@ export function ProjectTable({
   onSelect,
   onCalendar,
   personal = false,
+  statusFilter,
+  onStatusFilterChange,
 }: {
   projects: Project[];
   people: User[];
@@ -36,9 +38,16 @@ export function ProjectTable({
   onSelect: (id: string) => void;
   onCalendar: () => void;
   personal?: boolean;
+  statusFilter?: string;
+  onStatusFilterChange?: (status: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [internalStatus, setInternalStatus] = useState("all");
+  const status = statusFilter !== undefined ? statusFilter : internalStatus;
+  const setStatus = (next: string) => {
+    setInternalStatus(next);
+    onStatusFilterChange?.(next);
+  };
   const [track, setTrack] = useState("all");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -74,6 +83,7 @@ export function ProjectTable({
   return (
     <section
       className="studio-panel studio-project-table"
+      id="studio-project-table"
       aria-label={personal ? "My projects" : "All projects"}
     >
       <div className="studio-panel-heading flex-wrap gap-3">

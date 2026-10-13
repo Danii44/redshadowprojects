@@ -4,7 +4,13 @@ import { PROJECT_STATUSES } from "@/lib/constants";
 import { Panel, EmptyState } from "./panel";
 import { projectCounts } from "./data";
 
-export function StatusOverview({ projects }: { projects: Project[] }) {
+export function StatusOverview({
+  projects,
+  onSelectStatus,
+}: {
+  projects: Project[];
+  onSelectStatus?: (key: string) => void;
+}) {
   const counts = projectCounts(projects);
   const data = PROJECT_STATUSES.map(([key, name]) => ({
     key,
@@ -36,7 +42,11 @@ export function StatusOverview({ projects }: { projects: Project[] }) {
                   {data
                     .filter((item) => item.value)
                     .map((item) => (
-                      <Cell key={item.key} className={`studio-chart-tone--${item.key}`} />
+                      <Cell
+                        key={item.key}
+                        className={`studio-chart-tone--${item.key} ${onSelectStatus ? "cursor-pointer" : ""}`}
+                        onClick={() => onSelectStatus?.(item.key)}
+                      />
                     ))}
                 </Pie>
               </PieChart>
@@ -53,7 +63,14 @@ export function StatusOverview({ projects }: { projects: Project[] }) {
                   !["closed", "cancelled"].includes(item.key) || item.value,
               )
               .map((item) => (
-                <li key={item.key}>
+                <li
+                  key={item.key}
+                  className={onSelectStatus ? "cursor-pointer hover:opacity-80 transition select-none" : undefined}
+                  onClick={() => onSelectStatus?.(item.key)}
+                  role={onSelectStatus ? "button" : undefined}
+                  tabIndex={onSelectStatus ? 0 : undefined}
+                  onKeyDown={onSelectStatus ? (e) => { if (e.key === "Enter" || e.key === " ") onSelectStatus(item.key); } : undefined}
+                >
                   <span className="flex items-center gap-2">
                     <i className={`studio-chart-tone--${item.key}`} />
                     {item.name}

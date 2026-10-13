@@ -22,6 +22,8 @@ import {
 } from "@/components/dashboard/deadline-panels";
 import { ProjectTable } from "@/components/dashboard/project-table";
 import { MemberTasks } from "@/components/dashboard/member-tasks";
+import { RecentUpdates } from "@/components/dashboard/work-insights";
+import { QuickTaskModal } from "@/components/dashboard/quick-task-modal";
 import {
   isActiveProject,
   isActiveTask,
@@ -73,8 +75,23 @@ export function Dashboard({
   onTaskQueue,
   teamName = "All departments",
   onReviewDecision,
+  notify = () => {},
+  onRefresh,
 }: DashboardProps) {
   const [now, setNow] = React.useState(() => Date.now());
+  const [tableStatus, setTableStatus] = React.useState<string>("all");
+  const [quickTaskOpen, setQuickTaskOpen] = React.useState(false);
+
+  const filterTableTo = (status: string) => {
+    setTableStatus(status);
+    if (typeof document !== "undefined") {
+      const tableEl = document.getElementById("studio-project-table");
+      if (tableEl) {
+        tableEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+  };
+
   React.useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 60000);
     return () => window.clearInterval(timer);
@@ -103,6 +120,7 @@ export function Dashboard({
       detail: `${active} active`,
       icon: Layers3,
       tone: "neutral",
+      onClick: () => filterTableTo("all"),
     },
     {
       label: "Open",
@@ -110,6 +128,7 @@ export function Dashboard({
       detail: `${projects.length ? Math.round((counts.open / projects.length) * 100) : 0}% of projects`,
       icon: CircleDashed,
       tone: "blue",
+      onClick: () => filterTableTo("open"),
     },
     {
       label: "In Progress",
@@ -117,6 +136,7 @@ export function Dashboard({
       detail: "Work underway",
       icon: Activity,
       tone: "cyan",
+      onClick: () => filterTableTo("in_progress"),
     },
     {
       label: "In Review",
@@ -124,6 +144,7 @@ export function Dashboard({
       detail: "Awaiting feedback",
       icon: MessageSquare,
       tone: "amber",
+      onClick: () => onTaskQueue ? onTaskQueue("review") : filterTableTo("in_review"),
     },
     {
       label: "Revisions",
@@ -131,6 +152,7 @@ export function Dashboard({
       detail: "Client changes",
       icon: RotateCcw,
       tone: "purple",
+      onClick: () => setView("Revisions"),
     },
     {
       label: "Delivered",
@@ -138,6 +160,7 @@ export function Dashboard({
       detail: "Delivered or closed",
       icon: CheckCircle2,
       tone: "green",
+      onClick: () => filterTableTo("delivered"),
     },
   ];
   const memberMetrics = [
@@ -147,6 +170,7 @@ export function Dashboard({
       detail: `${active} active projects`,
       icon: Layers3,
       tone: "neutral",
+      onClick: () => filterTableTo("all"),
     },
     {
       label: "Active Projects",
@@ -154,6 +178,7 @@ export function Dashboard({
       detail: "Ongoing assignments",
       icon: Activity,
       tone: "cyan",
+      onClick: () => filterTableTo("in_progress"),
     },
     {
       label: "My Tasks",
@@ -161,6 +186,7 @@ export function Dashboard({
       detail: "Active assignments",
       icon: ListTodo,
       tone: "blue",
+      onClick: () => setView("My Tasks"),
     },
     {
       label: "In Progress",
@@ -168,6 +194,7 @@ export function Dashboard({
       detail: "Work underway",
       icon: Activity,
       tone: "cyan",
+      onClick: () => setView("My Tasks"),
     },
     {
       label: "In Review / Revision",
@@ -177,6 +204,7 @@ export function Dashboard({
       detail: "Awaiting feedback",
       icon: MessageSquare,
       tone: "amber",
+      onClick: () => onTaskQueue ? onTaskQueue("review") : setView("My Tasks"),
     },
     {
       label: "Completed",
@@ -186,6 +214,7 @@ export function Dashboard({
       detail: "Finished tasks",
       icon: CheckCircle2,
       tone: "green",
+      onClick: () => setView("My Tasks"),
     },
   ];
   return (
@@ -212,15 +241,24 @@ export function Dashboard({
               </span>
             </button>
             {!member && (
-              <button
-                className="studio-button studio-button--primary"
-                onClick={() =>
-                  onCreateProject ? onCreateProject() : setView("Projects")
-                }
-              >
-                <Plus size={16} />
-                New Project
-              </button>
+              <>
+                <button
+                  className="studio-button"
+                  onClick={() => setQuickTaskOpen(true)}
+                >
+                  <Plus size={16} />
+                  New Task
+                </button>
+                <button
+                  className="studio-button studio-button--primary"
+                  onClick={() =>
+                    onCreateProject ? onCreateProject() : setView("Projects")
+                  }
+                >
+                  <Plus size={16} />
+                  New Project
+                </button>
+              </>
             )}
           </div>
         </header>
@@ -255,7 +293,7 @@ export function Dashboard({
               onViewAll={() => onTaskQueue ? onTaskQueue("review") : setView("Tasks")}
             />
           )}
-          <StatusOverview projects={projects} />
+          <StatusOverview projects={projects} onSelectStatus={filterTableTo} />
           <TeamOverview
             partial={member}
             projects={projects}
@@ -279,6 +317,12 @@ export function Dashboard({
             onSelect={select}
             onCalendar={() => setView("Calendar")}
           />
+          <RecentUpdates
+            tasks={visibleTasks}
+            projects={projects}
+            onOpenTask={onOpenTask}
+            onSelectProject={select}
+          />
         </div>
         <ProjectTable
           personal={role !== "Admin"}
@@ -287,6 +331,17 @@ export function Dashboard({
           now={now}
           onSelect={select}
           onCalendar={() => setView("Calendar")}
+          statusFilter={tableStatus}
+          onStatusFilterChange={setTableStatus}
+        />
+        <QuickTaskModal
+          open={quickTaskOpen}
+          onClose={() => setQuickTaskOpen(false)}
+          projects={projects}
+          people={people}
+          profileId={profileId}
+          notify={notify}
+          onRefresh={onRefresh}
         />
       </div>
     </LazyMotion>
