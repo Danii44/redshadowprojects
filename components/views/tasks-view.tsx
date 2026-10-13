@@ -236,14 +236,13 @@ export function TasksView({
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskForm.title.trim()) return notify("Please enter a task title");
-    if (!taskForm.projectId) return notify("Please select a project");
 
     if (!supabase) return notify("Database connection is unavailable.");
     {
       const { error } = await supabase.from("tasks").insert([
         {
           title: taskForm.title.trim(),
-          project_id: taskForm.projectId,
+          project_id: taskForm.projectId || null,
           assignee_id: taskForm.assigneeId || null,
           created_by: profileId || null,
           due_at: taskForm.deadline
@@ -762,7 +761,7 @@ export function TasksView({
               Create New Task
             </h2>
             <p className="mt-1 text-xs font-medium text-muted-foreground">
-              Add a new task to your workspace project.
+              Add a new task and optionally link it to a project.
             </p>
 
             <form onSubmit={handleCreateTask} className="mt-5 space-y-4">
@@ -784,17 +783,16 @@ export function TasksView({
 
               <div>
                 <label className="block text-xs font-semibold text-foreground mb-1">
-                  Project *
+                  Project (optional)
                 </label>
                 <select
-                  required
                   value={taskForm.projectId}
                   onChange={(e) =>
                     setTaskForm({ ...taskForm, projectId: e.target.value })
                   }
                   className="w-full rounded-xl border border-border bg-card p-2.5 text-xs font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
                 >
-                  <option value="">Select a project...</option>
+                  <option value="">No project (General work)</option>
                   {projects.map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.name}
