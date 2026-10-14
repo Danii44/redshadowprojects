@@ -420,6 +420,8 @@ export default function Home() {
             {view === "Projects" && (
               <ProjectsView
                 projects={teamScope.projects}
+                teams={teams}
+                selectedTeamId={selectedTeam?.id ?? "all"}
                 role={role}
                 people={teamScope.people}
                 profileId={profileId}
@@ -436,8 +438,8 @@ export default function Home() {
               <DailyWorkView
                 onOpenTask={openTask}
                 tasks={teamScope.tasks}
-                projects={teamScope.projects}
-                people={teamScope.people}
+                projects={projects}
+                people={people}
                 profileId={profileId}
                 userName={userName}
                 role={role}

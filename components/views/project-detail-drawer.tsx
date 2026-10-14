@@ -2,13 +2,14 @@ import { Modal } from "@/components/ui/modal";
 import React from "react";
 import { Edit2, Eye, Trash2, Users, X } from "lucide-react";
 import { PROJECT_STATUSES } from "@/lib/constants";
-import type { Project, Role, User } from "@/lib/types";
+import type { Project, Role, Team, User } from "@/lib/types";
 import { canEdit, getInitials } from "@/lib/utils";
 
 export interface ProjectEditFormState {
   name: string;
   client: string;
   type: string;
+  team_id: string;
   project_type: "fixed_deadline" | "hourly_ongoing";
   deadline: string;
   priority: string;
@@ -22,6 +23,7 @@ interface ProjectDetailDrawerProps {
   project: Project;
   role: Role;
   people: User[];
+  teams: Team[];
   drawerTab: "overview" | "edit";
   setDrawerTab: (tab: "overview" | "edit") => void;
   onClose: () => void;
@@ -42,6 +44,7 @@ export function ProjectDetailDrawer({
   project,
   role,
   people,
+  teams,
   drawerTab,
   setDrawerTab,
   onClose,
@@ -114,6 +117,15 @@ export function ProjectDetailDrawer({
           {drawerTab === "overview" && (
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="rounded-xl border border-border p-3.5">
+                  <p className="text-xs font-semibold uppercase text-muted-foreground">
+                    Department
+                  </p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {teams.find((team) => team.id === project.team_id)?.name || "Unassigned"}
+                  </p>
+                </div>
+
                 <div className="rounded-xl border border-border p-3.5">
                   <p className="text-xs font-semibold uppercase text-muted-foreground">
                     Priority
@@ -378,6 +390,19 @@ export function ProjectDetailDrawer({
                         <option value="__custom__">+ Add Custom Category...</option>
                       </select>
                     )}
+                  </label>
+
+                  <label className="text-xs font-semibold text-muted-foreground">
+                    Department *
+                    <select
+                      required
+                      value={editForm.team_id}
+                      onChange={(e) => setEditForm((current) => ({ ...current, team_id: e.target.value }))}
+                      className="mt-1 h-10 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border cursor-pointer"
+                    >
+                      <option value="">Select Department...</option>
+                      {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+                    </select>
                   </label>
 
                   <label className="text-xs font-semibold text-muted-foreground">

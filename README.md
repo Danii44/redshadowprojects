@@ -15,6 +15,8 @@ Private internal project-management system for Red Shadow Designs.
 ## Setup
 
 1. Run `supabase/schema.sql` in the Supabase SQL Editor.
+   For an existing database, also apply
+   `supabase/migrations/20261014_add_project_department.sql` before assigning project departments.
 2. Invite staff in Supabase Authentication.
 3. Link each Auth user to the matching seeded profile using the SQL example at the bottom of the schema.
 4. Copy `.env.example` to `.env.local` and set the Supabase values.

@@ -223,7 +223,7 @@ console.log(
 );
 
 const { TasksView } = load(resolve(root, "components/views/tasks-view.tsx"));
-const taskFixture = { id: "panel-task", title: "Panel task", state: "Open", status: "open", owner: "Sample Member", assignee_id: "member", project: "Assigned project", initials: "SM", due: "No deadline", created_by: "leader" };
+const taskFixture = { id: "panel-task", title: "Panel task", state: "Open", status: "open", owner: "Sample Member", assignee_id: "member", project_id: "panel-project", project: "Assigned project", initials: "SM", due: "No deadline", created_by: "leader" };
 const taskPanelProps = { detailOnly: true, tasks: [taskFixture], projects: [], people: [{id:"member", name:"Sample Member", role:"team_member"}], profileId:"member", updateTask() {}, notify() {} };
 const memberPanelHtml = renderToStaticMarkup(React.createElement(TasksView, {...taskPanelProps, role:"Team Member"}));
 assert.match(memberPanelHtml, /Log Work/);
@@ -231,6 +231,7 @@ assert.doesNotMatch(memberPanelHtml, /Delete task|Status for Panel task|Assign P
 const managerPanelHtml = renderToStaticMarkup(React.createElement(TasksView, {...taskPanelProps, role:"Admin"}));
 assert.match(managerPanelHtml, /Status for Panel task/);
 assert.match(managerPanelHtml, /Assign Panel task/);
+assert.match(managerPanelHtml, /Edit Panel task/);
 assert.doesNotMatch(managerPanelHtml, /Log Work/);
 const finishedPanelHtml = renderToStaticMarkup(React.createElement(TasksView, {...taskPanelProps, tasks:[{...taskFixture, state:"Completed", status:"completed"}], role:"Team Member"}));
 assert.match(finishedPanelHtml, /Panel task/);
@@ -243,21 +244,27 @@ const scopeTasks = [
   { id: "b", assignee_id: "leader", project_id: null },
   { id: "c", assignee_id: "other", project_id: "p1" },
   { id: "d", assignee_id: null },
+  { id: "e", assignee_id: "member", project_id: "p2" },
+  { id: "f", assignee_id: "member", project_id: "p3" },
+  { id: "g", assignee_id: "member", project_id: "p4" },
+  { id: "h", assignee_id: "other", project_id: "p4" },
+  { id: "l", assignee_id: "member", project_id: null },
 ];
 const scopeProjects = [
-  { id: "p1" },
-  { id: "p2", project_members: [{ user_id: "member" }] },
-  { id: "p3", leader_id: "other" },
+  { id: "p1", team_id: "t1" },
+  { id: "p2", team_id: "t1", project_members: [{ user_id: "member" }] },
+  { id: "p3", team_id: "t2", leader_id: "other" },
+  { id: "p4" },
 ];
 const scopePeople = [{ id: "member" }, { id: "leader" }, { id: "other" }];
 const memberships = [{ team_id: "t1", user_id: "member" }, { team_id: "t2", user_id: "other" }];
 const scoped = scopeWorkspaceToTeam({ id: "t1", leader_id: "leader" }, memberships, scopeTasks, scopeProjects, scopePeople);
-assert.deepEqual(scoped.tasks.map(task => task.id), ["a", "b"]);
-assert.deepEqual(scoped.projects.map(project => project.id), ["p1", "p2"]);
+assert.deepEqual(scoped.tasks.map(task => task.id), ["a", "c", "e", "g"]);
+assert.deepEqual(scoped.projects.map(project => project.id), ["p1", "p2", "p4"]);
 assert.deepEqual(scoped.people.map(person => person.id), ["member", "leader"]);
 assert.equal(scopeWorkspaceToTeam(undefined, memberships, scopeTasks, scopeProjects, scopePeople).tasks, scopeTasks);
 assert.equal(scopeWorkspaceToTeam({ id: "empty" }, memberships, scopeTasks, scopeProjects, scopePeople).tasks.length, 0);
-console.log("Team workspace scope regressions passed.");
+console.log("Department scope regressions passed: project departments and legacy assignee fallback work, and other-department/standalone tasks are excluded.");
 
 const { TaskDeadlineEditor } = load(resolve(root, "components/tasks/task-deadline-editor.tsx"));
 const deadlineProps = { task: { id: "deadline-task", title: "Sample deadline task" }, notify() {}, onRefresh() {} };
@@ -267,13 +274,27 @@ for (const role of ["Project Leader", "Team Member"]) {
 }
 console.log("Admin deadline control visibility regressions passed.");
 
-const listProps = { ...taskPanelProps, detailOnly: false, role: "Admin", onOpenTask() {}, teams: [{ id: "dept", name: "Design" }], teamMembers: [{ team_id: "dept", user_id: "member" }], selectedTeamId: "dept", onTeamChange() {} };
+const listProps = { ...taskPanelProps, projects: [{ id: "panel-project", team_id: "dept" }], detailOnly: false, role: "Admin", onOpenTask() {}, teams: [{ id: "dept", name: "Design" }], teamMembers: [{ team_id: "dept", user_id: "member" }], selectedTeamId: "dept", onTeamChange() {} };
 const listHtml = renderToStaticMarkup(React.createElement(TasksView, listProps));
 assert.match(listHtml, /Filter tasks by department team/);
 assert.match(listHtml, /class="task-list-row"/);
+assert.match(listHtml, /aria-label="Edit Panel task"/);
 assert.match(listHtml, /task-extra-filters[^>]*hidden/);
 assert.doesNotMatch(listHtml, /Delete task|Change deadline|Assign Panel task|Status for Panel task|Task overview/);
-const emptyTeamHtml = renderToStaticMarkup(React.createElement(TasksView, { ...listProps, teams: [{ id: "dept", name: "Empty department" }], teamMembers: [] }));
+const departmentTaskHtml = renderToStaticMarkup(React.createElement(TasksView, {
+  ...listProps,
+  projects: [
+    { id: "shared-project", team_id: "dept" },
+    { id: "other-project", team_id: "other-dept" },
+  ],
+  tasks: [
+    { ...taskFixture, id: "department-task", title: "Design department task", project_id: "shared-project" },
+    { ...taskFixture, id: "other-task", title: "Other department task", assignee_id: "other", owner: "Other Member", project_id: "other-project" },
+  ],
+}));
+assert.match(departmentTaskHtml, /Design department task/);
+assert.doesNotMatch(departmentTaskHtml, /Other department task/);
+const emptyTeamHtml = renderToStaticMarkup(React.createElement(TasksView, { ...listProps, teams: [{ id: "empty-dept", name: "Empty department" }], selectedTeamId: "empty-dept", teamMembers: [] }));
 assert.match(emptyTeamHtml, /No tasks found/);
 assert.match(emptyTeamHtml, /Reset filters/);
 assert.match(managerPanelHtml, /Change deadline/);
@@ -382,7 +403,7 @@ assert.equal(failedLoad.data, null);
 assert.match(failedLoad.error.message, /Failed query/);
 console.log("Accuracy and access checks passed: ID-only tasks, task-linked projects, private department scope, calendar-day project deadlines, complete pagination, and load errors.");
 
-const crossTeamProject = {id:"cross-team",leader_id:"outsider",project_members:[{user_id:"member"}]};
+const crossTeamProject = {id:"cross-team",team_id:"own",leader_id:"outsider",project_members:[{user_id:"member"}]};
 const crossTeamScope = scopeWorkspaceToTeam({id:"own",leader_id:"leader"}, membershipRows, [], [crossTeamProject], [{id:"member"},{id:"leader"},{id:"outsider"}]);
 assert.ok(crossTeamScope.people.some(person => person.id === "outsider"));
 assert.ok(!crossTeamScope.teamPeople.some(person => person.id === "outsider"));

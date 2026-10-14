@@ -78,6 +78,7 @@ export interface ProjectRow {
   id: string;
   code: string;
   name: string;
+  team_id?: string | null;
   client?: string | null;
   type?: string | null;
   project_type?: "fixed_deadline" | "hourly_ongoing" | string;
@@ -126,6 +127,7 @@ export interface Project extends ProjectRow {
 export interface TaskRow {
   id: string;
   project_id?: string | null;
+  team_id?: string | null;
   phase_id?: string | null;
   title: string;
   description?: string | null;

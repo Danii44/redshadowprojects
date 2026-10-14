@@ -13,6 +13,7 @@ import {
   Clock,
   Send,
   X,
+  Pencil,
 } from "lucide-react";
 import { matchesTaskFocus, TASK_FOCUS_LABELS, type TaskFocus } from "@/lib/task-focus";
 import { scopeWorkspaceToTeam } from "@/lib/team-scope";
@@ -21,6 +22,14 @@ import { TaskCard } from "@/components/task-card";
 import type { Project, Role, Task, User, Team, TeamMember } from "@/lib/types";
 import { canEdit, updateTaskWithFallback } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+
+function localDateInput(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+  const pad = (number: number) => String(number).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 interface TasksViewProps {
   initialFocus?: TaskFocus;
@@ -96,6 +105,17 @@ export function TasksView({
     assigneeId: "",
     deadline: "",
   });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editTaskForm, setEditTaskForm] = useState({
+    title: "",
+    description: "",
+    projectId: "",
+    assigneeId: "",
+    priority: "normal",
+    status: "open",
+    deadline: "",
+  });
+  const [savingTaskEdit, setSavingTaskEdit] = useState(false);
 
   const userCanEdit = canEdit(role);
   const isManagerRole = role !== "Team Member";
@@ -267,6 +287,63 @@ export function TasksView({
     notify("Task created successfully");
     setCreating(false);
     setTaskForm({ title: "", projectId: "", assigneeId: "", deadline: "" });
+    refresh();
+  };
+
+  const startEditingTask = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskForm({
+      title: task.title,
+      description: task.description ?? "",
+      projectId: task.project_id ?? "",
+      assigneeId: task.assignee_id ?? "",
+      priority: task.priority ?? "normal",
+      status: task.status ?? "open",
+      deadline: localDateInput(task.due_at),
+    });
+  };
+
+  const handleEditTask = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingTask || !userCanEdit) return;
+    if (!editTaskForm.title.trim()) return notify("Please enter a task title");
+    if (!supabase) return notify("Database connection is unavailable.");
+
+    setSavingTaskEdit(true);
+    const dueAt = editTaskForm.deadline
+      ? new Date(`${editTaskForm.deadline}T17:00:00`).toISOString()
+      : null;
+    const { error } = await supabase.from("tasks").update({
+      title: editTaskForm.title.trim(),
+      description: editTaskForm.description.trim() || null,
+      project_id: editTaskForm.projectId || null,
+      assignee_id: editTaskForm.assigneeId || null,
+      priority: editTaskForm.priority,
+      status: editTaskForm.status,
+      due_at: dueAt,
+      updated_at: new Date().toISOString(),
+    }).eq("id", editingTask.id);
+
+    if (error) {
+      setSavingTaskEdit(false);
+      return notify(`Could not update task: ${error.message}`);
+    }
+
+    if (editTaskForm.assigneeId && editTaskForm.projectId) {
+      const { error: membershipError } = await supabase.from("project_members")
+        .upsert(
+          { project_id: editTaskForm.projectId, user_id: editTaskForm.assigneeId },
+          { onConflict: "project_id,user_id" },
+        );
+      if (membershipError) {
+        setSavingTaskEdit(false);
+        return notify(`Task updated, but project membership could not be updated: ${membershipError.message}`);
+      }
+    }
+
+    setSavingTaskEdit(false);
+    setEditingTask(null);
+    notify("Task updated successfully");
     refresh();
   };
 
@@ -593,17 +670,26 @@ export function TasksView({
             </div>
           ) : (
             pageTasks.map((task) => (!detailOnly && onOpenTask ?
-              <button type="button" key={task.id} className="task-list-row" onClick={() => onOpenTask(task)} aria-label={`Open ${task.title}`}>
-                <div className="task-list-title"><strong>{task.title}</strong><span>{task.project || "General work"}</span></div>
-                <div className="task-list-owner"><PersonIdentity name={task.owner} /></div>
-                <StatusBadge status={task.state} task />
-                <span className={`task-list-deadline ${task.due_at && new Date(task.due_at).getTime() < now && !isCompletedTask(task) ? "text-red" : "text-muted-foreground"}`}>
-                  <Clock size={14}/>{task.due_at ? new Date(task.due_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "No deadline"}
-                </span>
-              </button> : <TaskCard
+              <div className="task-list-entry" key={task.id}>
+                <button type="button" className="task-list-row" onClick={() => onOpenTask(task)} aria-label={`Open ${task.title}`}>
+                  <div className="task-list-title"><strong>{task.title}</strong><span>{task.project || "General work"}</span></div>
+                  <div className="task-list-owner"><PersonIdentity name={task.owner} /></div>
+                  <StatusBadge status={task.state} task />
+                  <span className={`task-list-deadline ${task.due_at && new Date(task.due_at).getTime() < now && !isCompletedTask(task) ? "text-red" : "text-muted-foreground"}`}>
+                    <Clock size={14}/>{task.due_at ? new Date(task.due_at).toLocaleDateString([], { month: "short", day: "numeric" }) : "No deadline"}
+                  </span>
+                </button>
+                {userCanEdit && <button
+                  type="button"
+                  className="task-edit-button"
+                  aria-label={`Edit ${task.title}`}
+                  onClick={() => startEditingTask(task)}
+                ><Pencil size={15} />Edit</button>}
+              </div> : <TaskCard
                 key={task.id}
                 t={task}
                 onOpen={onOpenTask ? () => onOpenTask(task) : undefined}
+                onEdit={userCanEdit ? () => startEditingTask(task) : undefined}
                 people={people}
                 updateTask={updateTask}
                 assignTask={updateAssignee}
@@ -682,6 +768,12 @@ export function TasksView({
                       <h4 className="text-base font-semibold text-foreground break-words">
                         {onOpenTask ? <button type="button" className="text-left hover:text-red" aria-label={`Open ${task.title} in ${task.project || "General work"}`} onClick={() => onOpenTask(task)}>{task.title}</button> : task.title}
                       </h4>
+                      {userCanEdit && <button
+                        type="button"
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-2.5 py-1.5 text-xs font-semibold text-secondary-foreground hover:bg-subtle"
+                        aria-label={`Edit ${task.title}`}
+                        onClick={() => startEditingTask(task)}
+                      ><Pencil size={13} />Edit task</button>}
 
                       <div className="mt-3 flex flex-col items-start gap-3 border-t border-border pt-3">
                         <PersonIdentity name={task.owner} />
@@ -848,6 +940,106 @@ export function TasksView({
                   className="rounded-xl bg-primary px-4 py-2 text-xs font-semibold text-on-strong shadow-xs hover:bg-red-strong transition cursor-pointer"
                 >
                   Create Task
+                </button>
+              </div>
+            </form>
+          </div>
+        </Modal>
+      )}
+
+      {editingTask && (
+        <Modal title="Edit task" onClose={() => { if (!savingTaskEdit) setEditingTask(null); }}>
+          <div className="w-full max-w-lg rounded-3xl border border-border bg-card p-6 shadow-2xl">
+            <div className="mb-4 border-b border-border pb-3">
+              <h2 className="text-lg font-semibold text-foreground">Edit Task</h2>
+              <p className="mt-1 text-xs text-muted-foreground">Update the task details, assignment, or project.</p>
+            </div>
+            <form onSubmit={handleEditTask} className="space-y-4">
+              <label className="block text-xs font-semibold text-foreground">
+                Task Title *
+                <input
+                  type="text"
+                  required
+                  value={editTaskForm.title}
+                  onChange={(event) => setEditTaskForm({ ...editTaskForm, title: event.target.value })}
+                  className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
+                />
+              </label>
+              <label className="block text-xs font-semibold text-foreground">
+                Description
+                <textarea
+                  rows={3}
+                  value={editTaskForm.description}
+                  onChange={(event) => setEditTaskForm({ ...editTaskForm, description: event.target.value })}
+                  className="mt-1.5 w-full rounded-xl border border-border p-3 text-sm font-medium text-foreground outline-none focus:border-red focus:ring-4 focus:ring-red-border"
+                />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-xs font-semibold text-foreground">
+                  Project
+                  <select
+                    value={editTaskForm.projectId}
+                    onChange={(event) => setEditTaskForm({ ...editTaskForm, projectId: event.target.value })}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+                  >
+                    <option value="">No project (General work)</option>
+                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-foreground">
+                  Assignee
+                  <select
+                    value={editTaskForm.assigneeId}
+                    onChange={(event) => setEditTaskForm({ ...editTaskForm, assigneeId: event.target.value })}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+                  >
+                    <option value="">Unassigned</option>
+                    {people.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-foreground">
+                  Priority
+                  <select
+                    value={editTaskForm.priority}
+                    onChange={(event) => setEditTaskForm({ ...editTaskForm, priority: event.target.value })}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-foreground">
+                  Status
+                  <select
+                    value={editTaskForm.status}
+                    onChange={(event) => setEditTaskForm({ ...editTaskForm, status: event.target.value })}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold text-foreground"
+                  >
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="in_review">In Review</option>
+                    <option value="in_revision">In Revision</option>
+                    <option value="completed">Completed</option>
+                    <option value="closed">Closed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold text-foreground">
+                  Deadline
+                  <input
+                    type="date"
+                    value={editTaskForm.deadline}
+                    onChange={(event) => setEditTaskForm({ ...editTaskForm, deadline: event.target.value })}
+                    className="mt-1.5 h-11 w-full rounded-xl border border-border px-3 text-sm font-semibold text-foreground"
+                  />
+                </label>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-border pt-4">
+                <button type="button" disabled={savingTaskEdit} className="studio-button" onClick={() => setEditingTask(null)}>Cancel</button>
+                <button type="submit" disabled={savingTaskEdit} className="studio-button studio-button--primary">
+                  {savingTaskEdit ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>

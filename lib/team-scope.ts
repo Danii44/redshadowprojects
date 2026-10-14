@@ -1,6 +1,6 @@
 import type { Project, Role, Task, Team, TeamMember, User } from "@/lib/types";
 
-/** Filter authorized workspace data by assignee membership, including the team leader. */
+/** Filter tasks by their department, with project and assignee fallbacks for older data. */
 export function scopeWorkspaceToTeam(
   team: Team | undefined,
   memberships: TeamMember[],
@@ -11,12 +11,15 @@ export function scopeWorkspaceToTeam(
   if (!team) return { tasks, projects, people, teamPeople: people };
   const memberIds = new Set(memberships.filter(item => item.team_id === team.id).map(item => item.user_id));
   if (team.leader_id) memberIds.add(team.leader_id);
-  const teamTasks = tasks.filter(task => Boolean(task.assignee_id && memberIds.has(task.assignee_id)));
-  const taskProjectIds = new Set(teamTasks.map(task => task.project_id).filter(Boolean));
+  const projectById = new Map(projects.map(project => [project.id, project]));
+  const teamTasks = tasks.filter(task => {
+    const project = task.project_id ? projectById.get(task.project_id) : undefined;
+    if (project?.team_id) return project.team_id === team.id;
+    return Boolean(project && task.assignee_id && memberIds.has(task.assignee_id));
+  });
+  const teamTaskProjectIds = new Set(teamTasks.map(task => task.project_id).filter((id): id is string => Boolean(id)));
   const teamProjects = projects.filter(project =>
-    taskProjectIds.has(project.id) ||
-    Boolean(project.leader_id && memberIds.has(project.leader_id)) ||
-    project.project_members?.some(member => memberIds.has(member.user_id)),
+    project.team_id === team.id || (!project.team_id && teamTaskProjectIds.has(project.id)),
   );
   const relatedIds = new Set(memberIds);
   for (const project of teamProjects) {

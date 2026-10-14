@@ -87,6 +87,9 @@ CREATE TABLE public.projects (
     -- Optional client name
     client                  text,
 
+    -- Department responsible for this project
+    team_id                 uuid        REFERENCES public.teams(id) ON DELETE SET NULL,
+
     -- Project category / discipline (e.g. DFM, Animation, Technical Design)
     type                    text,
 
@@ -137,6 +140,8 @@ CREATE TABLE public.project_members (
     created_at      timestamptz NOT NULL DEFAULT now(),
     UNIQUE(project_id, user_id)
 );
+
+CREATE INDEX projects_team_id_idx ON public.projects(team_id);
 
 
 -- ============================================================
@@ -205,7 +210,6 @@ CREATE TABLE public.tasks (
     created_at              timestamptz NOT NULL DEFAULT now(),
     updated_at              timestamptz NOT NULL DEFAULT now()
 );
-
 
 -- ============================================================
 -- TASK CHECKLIST

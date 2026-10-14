@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { ArrowUpDown, Grid, List, Plus, Search } from "lucide-react";
-import type { Project, ProjectStatus, Role, User } from "@/lib/types";
+import type { Project, ProjectStatus, Role, Team, User } from "@/lib/types";
 import { canEdit, normalizeProjectStatus } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { ProjectCreateModal } from "./project-create-modal";
@@ -26,6 +26,8 @@ const DEFAULT_CATEGORIES = [
 
 interface ProjectsViewProps {
   projects: Project[];
+  teams: Team[];
+  selectedTeamId?: string;
   role: Role;
   people: User[];
   profileId: string;
@@ -39,6 +41,8 @@ interface ProjectsViewProps {
 
 export function ProjectsView({
   projects,
+  teams,
+  selectedTeamId = "all",
   role,
   people,
   profileId,
@@ -95,6 +99,7 @@ export function ProjectsView({
     code: "",
     client: "",
     type: "DFM / Sheet Metal",
+    teamId: selectedTeamId === "all" ? "" : selectedTeamId,
     projectType: "fixed_deadline" as "fixed_deadline" | "hourly_ongoing",
     leaderId: "",
     startDate: new Date().toISOString().slice(0, 10),
@@ -112,6 +117,7 @@ export function ProjectsView({
     name: "",
     client: "",
     type: "",
+    team_id: "",
     project_type: "fixed_deadline",
     deadline: "",
     priority: "normal",
@@ -138,6 +144,7 @@ export function ProjectsView({
       name: p.name || "",
       client: p.client || "",
       type: p.type || "Product Design",
+      team_id: p.team_id || "",
       project_type: projectType,
       deadline: p.deadline ? p.deadline.slice(0, 10) : "",
       priority: p.priority ? p.priority.toLowerCase() : "normal",
@@ -297,6 +304,7 @@ export function ProjectsView({
       code: "",
       client: "",
       type: dynamicCategories[0] || "DFM / Sheet Metal",
+      teamId: selectedTeamId === "all" ? "" : selectedTeamId,
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -337,6 +345,7 @@ export function ProjectsView({
       code,
       client: projectForm.client || null,
       type: finalType,
+      team_id: projectForm.teamId,
       project_type: projectForm.projectType,
       description: projectForm.description || null,
       requirements: projectForm.requirements || null,
@@ -415,6 +424,7 @@ export function ProjectsView({
       code: "",
       client: "",
       type: "DFM / Sheet Metal",
+      teamId: selectedTeamId === "all" ? "" : selectedTeamId,
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -450,6 +460,7 @@ export function ProjectsView({
       name: editForm.name,
       client: editForm.client || null,
       type: finalType || null,
+      team_id: editForm.team_id,
       deadline,
       priority: editForm.priority,
       status: editForm.status,
@@ -486,6 +497,7 @@ export function ProjectsView({
       name: editForm.name,
       client: editForm.client || null,
       type: editForm.type || null,
+      team_id: editForm.team_id,
       deadline,
       due: deadline ? new Date(deadline).toLocaleDateString() : "No deadline",
       priority: editForm.priority,
@@ -764,6 +776,7 @@ export function ProjectsView({
         customCategoryInput={customCategoryInput}
         setCustomCategoryInput={setCustomCategoryInput}
         people={people}
+        teams={teams}
         savingProject={savingProject}
       />
 
@@ -772,6 +785,7 @@ export function ProjectsView({
           project={activeProject}
           role={role}
           people={people}
+          teams={teams}
           drawerTab={drawerTab}
           setDrawerTab={setDrawerTab}
           onClose={() => setActiveProject(null)}

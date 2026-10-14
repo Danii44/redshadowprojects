@@ -13,6 +13,7 @@ import type { Task, User } from "@/lib/types";
 
 interface TaskCardProps {
   deadlineEditor?: React.ReactNode;
+  onEdit?: () => void;
   onOpen?: () => void;
   t: Task;
   people: User[];
@@ -128,6 +129,7 @@ function getDeadlineInfo(due_at?: string | null): {
 
 export function TaskCard({
   onOpen,
+  onEdit,
   deadlineEditor,
   t,
   people,
@@ -256,9 +258,19 @@ export function TaskCard({
         {/* Admin controls */}
         {(editable || statusEditable) && (
           <div className="mt-3 space-y-2 border-t border-border pt-3">
-            {editable && (
-              <select
-                aria-label={`Assign ${t.title}`}
+            {editable && onEdit && (
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-xl border border-border px-3 text-xs font-semibold text-secondary-foreground hover:bg-subtle"
+                aria-label={`Edit ${t.title}`}
+              >
+                Edit task
+              </button>
+            )}
+              {editable && (
+                <select
+                  aria-label={`Assign ${t.title}`}
                 value={t.assignee_id ?? ""}
                 onChange={(e) => assignTask(String(t.id), e.target.value)}
                 className="w-full rounded-xl border border-border px-2.5 py-1.5 text-xs font-semibold text-foreground bg-subtle hover:border-border cursor-pointer"

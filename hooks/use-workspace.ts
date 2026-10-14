@@ -18,6 +18,7 @@ type ProjectRow = {
   revisions?: ProjectRevisionRow[];
   name: string;
   code?: string | null;
+  team_id?: string | null;
   client?: string | null;
   type?: string | null;
   project_type?: string;
@@ -88,6 +89,7 @@ function mapProjects(
       id: project.id,
       code: project.code ?? "",
       name: project.name,
+      team_id: project.team_id ?? null,
       client: project.client ?? null,
       type: project.type ?? null,
       project_type: project.project_type ?? "fixed_deadline",
