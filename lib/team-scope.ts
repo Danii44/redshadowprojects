@@ -1,6 +1,20 @@
 import type { Project, Role, Task, Team, TeamMember, User } from "@/lib/types";
 
-/** Filter tasks by their department, with project and assignee fallbacks for older data. */
+/** Resolve departments from current staff assignments; retain legacy departments only for unassigned projects. */
+export function projectDepartmentIds(project: Project, teams: Team[], memberships: TeamMember[], tasks: Task[] = []) {
+  const userIds = new Set([
+    project.leader_id,
+    ...(project.project_members ?? []).map(member => member.user_id),
+    ...(project.members ?? []).map(member => member.user_id),
+    ...tasks.filter(task => task.project_id === project.id).map(task => task.assignee_id),
+  ].filter((id): id is string => Boolean(id)));
+  const ids = new Set(memberships.filter(member => userIds.has(member.user_id)).map(member => member.team_id));
+  for (const team of teams) if (team.leader_id && userIds.has(team.leader_id)) ids.add(team.id);
+  if (!ids.size && project.team_id) ids.add(project.team_id);
+  return ids;
+}
+
+/** Assigned tasks follow their assignee; unassigned tasks inherit their project's departments. */
 export function scopeWorkspaceToTeam(
   team: Team | undefined,
   memberships: TeamMember[],
@@ -11,16 +25,11 @@ export function scopeWorkspaceToTeam(
   if (!team) return { tasks, projects, people, teamPeople: people };
   const memberIds = new Set(memberships.filter(item => item.team_id === team.id).map(item => item.user_id));
   if (team.leader_id) memberIds.add(team.leader_id);
-  const projectById = new Map(projects.map(project => [project.id, project]));
-  const teamTasks = tasks.filter(task => {
-    const project = task.project_id ? projectById.get(task.project_id) : undefined;
-    if (project?.team_id) return project.team_id === team.id;
-    return Boolean(project && task.assignee_id && memberIds.has(task.assignee_id));
-  });
-  const teamTaskProjectIds = new Set(teamTasks.map(task => task.project_id).filter((id): id is string => Boolean(id)));
-  const teamProjects = projects.filter(project =>
-    project.team_id === team.id || (!project.team_id && teamTaskProjectIds.has(project.id)),
-  );
+  const teamProjects = projects.filter(project => projectDepartmentIds(project, [team], memberships, tasks).has(team.id));
+  const projectIds = new Set(teamProjects.map(project => project.id));
+  const teamTasks = tasks.filter(task => task.assignee_id
+    ? memberIds.has(task.assignee_id)
+    : Boolean(task.project_id && projectIds.has(task.project_id)));
   const relatedIds = new Set(memberIds);
   for (const project of teamProjects) {
     if (project.leader_id) relatedIds.add(project.leader_id);

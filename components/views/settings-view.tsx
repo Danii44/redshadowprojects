@@ -88,6 +88,10 @@ export function SettingsView({
   const [teamTab, setTeamTab] = useState<"people" | "departments">("people");
   const [teams, setTeams] = useState<TeamRecord[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
+  const [teamMembershipsLoaded, setTeamMembershipsLoaded] = useState(false);
+  const [teamMembershipLoadError, setTeamMembershipLoadError] = useState(
+    supabase ? "" : "Department membership is unavailable.",
+  );
 
   // Modals
   const [creatingMember, setCreatingMember] = useState(false);
@@ -127,8 +131,16 @@ export function SettingsView({
       supabase.from("teams").select("*"),
       supabase.from("team_members").select("*"),
     ]).then(([teamResult, memberResult]) => {
+      const error = teamResult.error ?? memberResult.error;
+      if (error) {
+        setTeamMembershipLoadError(
+          `Unable to load department memberships: ${error.message}`,
+        );
+        return;
+      }
       setTeams(teamResult.data ?? []);
       setTeamMembers(memberResult.data ?? []);
+      setTeamMembershipsLoaded(true);
     });
   }, []);
 
@@ -324,6 +336,23 @@ export function SettingsView({
     event.preventDefault();
     if (!supabase) return;
 
+    const { data: existingMembership, error: membershipError } = await supabase
+      .from("team_members")
+      .select("id, team_id")
+      .eq("user_id", assignment.userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipError) return notify(membershipError.message);
+    if (existingMembership) {
+      setTeamMembers((items) =>
+        items.some((item) => item.user_id === assignment.userId)
+          ? items
+          : [...items, { ...existingMembership, user_id: assignment.userId }],
+      );
+      return notify("This member is already assigned to a department.");
+    }
+
     const { data, error } = await supabase
       .from("team_members")
       .insert({
@@ -336,6 +365,7 @@ export function SettingsView({
     if (error) return notify(error.message);
 
     setTeamMembers((items) => [...items, data]);
+    setAssignment({ teamId: "", userId: "" });
     notify("Member added to team");
     onRefresh?.();
   };
@@ -626,11 +656,17 @@ export function SettingsView({
               <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Assign Member to Team
               </h3>
+              {teamMembershipLoadError && (
+                <p role="alert" className="text-xs font-semibold text-red">
+                  {teamMembershipLoadError}
+                </p>
+              )}
               <div className="grid gap-2 sm:grid-cols-2">
                 <select
                   required
                   aria-label="Department to assign"
                   value={assignment.teamId}
+                  disabled={!teamMembershipsLoaded || Boolean(teamMembershipLoadError)}
                   onChange={(e) =>
                     setAssignment({ ...assignment, teamId: e.target.value })
                   }
@@ -647,20 +683,32 @@ export function SettingsView({
                   required
                   aria-label="Member to assign"
                   value={assignment.userId}
+                  disabled={!teamMembershipsLoaded || Boolean(teamMembershipLoadError) || !members.some((member) => !teamMembers.some((item) => item.user_id === member.id))}
                   onChange={(e) =>
                     setAssignment({ ...assignment, userId: e.target.value })
                   }
                   className="rounded-xl border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground outline-none focus:border-red"
                 >
-                  <option value="">Select Member</option>
-                  {members.map((member) => (
+                  <option value="">
+                    {!teamMembershipsLoaded
+                      ? "Loading members..."
+                      : members.some((member) => !teamMembers.some((item) => item.user_id === member.id))
+                        ? "Select Member"
+                        : "No unassigned members"}
+                  </option>
+                  {members
+                    .filter((member) => !teamMembers.some((item) => item.user_id === member.id))
+                    .map((member) => (
                     <option key={member.id} value={member.id}>
                       {member.name}
                     </option>
-                  ))}
+                    ))}
                 </select>
               </div>
-              <button className="h-9 rounded-xl border border-border px-4 text-xs font-semibold text-foreground hover:bg-subtle transition">
+              <button
+                disabled={!teamMembershipsLoaded || Boolean(teamMembershipLoadError) || !members.some((member) => !teamMembers.some((item) => item.user_id === member.id))}
+                className="h-9 rounded-xl border border-border px-4 text-xs font-semibold text-foreground hover:bg-subtle transition disabled:cursor-not-allowed disabled:opacity-50"
+              >
                 Assign Member
               </button>
             </form>

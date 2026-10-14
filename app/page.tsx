@@ -421,7 +421,8 @@ export default function Home() {
               <ProjectsView
                 projects={teamScope.projects}
                 teams={teams}
-                selectedTeamId={selectedTeam?.id ?? "all"}
+                teamMembers={teamMembers}
+                tasks={tasks}
                 role={role}
                 people={teamScope.people}
                 profileId={profileId}

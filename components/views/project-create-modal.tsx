@@ -1,14 +1,13 @@
 import { Modal } from "@/components/ui/modal";
 import React from "react";
 import { X } from "lucide-react";
-import type { Team, User } from "@/lib/types";
+import type { User } from "@/lib/types";
 
 export interface ProjectCreateFormState {
   name: string;
   code: string;
   client: string;
   type: string;
-  teamId: string;
   projectType: "fixed_deadline" | "hourly_ongoing";
   leaderId: string;
   startDate: string;
@@ -32,7 +31,6 @@ interface ProjectCreateModalProps {
   customCategoryInput: string;
   setCustomCategoryInput: (value: string) => void;
   people: User[];
-  teams: Team[];
   savingProject: boolean;
 }
 
@@ -48,7 +46,6 @@ export function ProjectCreateModal({
   customCategoryInput,
   setCustomCategoryInput,
   people,
-  teams,
   savingProject,
 }: ProjectCreateModalProps) {
   if (!open) return null;
@@ -128,18 +125,7 @@ export function ProjectCreateModal({
               )}
             </label>
 
-            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Department *
-              <select
-                required
-                value={projectForm.teamId}
-                onChange={(e) => setProjectForm((current) => ({ ...current, teamId: e.target.value }))}
-                className="mt-1.5 h-11 w-full rounded-xl border border-border bg-card px-3 text-sm font-semibold outline-none focus:border-red focus:ring-4 focus:ring-red-border text-foreground cursor-pointer"
-              >
-                <option value="">Select Department...</option>
-                {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
-              </select>
-            </label>
+            <p className="text-xs text-muted-foreground md:col-span-2">Departments follow the assigned leader and members automatically.</p>
 
             <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Project Name *

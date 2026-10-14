@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { ArrowUpDown, Grid, List, Plus, Search } from "lucide-react";
-import type { Project, ProjectStatus, Role, Team, User } from "@/lib/types";
+import type { Project, ProjectStatus, Role, Team, TeamMember, Task, User } from "@/lib/types";
 import { canEdit, normalizeProjectStatus } from "@/lib/utils";
+import { projectDepartmentIds } from "@/lib/team-scope";
 import { supabase } from "@/lib/supabase";
 import { ProjectCreateModal } from "./project-create-modal";
 import {
@@ -27,7 +28,8 @@ const DEFAULT_CATEGORIES = [
 interface ProjectsViewProps {
   projects: Project[];
   teams: Team[];
-  selectedTeamId?: string;
+  teamMembers: TeamMember[];
+  tasks: Task[];
   role: Role;
   people: User[];
   profileId: string;
@@ -42,7 +44,8 @@ interface ProjectsViewProps {
 export function ProjectsView({
   projects,
   teams,
-  selectedTeamId = "all",
+  teamMembers,
+  tasks,
   role,
   people,
   profileId,
@@ -99,7 +102,6 @@ export function ProjectsView({
     code: "",
     client: "",
     type: "DFM / Sheet Metal",
-    teamId: selectedTeamId === "all" ? "" : selectedTeamId,
     projectType: "fixed_deadline" as "fixed_deadline" | "hourly_ongoing",
     leaderId: "",
     startDate: new Date().toISOString().slice(0, 10),
@@ -117,7 +119,6 @@ export function ProjectsView({
     name: "",
     client: "",
     type: "",
-    team_id: "",
     project_type: "fixed_deadline",
     deadline: "",
     priority: "normal",
@@ -144,7 +145,6 @@ export function ProjectsView({
       name: p.name || "",
       client: p.client || "",
       type: p.type || "Product Design",
-      team_id: p.team_id || "",
       project_type: projectType,
       deadline: p.deadline ? p.deadline.slice(0, 10) : "",
       priority: p.priority ? p.priority.toLowerCase() : "normal",
@@ -172,55 +172,49 @@ export function ProjectsView({
     return () => window.clearTimeout(timeoutId);
   }, [initialProjectId, onClearInitialProject, projects]);
 
+  const query = searchQuery.trim().toLowerCase();
+  const searchedProjects = projects.filter(project =>
+    [project.name, project.code, project.client, project.leader, project.type,
+      ...(project.members ?? []).map(member => member.name)]
+      .some(value => (value ?? "").toLowerCase().includes(query)),
+  );
+
   const statusCounts = {
-    active: projects.filter(
+    active: searchedProjects.filter(
       (p) =>
         !["closed", "cancelled"].includes(normalizeProjectStatus(p.status)),
     ).length,
-    all: projects.length,
-    open: projects.filter((p) => normalizeProjectStatus(p.status) === "open")
+    all: searchedProjects.length,
+    open: searchedProjects.filter((p) => normalizeProjectStatus(p.status) === "open")
       .length,
-    in_progress: projects.filter(
+    in_progress: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "in_progress",
     ).length,
-    in_review: projects.filter(
+    in_review: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "in_review",
     ).length,
-    revisions: projects.filter(
+    revisions: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "revisions",
     ).length,
-    on_hold: projects.filter(
+    on_hold: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "on_hold",
     ).length,
-    delivered: projects.filter(
+    delivered: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "delivered",
     ).length,
-    closed: projects.filter(
+    closed: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "closed",
     ).length,
-    cancelled: projects.filter(
+    cancelled: searchedProjects.filter(
       (p) => normalizeProjectStatus(p.status) === "cancelled",
     ).length,
   };
 
-  const filteredProjects = projects.filter((p) => {
-    const normalizedStatus = normalizeProjectStatus(p.status);
-    const matchesStatus =
-      statusFilter === "active"
-        ? !["closed", "cancelled"].includes(normalizedStatus)
-        : statusFilter === "all"
-          ? true
-          : normalizedStatus === statusFilter;
-
-    const query = searchQuery.toLowerCase().trim();
-    const matchesQuery =
-      !query ||
-      p.name.toLowerCase().includes(query) ||
-      p.code.toLowerCase().includes(query) ||
-      (p.client ?? "").toLowerCase().includes(query) ||
-      (p.leader ?? "").toLowerCase().includes(query);
-
-    return matchesStatus && matchesQuery;
+  const filteredProjects = searchedProjects.filter(project => {
+    const status = normalizeProjectStatus(project.status);
+    return statusFilter === "all" || (statusFilter === "active"
+      ? !["closed", "cancelled"].includes(status)
+      : status === statusFilter);
   });
 
   const sortedProjects = [...filteredProjects].sort((a, b) => {
@@ -304,7 +298,6 @@ export function ProjectsView({
       code: "",
       client: "",
       type: dynamicCategories[0] || "DFM / Sheet Metal",
-      teamId: selectedTeamId === "all" ? "" : selectedTeamId,
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -345,7 +338,6 @@ export function ProjectsView({
       code,
       client: projectForm.client || null,
       type: finalType,
-      team_id: projectForm.teamId,
       project_type: projectForm.projectType,
       description: projectForm.description || null,
       requirements: projectForm.requirements || null,
@@ -424,7 +416,6 @@ export function ProjectsView({
       code: "",
       client: "",
       type: "DFM / Sheet Metal",
-      teamId: selectedTeamId === "all" ? "" : selectedTeamId,
       projectType: "fixed_deadline",
       leaderId: "",
       startDate: new Date().toISOString().slice(0, 10),
@@ -460,7 +451,6 @@ export function ProjectsView({
       name: editForm.name,
       client: editForm.client || null,
       type: finalType || null,
-      team_id: editForm.team_id,
       deadline,
       priority: editForm.priority,
       status: editForm.status,
@@ -497,7 +487,6 @@ export function ProjectsView({
       name: editForm.name,
       client: editForm.client || null,
       type: editForm.type || null,
-      team_id: editForm.team_id,
       deadline,
       due: deadline ? new Date(deadline).toLocaleDateString() : "No deadline",
       priority: editForm.priority,
@@ -598,7 +587,7 @@ export function ProjectsView({
             />
             <input
               type="text"
-              aria-label="Search projects by code, name or client"
+              aria-label="Search projects by code, name, client, leader, category or member"
               placeholder="Search code, name, client..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -679,6 +668,13 @@ export function ProjectsView({
         statusFilter={statusFilter}
         onChange={setStatusFilter}
       />
+
+      <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-live="polite">
+        <span>{sortedProjects.length} matching {sortedProjects.length === 1 ? "project" : "projects"}</span>
+        {(searchQuery || statusFilter !== "active" || sortBy !== "status_workflow") && (
+          <button type="button" className="studio-button" onClick={() => { setSearchQuery(""); setStatusFilter("active"); setSortBy("status_workflow"); setSelectedIds(new Set()); }}>Clear filters</button>
+        )}
+      </div>
 
       {/* LIST VIEW */}
       {viewMode === "list" && (
@@ -776,7 +772,6 @@ export function ProjectsView({
         customCategoryInput={customCategoryInput}
         setCustomCategoryInput={setCustomCategoryInput}
         people={people}
-        teams={teams}
         savingProject={savingProject}
       />
 
@@ -786,6 +781,7 @@ export function ProjectsView({
           role={role}
           people={people}
           teams={teams}
+          departmentIds={projectDepartmentIds(activeProject, teams, teamMembers, tasks)}
           drawerTab={drawerTab}
           setDrawerTab={setDrawerTab}
           onClose={() => setActiveProject(null)}

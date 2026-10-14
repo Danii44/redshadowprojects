@@ -76,7 +76,7 @@ export function TasksView({
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 60000); return () => window.clearInterval(timer); }, []);
   const [focus, setFocus] = useState<TaskFocus>(initialFocus);
-  const tasks = teamScope.tasks.filter(task => detailOnly || matchesTaskFocus(task, focus, now));
+  const tasks = teamScope.tasks;
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
   const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loggingProgressTask, setLoggingProgressTask] = useState<Task | null>(
@@ -92,7 +92,7 @@ export function TasksView({
   });
   const [selectedPersonId, setSelectedPersonId] = useState<string>("all");
   const [taskStatusFilter, setTaskStatusFilter] = useState<
-    "all" | "open" | "in_progress" | "in_review" | "completed"
+    "all" | "any" | "open" | "in_progress" | "in_review" | "completed"
   >("all");
   const [urgency, setUrgency] = useState("all");
   const [sort, setSort] = useState("deadline");
@@ -150,7 +150,7 @@ export function TasksView({
   );
 
   const personTaskSet =
-    selectedPersonId === "all"
+    (selectedPersonId === "all" || !teamScope.people.some(person => person.id === selectedPersonId))
       ? tasks
       : tasks.filter(
           (task) =>
@@ -160,6 +160,8 @@ export function TasksView({
 
   const matchesTaskStatus = (task: Task) => {
     switch (taskStatusFilter) {
+      case "any":
+        return true;
       case "open":
         return task.state === "Open";
       case "in_progress":
@@ -176,71 +178,29 @@ export function TasksView({
     }
   };
 
-  // List view hides completed tasks by default; board view can still show them.
-  const listVisibleTasks = tasks.filter((task) => {
-    if (
-      initialTaskId &&
-      searchQuery === initialSearch &&
-      searchQuery &&
-      String(task.id) !== initialTaskId
-    )
-      return false;
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.project ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!isManagerRole) {
-      const matchesSelf =
-        task.assignee_id === profileId || task.owner === memberProfile?.name;
-      return matchesSearch && matchesSelf && matchesTaskStatus(task);
-    }
-
-    const matchesPerson =
-      selectedPersonId === "all" ||
-      task.assignee_id === selectedPersonId ||
-      task.owner === selectedPerson?.name;
-
-    return matchesSearch && matchesPerson && matchesTaskStatus(task);
+  const query = searchQuery.trim().toLowerCase();
+  const matchesDeadline = (task: Task) => {
+    if (urgency === "all") return true;
+    if (isCompletedTask(task) || !task.due_at) return false;
+    const delta = new Date(task.due_at).getTime() - now;
+    return urgency === "overdue" ? delta < 0 : delta >= 0 && delta <= 7 * 86400000;
+  };
+  // Counts and both layouts share every filter except the selected status tab.
+  const scopedTasks = (isManagerRole ? personTaskSet : memberTaskSet).filter(task => {
+    if (initialTaskId && searchQuery === initialSearch && searchQuery && String(task.id) !== initialTaskId) return false;
+    const matchesSearch = [task.title, task.owner, task.project, task.description]
+      .some(value => (value ?? "").toLowerCase().includes(query));
+    return matchesSearch && (detailOnly || matchesTaskFocus(task, focus, now)) && matchesDeadline(task);
   });
-
-  const boardVisibleTasks = tasks.filter((task) => {
-    if (
-      initialTaskId &&
-      searchQuery === initialSearch &&
-      searchQuery &&
-      String(task.id) !== initialTaskId
-    )
-      return false;
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.owner ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (task.project ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-
-    if (!isManagerRole) {
-      const matchesSelf =
-        task.assignee_id === profileId || task.owner === memberProfile?.name;
-      return matchesSearch && matchesSelf && matchesTaskStatus(task);
-    }
-
-    const matchesPerson =
-      selectedPersonId === "all" ||
-      task.assignee_id === selectedPersonId ||
-      task.owner === selectedPerson?.name;
-
-    return matchesSearch && matchesPerson && matchesTaskStatus(task);
+  const visibleTasks = scopedTasks.filter(matchesTaskStatus).sort((a, b) => {
+    if (sort === "name") return a.title.localeCompare(b.title);
+    const deadline = (task: Task) => {
+      const time = task.due_at ? new Date(task.due_at).getTime() : NaN;
+      return Number.isFinite(time) ? time : Infinity;
+    };
+    const left = deadline(a), right = deadline(b);
+    return left === right ? a.title.localeCompare(b.title) : left - right;
   });
-
-  const scopedTasks = isManagerRole ? personTaskSet : memberTaskSet;
-  const visibleTasks = (viewMode === "list" ? listVisibleTasks : boardVisibleTasks)
-    .filter(task => {
-      if (urgency === "all") return true;
-      if (isCompletedTask(task) || !task.due_at) return false;
-      const delta = new Date(task.due_at).getTime() - now;
-      return urgency === "overdue" ? delta < 0 : delta >= 0 && delta <= 7 * 86400000;
-    }).sort((a, b) => sort === "name" ? a.title.localeCompare(b.title) :
-      (a.due_at ? new Date(a.due_at).getTime() : Infinity) -
-      (b.due_at ? new Date(b.due_at).getTime() : Infinity));
   const pageCount = Math.max(1, Math.ceil(visibleTasks.length / 12));
   const currentPage = Math.min(page, pageCount);
   const pageTasks = visibleTasks.slice((currentPage - 1) * 12, currentPage * 12);
@@ -608,13 +568,14 @@ export function TasksView({
         </div>
         <div className="task-status-tabs" role="group" aria-label="Filter tasks by status">
           {([
+            ["any", "All", scopedTasks.length],
             ["all", "Active", scopedTasks.filter(t => !isCompletedTask(t)).length],
             ["open", "Open", scopedTasks.filter(t => t.state === "Open").length],
             ["in_progress", "In Progress", scopedTasks.filter(t => t.state === "In Progress").length],
             ["in_review", "Review / Revision", scopedTasks.filter(t => ["In Review", "In Revision"].includes(t.state)).length],
             ["completed", "Finished", scopedTasks.filter(isCompletedTask).length],
           ] as const).map(([key, label, count]) => <button key={key} type="button"
-            aria-pressed={taskStatusFilter === key} onClick={() => { setTaskStatusFilter(key); if (key === "completed") setFocus("active"); setPage(1); }}>
+            aria-pressed={taskStatusFilter === key} onClick={() => { setTaskStatusFilter(key); if (key === "completed" || key === "any") { setFocus("active"); setUrgency("all"); } setPage(1); }}>
             {label}<span>{count}</span>
           </button>)}
         </div>
